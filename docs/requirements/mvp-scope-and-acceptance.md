@@ -57,6 +57,10 @@ cloud product surfaces and persists memory in CockroachDB.
 - A bounded memory and database stewardship agent that retrieves context,
   checks provenance and consistency, and reports anomalies without replacing
   deterministic database integrity or receiving unrestricted administration.
+- Relational persistence for important extracted and approved project,
+  supplier, tender, contract, purchase-order, invoice, and payment data.
+- Separation between uncertain extracted candidates and reviewed canonical
+  facts, with confidence, evidence, provenance, and supersession history.
 
 ### 3.4 Human review
 

@@ -246,6 +246,27 @@ all completed work.
   authorized mutation shall be scoped, observable, and attributable in the
   agent and audit history.
 
+### 6.10 Relational domain data
+
+- **FR-055:** Important document, operational, and approved business data shall
+  be persisted in typed relational CockroachDB tables rather than hidden in
+  opaque application objects.
+- **FR-056:** The initial relational domain shall represent projects,
+  suppliers, tenders, contracts, purchase orders, invoices, payments, and their
+  links to source documents where required by the approved workflow.
+- **FR-057:** Proposed extracted facts shall retain typed values, confidence,
+  evidence, model provenance, review state, and history separately from
+  human-approved canonical facts.
+- **FR-058:** JSON may retain minimized raw technical evidence where approved,
+  but it shall not be the sole authoritative representation of classification,
+  canonical facts, file operations, relationships, or audit history.
+- **FR-059:** The demonstration dataset shall use fictional values and
+  internally consistent document dossiers inspired only by general real-world
+  field categories and relationships.
+- **FR-060:** Private reference records, exact filenames, company identifiers,
+  tax identifiers, payment references, and amounts shall not be copied into the
+  repository, prompts, generated corpus, or demonstration.
+
 ## 7. Non-functional requirements
 
 ### 7.1 Usability and accessibility
@@ -356,6 +377,7 @@ The following are deliberately not decided by this document:
 - the physical CockroachDB schema and indexes;
 - the division between application transactions, database functions, and
   stewardship-agent tools;
+- the physical relational representation of proposed and canonical facts;
 - the web framework and desktop packaging method;
 - confidence calibration algorithm and final thresholds;
 - document retention duration;

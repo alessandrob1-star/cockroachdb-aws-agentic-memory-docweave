@@ -36,6 +36,7 @@ Mandatory governance:
 - [Project operating rules](PROJECT_RULES.md)
 - [Competition rules and compliance guide](docs/requirements/competition-rules.md)
 - [Product requirements](docs/requirements/product-requirements.md)
+- [Domain and relational data requirements](docs/requirements/domain-data-requirements.md)
 - [Minimum Viable Product scope and acceptance](docs/requirements/mvp-scope-and-acceptance.md)
 - [Quality and security charter](docs/requirements/quality-security-charter.md)
 - [Requirements traceability matrix](docs/requirements/requirements-traceability-matrix.md)
