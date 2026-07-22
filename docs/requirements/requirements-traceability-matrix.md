@@ -47,7 +47,7 @@ is reproducible.
 | GOV-002 | English repository artifacts | Repository convention | Documentation and naming review | In progress |
 | GOV-003 | Expand acronyms for learning | Documentation and communication convention | Review checklist | Verified as policy |
 | GOV-004 | No fabricated intelligence or success | Integrity rules and evaluation evidence | Tests, traces, and limitation disclosures | Planned |
-| GOV-005 | Architecture decisions are recorded | Architecture Decision Record process | Approved decision records | Planned |
+| GOV-005 | Architecture decisions are recorded | Architecture Decision Record process | `docs/architecture/decisions/0001-amazon-bedrock-primary-model.md` | In progress |
 | GOV-006 | Claims require evidence | Release evidence matrix | Final validation report | Planned |
 
 ## 5. Quality controls
