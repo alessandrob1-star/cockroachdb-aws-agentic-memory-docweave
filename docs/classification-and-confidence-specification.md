@@ -23,8 +23,10 @@ Large Language Model (LLM) inference. CockroachDB provides persistent,
 relational-first memory for evidence, results, decisions, calibration,
 preferences, and governed rules.
 
-This document does not approve a physical database schema, a specific Bedrock
-model, model training, or cloud resource creation.
+This document does not approve a physical database schema, model training, or
+cloud resource creation. Claude Sonnet 4.6 is the approved primary Bedrock
+model under
+[`ADR-0001`](architecture/decisions/0001-amazon-bedrock-primary-model.md).
 
 ## 2. Objectives
 
@@ -453,18 +455,17 @@ This specification is satisfied only when evidence demonstrates that:
 
 The following decisions remain open:
 
-1. exact Amazon Bedrock model and inference profile;
-2. prompt and structured-output contract;
-3. physical CockroachDB tables, indexes, and transaction boundaries;
-4. extraction libraries and the OCR boundary;
-5. raw confidence scoring formula;
-6. calibration algorithm and minimum sample requirements;
-7. numerical confidence-band thresholds;
-8. second-analysis triggers and cost limits;
-9. preference-promotion thresholds and approval matrix;
-10. Grounding Rule Studio MVP inclusion or post-MVP scheduling;
-11. rule expression format and precedence engine; and
-12. retention policy for raw model responses and learning evidence.
+1. prompt and structured-output contract;
+2. physical CockroachDB tables, indexes, and transaction boundaries;
+3. extraction libraries and the OCR boundary;
+4. raw confidence scoring formula;
+5. calibration algorithm and minimum sample requirements;
+6. numerical confidence-band thresholds;
+7. second-analysis triggers and cost limits;
+8. preference-promotion thresholds and approval matrix;
+9. Grounding Rule Studio MVP inclusion or post-MVP scheduling;
+10. rule expression format and precedence engine; and
+11. retention policy for raw model responses and learning evidence.
 
 Each decision requires an explained proposal and explicit user approval before
 implementation.
