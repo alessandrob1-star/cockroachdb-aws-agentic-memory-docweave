@@ -10,7 +10,6 @@ private-reference-data/
 *.key
 *.p12
 *.pfx
-*_credentials.csv
 
 # Python
 __pycache__/
