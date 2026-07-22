@@ -192,7 +192,10 @@ Required design measures:
 
 ## 10. AWS hardening
 
-- Do not use the account root identity for routine work or workloads.
+- Local AWS administration and development use the project owner's AWS root
+  profile, as explicitly directed by the project owner. Deployed application
+  workloads use dedicated AWS service roles and never receive human login
+  credentials.
 - Apply least privilege and separate deployment, runtime, and human identities.
 - Use short-lived credentials and runtime secret resolution.
 - Use Infrastructure as Code for reproducible resources and reviewed changes.

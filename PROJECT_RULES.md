@@ -126,7 +126,10 @@ Raw test counts are not a substitute for coverage of meaningful risks.
 - Never commit credentials, tokens, passwords, private keys, or production
   documents.
 - Use runtime secret resolution and least-privilege identities.
-- Do not use the AWS root identity for normal development or runtime workloads.
+- Local AWS administration and development use the project owner's AWS root
+  profile, as explicitly directed by the project owner. Deployed application
+  workloads use dedicated AWS service roles and never receive human login
+  credentials.
 - Encrypt data in transit and at rest.
 - Validate file type by content, size, structure, and policy before processing.
 - Quarantine suspicious, malformed, encrypted, or unsupported documents.
