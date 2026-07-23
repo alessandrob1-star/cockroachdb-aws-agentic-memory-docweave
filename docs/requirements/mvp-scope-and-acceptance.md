@@ -287,13 +287,19 @@ The MVP is not complete if any of the following is true:
 
 Architecture work must resolve and obtain approval for:
 
-1. model selection and confidence-calibration method;
-2. local-versus-cloud extraction and privacy boundary;
-3. cloud storage and compute topology;
-4. database schema, indexes, and transaction strategy;
+1. confidence-calibration method;
+2. embedding model, vector dimension, and distance metric;
+3. local-versus-cloud extraction and privacy boundary;
+4. cloud storage and compute topology;
 5. desktop-to-cloud authentication and authorization;
 6. web technology and cross-surface design approach;
-7. operation execution and reconciliation protocol;
-8. exact performance reference environment;
-9. cost model and protective limits;
-10. final role and approval-policy matrix.
+7. exact performance reference environment;
+8. cost model and protective limits; and
+9. final role and approval-policy matrix.
+
+The primary Large Language Model is resolved by
+[`ADR-0001`](../architecture/decisions/0001-amazon-bedrock-primary-model.md).
+The database schema, indexes, transaction strategy, and operation
+reconciliation protocol are resolved by
+[`ADR-0002`](../architecture/decisions/0002-cockroachdb-physical-data-model.md).
+Their implementations remain not started.

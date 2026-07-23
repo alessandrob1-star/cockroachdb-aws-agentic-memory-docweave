@@ -258,11 +258,12 @@ analysis.
 
 The following require a separate proposal and approval:
 
-- physical table and index definitions;
-- typed proposal-table strategy;
-- canonical-fact promotion transactions;
 - vector dimensions and index configuration;
-- row-level authorization design;
 - retention of raw model responses;
-- reconciliation between filesystem state and database transactions;
 - synthetic corpus distribution and generation pipeline.
+
+Physical tables and indexes, the typed proposal strategy, canonical-fact
+promotion, workspace isolation, and file-operation reconciliation are approved
+by
+[`ADR-0002`](../architecture/decisions/0002-cockroachdb-physical-data-model.md).
+Implementation and verification remain not started.

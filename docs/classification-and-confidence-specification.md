@@ -8,7 +8,7 @@
 
 **Implementation status:** Not started
 
-**Document status:** Approved product design; physical schema and implementation pending
+**Document status:** Approved product design; physical schema approved separately; implementation pending
 
 ## 1. Purpose
 
@@ -375,8 +375,9 @@ corrections remains an MVP requirement.
 
 ## 9. Relational persistence requirements
 
-The physical schema is not approved by this document. The future schema shall,
-however, preserve typed relational responsibilities for:
+The physical schema is approved separately by
+[`ADR-0002`](architecture/decisions/0002-cockroachdb-physical-data-model.md).
+Its implementation must preserve typed relational responsibilities for:
 
 - taxonomy and taxonomy versions;
 - classification results and alternatives;
@@ -456,16 +457,18 @@ This specification is satisfied only when evidence demonstrates that:
 The following decisions remain open:
 
 1. prompt and structured-output contract;
-2. physical CockroachDB tables, indexes, and transaction boundaries;
-3. extraction libraries and the OCR boundary;
-4. raw confidence scoring formula;
-5. calibration algorithm and minimum sample requirements;
-6. numerical confidence-band thresholds;
-7. second-analysis triggers and cost limits;
-8. preference-promotion thresholds and approval matrix;
-9. Grounding Rule Studio MVP inclusion or post-MVP scheduling;
-10. rule expression format and precedence engine; and
-11. retention policy for raw model responses and learning evidence.
+2. extraction libraries and the OCR boundary;
+3. raw confidence scoring formula;
+4. calibration algorithm and minimum sample requirements;
+5. numerical confidence-band thresholds;
+6. second-analysis triggers and cost limits;
+7. preference-promotion thresholds and approval matrix;
+8. Grounding Rule Studio MVP inclusion or post-MVP scheduling;
+9. rule expression format and precedence engine; and
+10. retention policy for raw model responses and learning evidence.
 
 Each decision requires an explained proposal and explicit user approval before
 implementation.
+
+Physical CockroachDB tables, indexes, proposal boundaries, promotion
+transactions, and file-operation reconciliation are resolved by ADR-0002.

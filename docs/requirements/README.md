@@ -21,6 +21,15 @@
 7. [`requirements-traceability-matrix.md`](requirements-traceability-matrix.md)
    — mapping from requirements to controls, tests, evidence, and status.
 
+Approved architecture that realizes these requirements is indexed from the
+repository [`README.md`](../../README.md). The CockroachDB data-model baseline
+is defined by
+[`ADR-0002`](../architecture/decisions/0002-cockroachdb-physical-data-model.md),
+the
+[`physical-schema specification`](../architecture/cockroachdb-physical-schema.md),
+and the
+[`Entity Relationship model`](../architecture/cockroachdb-entity-relationship.md).
+
 ## Authority
 
 These documents are governed by [`../../PROJECT_RULES.md`](../../PROJECT_RULES.md).
