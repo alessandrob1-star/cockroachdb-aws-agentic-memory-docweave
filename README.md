@@ -11,9 +11,9 @@ complete judged product will run on Amazon Web Services.
 
 ## Current status
 
-DocWeave is in the approved requirements and architecture phase. No
-application implementation, database migration, deployed schema, or AWS
-infrastructure is claimed yet.
+DocWeave is in the approved requirements and architecture phase with an initial
+local Python engineering scaffold. No application behavior, database migration,
+deployed schema, or AWS infrastructure is claimed yet.
 
 The current approved product direction includes:
 
@@ -61,6 +61,22 @@ Approved architecture:
   committed.
 - Material changes are developed on branches and reviewed through pull
   requests.
+
+## Local development
+
+The initial Python scaffold contains no runtime cloud integration and no
+database migration. It exists to establish reproducible local quality gates
+before product behavior is implemented.
+
+Create a virtual environment, install the pinned development tools, and run the
+local checks:
+
+```powershell
+python -m venv .venv
+.\.venv\Scripts\python -m pip install -r requirements-dev.txt
+.\.venv\Scripts\python -m pip install -e .
+.\scripts\check.ps1
+```
 
 ## License
 

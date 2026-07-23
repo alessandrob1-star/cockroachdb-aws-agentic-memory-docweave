@@ -1,6 +1,8 @@
 # Private reference material
 ProtoMaster_Alfa001.xlsm
 private-reference-data/
+*.xlsm
+*.xlsx
 
 # Secrets and local configuration
 .env
@@ -14,24 +16,30 @@ private-reference-data/
 # Python
 __pycache__/
 *.py[cod]
+*.pyo
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
+.coverage
+htmlcov/
+dist/
+build/
+*.egg-info/
+
+# Virtual environments
 .venv/
+venv/
 
 # JavaScript and web tooling
 node_modules/
 .next/
-dist/
-build/
-coverage/
 
 # Editors and operating systems
 .idea/
 .vscode/
 .DS_Store
 Thumbs.db
-desktop.ini
+Desktop.ini
 
 # Local runtime data
 *.log
