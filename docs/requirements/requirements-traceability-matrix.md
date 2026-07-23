@@ -21,7 +21,7 @@ is reproducible.
 | COMP-005 | At least two CockroachDB tools | Managed Model Context Protocol Server and Distributed Vector Indexing; optional Agent Skills | Per-tool implementation and demo evidence | Planned |
 | COMP-006 | At least one AWS service | Amazon Bedrock and Amazon Simple Storage Service, plus approved compute | Runtime traces and architecture evidence | Planned |
 | COMP-007 | Components meaningfully integrated | Each service supports a real user or agent workflow | Integration tests and video steps | Planned |
-| COMP-008 | Consistent installation and operation | Pinned dependencies, setup automation, smoke tests, health checks | Clean-machine test report | Planned |
+| COMP-008 | Consistent installation and operation | Pinned dependencies, setup automation, smoke tests, health checks | Clean-machine test report | In progress |
 | COMP-009 | Public open-source repository | Public GitHub repository with approved license and complete source | Public URL and license detection | Planned |
 | COMP-010 | Functional demo | Public, free, stable deployment through judging | URL, uptime evidence, testing instructions | Planned |
 | COMP-011 | Video under three minutes | Scripted demonstration of product and CockroachDB memory | Public YouTube or Vimeo URL | Planned |
@@ -54,9 +54,9 @@ is reproducible.
 
 | ID | Requirement | Automated control | Evidence | Status |
 | --- | --- | --- | --- | --- |
-| QUAL-001 | Formatting and linting | Language-specific formatter and linter | Continuous Integration logs | Planned |
-| QUAL-002 | Static type safety | Strict type checker | Continuous Integration logs | Planned |
-| QUAL-003 | Unit tests | Test runner with coverage | Test and coverage reports | Planned |
+| QUAL-001 | Formatting and linting | Language-specific formatter and linter | Continuous Integration logs | In progress |
+| QUAL-002 | Static type safety | Strict type checker | Continuous Integration logs | In progress |
+| QUAL-003 | Unit tests | Test runner with coverage | Test and coverage reports | In progress |
 | QUAL-004 | Integration and contract tests | Real CockroachDB and mocked or sandboxed AWS boundaries as appropriate | Integration report | Planned |
 | QUAL-005 | End-to-end critical journeys | Browser and service end-to-end suite | Video and machine-readable report | Planned |
 | QUAL-006 | Agent regression evaluation | Versioned corpus and evaluation runner | Evaluation report | Planned |

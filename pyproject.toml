@@ -1,0 +1,81 @@
+[build-system]
+requires = ["hatchling==1.27.0"]
+build-backend = "hatchling.build"
+
+[project]
+name = "docweave"
+version = "0.1.0"
+description = "Human-governed agentic document management with CockroachDB memory and AWS deployment."
+readme = "README.md"
+requires-python = ">=3.12"
+license = { text = "License not selected yet" }
+authors = [
+  { name = "DocWeave contributors" },
+]
+dependencies = []
+
+[project.optional-dependencies]
+dev = [
+  "mypy==1.17.1",
+  "pytest==8.4.1",
+  "pytest-cov==6.2.1",
+  "ruff==0.12.5",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/docweave"]
+
+[tool.pytest.ini_options]
+addopts = [
+  "--strict-config",
+  "--strict-markers",
+  "--cov=docweave",
+  "--cov-report=term-missing",
+]
+testpaths = ["tests"]
+
+[tool.coverage.run]
+branch = true
+source = ["docweave"]
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = false
+
+[tool.ruff]
+line-length = 88
+src = ["src", "tests"]
+target-version = "py312"
+
+[tool.ruff.lint]
+select = [
+  "A",
+  "B",
+  "C4",
+  "E",
+  "F",
+  "I",
+  "N",
+  "PL",
+  "PT",
+  "PTH",
+  "RET",
+  "RUF",
+  "S",
+  "SIM",
+  "UP",
+  "W",
+]
+ignore = [
+  "S101",
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**/*.py" = ["PLR2004"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+warn_unused_configs = true
+mypy_path = "src"
+files = ["src", "tests"]
