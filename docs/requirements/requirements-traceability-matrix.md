@@ -104,7 +104,7 @@ is reproducible.
 
 | ID | Requirement group | Primary specification | Required evidence | Status |
 | --- | --- | --- | --- | --- |
-| PROD-001 | Safe workspace discovery and differential rescan | `product-requirements.md` FR-001–FR-006 | Discovery, restart, and differential-scan tests | Planned |
+| PROD-001 | Safe workspace discovery and differential rescan | `product-requirements.md` FR-001–FR-006 | Discovery, restart, and differential-scan tests | In progress |
 | PROD-002 | Stable logical document and physical-instance identity | `product-requirements.md` FR-007–FR-010 | Identity, copy, move, and version tests | Planned |
 | PROD-003 | Explainable analysis, classification, naming, and relationships | `product-requirements.md` FR-011–FR-017, `domain-data-requirements.md` taxonomy baseline, and `classification-and-confidence-specification.md` | Curated-corpus evaluation and trace evidence | Planned |
 | PROD-004 | Confidence-driven and sampled human review | `product-requirements.md` FR-018–FR-024 | User-flow tests and calibration report | Planned |
@@ -120,7 +120,7 @@ is reproducible.
 
 | ID | Requirement | Target | Required evidence | Status |
 | --- | --- | ---: | --- | --- |
-| CAP-001 | Source-folder discovery | 10,000 files | Responsive discovery, restart, and reconciliation test | Planned |
+| CAP-001 | Source-folder discovery | 10,000 files | Responsive discovery, restart, and reconciliation test | In progress |
 | CAP-002 | Active documents per MVP project | 5,000 files | Sorting, filtering, review, and persistence test | Planned |
 | CAP-003 | Maximum processing batch | 1,000 files | Checkpoint, interruption, resume, and duplicate-request test | Planned |
 | CAP-004 | Primary demonstration and evaluation corpus | Approximately 300 PDFs | Curated corpus, reference labels, license manifest, and evaluation report | Planned |
