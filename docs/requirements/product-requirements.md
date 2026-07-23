@@ -323,7 +323,8 @@ all completed work.
 ### 7.5 Cost and operations
 
 - **NFR-020:** Total AWS expenditure shall remain within the user-approved
-  100 USD ceiling unless a new limit is explicitly approved.
+  80 USD project ceiling unless a new limit is explicitly approved. Available
+  promotional credits do not increase this authorization.
 - **NFR-021:** Paid workloads shall not begin before budgets, alerts, usage
   limits, and shutdown guidance are established.
 - **NFR-022:** Per-batch estimates and observed model, storage, and compute cost
