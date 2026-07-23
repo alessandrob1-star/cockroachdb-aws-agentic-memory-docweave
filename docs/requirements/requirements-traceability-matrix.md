@@ -92,11 +92,13 @@ is reproducible.
 | ID | Item | Current evidence | Status |
 | --- | --- | --- | --- |
 | ENV-001 | Local repository | `D:\repo\cockroachdb-aws-agentic-memory-docweave` | Verified |
-| ENV-002 | CockroachDB Cloud cluster | `docweave-memory` in AWS Frankfurt | Verified environment only |
+| ENV-002 | CockroachDB Cloud cluster | `docweave-memory`, CockroachDB Cloud Basic on AWS Frankfurt with free-resource limits | Verified environment only; application schema not created |
 | ENV-003 | CockroachDB Managed Model Context Protocol connection | OAuth connection configured and previously queried | Verified environment only; product integration pending |
 | ENV-004 | AWS authentication | AWS Command-Line Interface login verified | Verified environment only |
 | ENV-005 | AWS Model Context Protocol | Proxy handshake and read-only region query succeeded | Verified environment only; product integration pending |
-| ENV-006 | AWS budget ceiling | User stated 100 USD available | Constraint recorded; budget controls pending |
+| ENV-006 | AWS budget ceiling | AWS Free plan and `DocWeave-Total-Cost` custom total budget at 80 USD with actual and forecast alerts | Verified control; credits do not increase authorization |
+| ENV-007 | Amazon Bedrock primary profile | European Claude Sonnet 4.6 inference profile active in `eu-central-1` | Verified availability only; invocation and product integration pending |
+| ENV-008 | Environment baseline | `docs/operations/environment-baseline.md` | Verified on 2026-07-23; re-verification required before deployment |
 
 ## 8. Product behavior
 
