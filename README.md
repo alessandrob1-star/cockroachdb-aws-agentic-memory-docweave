@@ -12,8 +12,9 @@ complete judged product will run on Amazon Web Services.
 ## Current status
 
 DocWeave is in the approved requirements and architecture phase with an initial
-local Python engineering scaffold. No application behavior, database migration,
-deployed schema, or AWS infrastructure is claimed yet.
+local Python engineering scaffold and deterministic local filesystem discovery
+contracts. No database migration, deployed schema, cloud integration, or
+intelligent document analysis is claimed yet.
 
 The current approved product direction includes:
 
