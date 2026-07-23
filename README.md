@@ -11,8 +11,9 @@ complete judged product will run on Amazon Web Services.
 
 ## Current status
 
-DocWeave is in the approved requirements phase. No application implementation,
-database schema, or AWS infrastructure is claimed yet.
+DocWeave is in the approved requirements and architecture phase. No
+application implementation, database migration, deployed schema, or AWS
+infrastructure is claimed yet.
 
 The current approved product direction includes:
 
@@ -40,6 +41,14 @@ Mandatory governance:
 - [Minimum Viable Product scope and acceptance](docs/requirements/mvp-scope-and-acceptance.md)
 - [Quality and security charter](docs/requirements/quality-security-charter.md)
 - [Requirements traceability matrix](docs/requirements/requirements-traceability-matrix.md)
+
+Approved architecture:
+
+- [Amazon Bedrock primary-model decision](docs/architecture/decisions/0001-amazon-bedrock-primary-model.md)
+- [CockroachDB physical-data-model decision](docs/architecture/decisions/0002-cockroachdb-physical-data-model.md)
+- [Document-processing pipeline](docs/architecture/document-processing-pipeline.md)
+- [CockroachDB physical-schema specification](docs/architecture/cockroachdb-physical-schema.md)
+- [CockroachDB Entity Relationship model](docs/architecture/cockroachdb-entity-relationship.md)
 
 ## Repository policy
 

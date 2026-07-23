@@ -371,16 +371,20 @@ evidence:
 
 The following are deliberately not decided by this document:
 
-- the exact Large Language Model and embedding model;
+- the embedding model, vector dimension, and distance metric;
 - which extraction steps run locally or in AWS;
 - the precise cloud compute service;
-- the physical CockroachDB schema and indexes;
 - the division between application transactions, database functions, and
   stewardship-agent tools;
-- the physical relational representation of proposed and canonical facts;
 - the web framework and desktop packaging method;
 - confidence calibration algorithm and final thresholds;
 - document retention duration;
 - the exact approval policy for each action class.
 
 Each choice requires an explained architecture proposal and explicit approval.
+
+The primary Large Language Model is approved by
+[`ADR-0001`](../architecture/decisions/0001-amazon-bedrock-primary-model.md).
+The physical CockroachDB schema and the relational representation of proposed
+and canonical facts are approved by
+[`ADR-0002`](../architecture/decisions/0002-cockroachdb-physical-data-model.md).

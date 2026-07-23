@@ -1,7 +1,7 @@
 # Requirements Traceability Matrix
 
 **Project:** DocWeave
-**Last updated:** 2026-07-21
+**Last updated:** 2026-07-23
 **Status vocabulary:** Not started, Planned, In progress, Verified, Blocked
 
 ## 1. Purpose
@@ -47,7 +47,7 @@ is reproducible.
 | GOV-002 | English repository artifacts | Repository convention | Documentation and naming review | In progress |
 | GOV-003 | Expand acronyms for learning | Documentation and communication convention | Review checklist | Verified as policy |
 | GOV-004 | No fabricated intelligence or success | Integrity rules and evaluation evidence | Tests, traces, and limitation disclosures | Planned |
-| GOV-005 | Architecture decisions are recorded | Architecture Decision Record process | `docs/architecture/decisions/0001-amazon-bedrock-primary-model.md` | In progress |
+| GOV-005 | Architecture decisions are recorded | Architecture Decision Record process | `docs/architecture/decisions/0001-amazon-bedrock-primary-model.md` and `docs/architecture/decisions/0002-cockroachdb-physical-data-model.md` | In progress |
 | GOV-006 | Claims require evidence | Release evidence matrix | Final validation report | Planned |
 
 ## 5. Quality controls
@@ -112,6 +112,7 @@ is reproducible.
 | PROD-008 | Complete desktop and cloud product parity | `product-requirements.md` FR-047–FR-050 | Cross-surface contract and end-to-end tests | Planned |
 | PROD-009 | Bounded memory and database stewardship agent | `product-requirements.md` FR-051–FR-054 | Tool-authorization, provenance, anomaly, and audit tests | Planned |
 | PROD-010 | Relational-first domain data and safe synthetic provenance | `product-requirements.md` FR-055–FR-060 and `domain-data-requirements.md` | Schema, constraints, provenance checks, and corpus audit | Planned |
+| PROD-011 | Approved physical CockroachDB data model | `docs/architecture/decisions/0002-cockroachdb-physical-data-model.md`, physical-schema specification, and Entity Relationship model | Migration, constraint, transaction, authorization, vector, and provenance tests | Planned; design approved |
 
 ## 9. Capacity baseline
 

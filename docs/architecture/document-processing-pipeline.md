@@ -258,7 +258,7 @@ Observed cost is stored after processing so estimates can be improved.
 
 The following remain separate approval points:
 
-1. physical CockroachDB schema, indexes, and transaction boundaries;
+1. embedding model, vector dimension, and distance metric;
 2. PDF extraction library and isolation mechanism;
 3. structured-output schema and prompt contract;
 4. raw confidence formula and calibration method;
@@ -267,6 +267,11 @@ The following remain separate approval points:
 7. desktop-to-cloud identity and authorization design;
 8. retention of extracted text and raw model responses; and
 9. whether and when a secondary model is evaluated.
+
+The physical CockroachDB schema, indexes, and transaction boundaries are
+approved by
+[`ADR-0002`](decisions/0002-cockroachdb-physical-data-model.md). Implementation
+and migration verification have not started.
 
 ## 9. Acceptance evidence
 
