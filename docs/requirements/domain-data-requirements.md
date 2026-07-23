@@ -33,24 +33,33 @@ relationships, document shapes, naming problems, and workflow complexity.
 
 ## 3. MVP document taxonomy
 
-The approved initial taxonomy contains:
+The approved initial taxonomy baseline is `docweave_mvp_v0_1`. It contains ten
+primary business classes and two controlled outcomes used for coverage and
+abstention:
 
 | Code | Document type | Purpose |
 | --- | --- | --- |
 | `invoice` | Invoice | Supplier charge linked to an order, contract, or project |
 | `contract` | Contract | Agreement governing commercial terms and obligations |
 | `purchase_order` | Purchase Order | Authorized order linked to a supplier and contract |
-| `tender_document` | Tender Document | Procurement or bid material linked to a project |
+| `tender_document` | Tender Document | Procurement, bid, proposal, quotation, or tender material linked to a project |
 | `payment_notice` | Payment Notice | Evidence that an invoice entered a payment workflow |
 | `bank_certification` | Bank Certification | Bank-originated evidence supporting payment |
 | `supplier_receipt` | Supplier Receipt | Supplier acknowledgement or payment receipt |
 | `bank_statement` | Bank Statement | Statement containing one or more payment references |
 | `acceptance_document` | Acceptance Document | Evidence that goods, work, or services were accepted |
 | `technical_attachment` | Technical Attachment | Material, asset, plant, measurement, or delivery detail |
+| `other` | Other | Supported document with enough evidence to determine that no configured primary class applies |
+| `unclassified` | Unclassified | Insufficient, conflicting, unreadable, suspicious, or unsupported evidence |
 
 The taxonomy is deliberately small enough for a high-quality demonstration and
 large enough to prove classification, naming, organization, uncertainty, and
 cross-document relationships.
+
+`Other` and `Unclassified` are intentionally different. `Other` is an informed
+classification result inside the supported workflow. `Unclassified` is an
+abstention or limited-processing outcome that requires human attention before
+the product treats the document as classified.
 
 ## 4. Relational-first requirements
 

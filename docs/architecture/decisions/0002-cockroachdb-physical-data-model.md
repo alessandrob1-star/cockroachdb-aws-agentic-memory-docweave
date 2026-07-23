@@ -151,13 +151,13 @@ Rejected because SQL cannot atomically commit a Windows filesystem or Amazon
 Simple Storage Service mutation. Claiming otherwise would create false success
 states.
 
-## Known prerequisite
+## Taxonomy prerequisite
 
-The approved domain-data requirements and classification specification contain
-different initial taxonomy lists. The physical schema deliberately stores
-versioned taxonomy data and does not hardcode either list. The taxonomy baseline
-must be reconciled and approved before seed data or classification contracts
-are implemented.
+The physical schema deliberately stores versioned taxonomy data instead of
+hardcoding class values. The initial approved taxonomy baseline is defined in
+the domain-data requirements and classification specification. Seed data and
+classification contracts must use that baseline unless a later approved
+taxonomy decision supersedes it.
 
 ## Verification required before implementation is accepted
 

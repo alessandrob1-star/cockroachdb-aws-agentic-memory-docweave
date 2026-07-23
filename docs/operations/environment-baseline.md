@@ -78,7 +78,8 @@ connection pooling, and workspace-context cleanup.
 
 The following decisions or artifacts remain mandatory:
 
-1. reconcile and approve one taxonomy baseline;
+1. seed and test the approved taxonomy baseline before classification
+   contracts depend on it;
 2. approve the embedding model, vector dimension, and distance metric;
 3. implement reviewed CockroachDB migrations from ADR-0002;
 4. test constraints, serializable retries, workspace isolation, and recovery;
