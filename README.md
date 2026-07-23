@@ -50,6 +50,7 @@ Approved architecture:
 - [CockroachDB physical-schema specification](docs/architecture/cockroachdb-physical-schema.md)
 - [CockroachDB Entity Relationship model](docs/architecture/cockroachdb-entity-relationship.md)
 - [Verified AWS and CockroachDB environment baseline](docs/operations/environment-baseline.md)
+- [Delivery plan](docs/operations/delivery-plan.md)
 
 ## Repository policy
 
