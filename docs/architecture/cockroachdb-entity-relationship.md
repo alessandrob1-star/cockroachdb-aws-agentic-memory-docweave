@@ -121,5 +121,5 @@ The diagram does not imply:
 - that a model may promote facts without review;
 - that file operations are atomic with SQL;
 - that vector dimensions are already approved;
-- that the current taxonomy discrepancy has been resolved; or
+- that taxonomy seed data or classification contracts have been implemented; or
 - that implementation or database creation has started.

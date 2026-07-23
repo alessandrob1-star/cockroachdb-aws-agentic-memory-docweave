@@ -80,21 +80,22 @@ model-weight updates are not part of the Minimum Viable Product (MVP).
 
 ## 4. Initial document taxonomy
 
-The initial taxonomy is deliberately useful but small enough to evaluate
-reliably:
+The approved initial taxonomy baseline is `docweave_mvp_v0_1`. It is deliberately
+useful but small enough to evaluate reliably, and it matches the domain
+requirements:
 
 | Code | Display name | Typical evidence |
 | --- | --- | --- |
 | `invoice` | Invoice | Invoice number, taxable amount, tax, total, due date |
 | `contract` | Contract | Parties, obligations, signatures, effective dates |
-| `tender_notice` | Tender Notice | Tender identifier, deadline, eligibility, scope |
-| `technical_proposal` | Technical Proposal | Technical solution, specifications, delivery method |
-| `commercial_proposal` | Commercial Proposal | Price, commercial terms, offer validity |
 | `purchase_order` | Purchase Order | Order number, buyer, supplier, ordered items |
-| `compliance_document` | Compliance Document | Certification, declaration, control or policy evidence |
-| `administrative_document` | Administrative Document | Formal administrative record not covered elsewhere |
-| `correspondence` | Correspondence | Sender, recipient, subject, message or cover letter |
-| `supporting_attachment` | Supporting Attachment | Evidence that supplements another primary document |
+| `tender_document` | Tender Document | Tender identifier, proposal, quotation, deadline, eligibility, scope |
+| `payment_notice` | Payment Notice | Invoice reference, payment workflow status, due or scheduled date |
+| `bank_certification` | Bank Certification | Bank issuer, certified payment reference, amount, account or transaction evidence |
+| `supplier_receipt` | Supplier Receipt | Supplier acknowledgement, received amount, invoice or payment reference |
+| `bank_statement` | Bank Statement | Statement period, transaction rows, payment references, account evidence |
+| `acceptance_document` | Acceptance Document | Acceptance statement, goods or services received, approver, date |
+| `technical_attachment` | Technical Attachment | Technical specification, asset, material, measurement, delivery detail |
 | `other` | Other | Sufficient evidence that no configured class applies |
 | `unclassified` | Unclassified | Insufficient, conflicting, unreadable, or unsupported evidence |
 

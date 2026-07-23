@@ -604,7 +604,7 @@ Each migration requires a clean-database test and a forward-recovery test.
 The approved structure does not decide:
 
 - embedding provider, model, dimension, and distance metric;
-- final reconciled taxonomy rows;
+- initial taxonomy seed rows and version labels beyond the approved baseline;
 - retention duration for extracted text and raw provider payloads;
 - exact confidence formula and thresholds;
 - exact Row-Level Security session-context mechanism;
