@@ -1,14 +1,16 @@
 # Database Migration Runbook
 
 **Project:** DocWeave
-**Status:** Offline workflow implemented; live execution not authorized
+**Status:** Initial revision validated live; online Alembic runner pending
 **Last updated:** 2026-07-24
 
 ## 1. Purpose
 
 This runbook defines the controlled CockroachDB migration workflow. It does not
-authorize a live migration and is not evidence that any DocWeave application
-table exists.
+authorize future live migrations. Revision `0001_operational_foundation` was
+separately authorized and accepted in the isolated `docweave_validation`
+database on 2026-07-24. That evidence does not mean the application connects to
+CockroachDB or that a production schema is deployed.
 
 The current migration head is:
 
@@ -82,10 +84,10 @@ The migration must not run automatically during desktop startup, cloud startup,
 tests, or deployment. A separately authorized operator runs it as an explicit
 release step.
 
-Before the first live migration, add or verify:
+Before a future live migration, add or verify:
 
 - a controlled clean test target;
-- a least-privilege migration identity distinct from runtime identities;
+- the identity mode explicitly approved for that phase;
 - Transport Layer Security certificate validation;
 - current cluster usage and cost evidence;
 - a clean-database migration test;
@@ -93,6 +95,12 @@ Before the first live migration, add or verify:
 - invalid-state and cross-workspace constraint tests;
 - forward-recovery behavior; and
 - the exact revision recorded by Alembic.
+
+For the 2026-07-24 predevelopment validation, the project owner explicitly
+approved the existing authenticated root or administrator path and deferred
+least-privilege profiles to a later separately approved phase. No credential
+was exported, logged, or committed. Root or administrator access is not
+approved for application runtime use.
 
 ## 5. Failure handling
 
@@ -112,11 +120,16 @@ An unavailable check or ambiguous schema state is a failure, never a pass.
 
 The repository does not yet prove:
 
-- a successful live migration;
-- deployed DocWeave tables;
+- online Alembic execution through the Psycopg driver;
+- a production or runtime-connected DocWeave schema;
 - persistent application memory;
 - runtime database roles or Row-Level Security;
 - serializable transaction retries;
 - live operation reconciliation;
 - Distributed Vector Indexing; or
 - competition-qualifying CockroachDB integration.
+
+The repository does prove that the exact offline-rendered SQL for revision
+`0001_operational_foundation` was accepted and introspected in a clean,
+isolated CockroachDB Cloud validation database. See
+[`cockroachdb-live-validation.md`](cockroachdb-live-validation.md).

@@ -154,7 +154,12 @@ Acceptance requires:
   foreign keys, digest fields, and reconciliation fields;
 - a test proving online execution fails without an explicit database URL;
 - the complete local quality gate; and
-- a later separately approved clean-database test against CockroachDB.
+- a separately approved clean-database test against CockroachDB.
+
+The clean-database acceptance test completed on 2026-07-24 using the exact
+offline-rendered SQL for revision `0001_operational_foundation`. Online Alembic
+execution through Psycopg remains pending. See
+[`../../operations/cockroachdb-live-validation.md`](../../operations/cockroachdb-live-validation.md).
 
 ## References
 

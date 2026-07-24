@@ -18,9 +18,10 @@ deterministic intake records with duplicate grouping, and safe file-operation
 planning, approval, single-operation execution, bounded local batch execution,
 per-item results, in-memory idempotency, interrupted-operation reconciliation,
 and append-only local audit event contracts. The first non-vector CockroachDB
-migration is authored and validated offline but has not been applied to any
-database. These local contracts are not durable persistence. No deployed
-schema, restore, cloud integration, or intelligent document analysis is
+migration is validated offline and against a clean, isolated live validation
+database. The application does not yet connect to that schema, so the local
+contracts are not durable persistence. No runtime database integration,
+restore, AWS workload, user interface, or intelligent document analysis is
 claimed yet.
 
 The current approved product direction includes:
@@ -59,6 +60,7 @@ Approved architecture:
 - [CockroachDB physical-schema specification](docs/architecture/cockroachdb-physical-schema.md)
 - [CockroachDB Entity Relationship model](docs/architecture/cockroachdb-entity-relationship.md)
 - [Verified AWS and CockroachDB environment baseline](docs/operations/environment-baseline.md)
+- [CockroachDB live validation evidence](docs/operations/cockroachdb-live-validation.md)
 - [Delivery plan](docs/operations/delivery-plan.md)
 
 ## Repository policy
@@ -75,9 +77,10 @@ Approved architecture:
 
 The Python scaffold contains no runtime cloud integration and does not connect
 to a database by default. It includes an initial CockroachDB migration that is
-rendered and tested offline only; no application schema has been deployed.
-The scaffold establishes reproducible local quality gates before durable or
-cloud-connected product behavior is implemented.
+rendered and tested offline and whose exact SQL has been accepted by a clean
+live validation database. The validation schema is not a runtime or production
+deployment. The scaffold establishes reproducible local quality gates before
+durable or cloud-connected product behavior is implemented.
 
 Create a virtual environment, install the pinned development tools, and run the
 local checks:

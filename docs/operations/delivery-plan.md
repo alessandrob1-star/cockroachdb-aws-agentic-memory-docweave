@@ -1,7 +1,7 @@
 # Delivery Plan
 
 **Project:** DocWeave
-**Plan date:** 2026-07-23
+**Plan date:** 2026-07-24
 **Submission deadline:** 2026-08-18 17:00 EDT / 2026-08-18 23:00 CEST
 **Implementation status:** In progress
 
@@ -94,10 +94,12 @@ The critical path is:
   idempotency, interrupted-operation reconciliation, and append-only local audit
   event contracts are implemented and tested.
 - The CockroachDB migration toolchain is pinned and the initial non-vector
-  operational migration is authored and tested through offline SQL rendering.
-- No migration has been applied. CockroachDB persistence, durable Activity
-  History, restore, AWS infrastructure, Bedrock invocation, and user interfaces
-  remain not implemented.
+  operational migration is tested through offline SQL rendering and an
+  isolated live clean-database validation.
+- The application does not connect to the validation schema. CockroachDB
+  application persistence, durable Activity History, restore, AWS
+  infrastructure, Bedrock invocation, and user interfaces remain not
+  implemented.
 - The preparatory notes
   [`local-core-status.md`](local-core-status.md) and
   [`local-batch-operation-design-note.md`](../architecture/local-batch-operation-design-note.md)
@@ -124,8 +126,10 @@ The critical path is:
 - Revision `0001_operational_foundation` renders offline for workspace, actor,
   operation, and audit tables.
 - Offline contract tests are implemented.
-- Live clean-database migration, runtime roles, Row-Level Security, transaction
-  helpers, and persistent application services remain pending.
+- The exact rendered revision was accepted and introspected in the isolated
+  live `docweave_validation` database.
+- Online Alembic driver execution, runtime roles, Row-Level Security,
+  transaction helpers, and persistent application services remain pending.
 
 **Exit criteria:**
 
@@ -232,32 +236,74 @@ The critical path is:
 - The deployed demo remains available through the judging period.
 - The submission does not claim unimplemented features.
 
-## 5. Immediate next decisions
+## 5. Status measurement
 
-The next implementation work is blocked until these decisions are made:
+**Measurement date:** 2026-07-24
 
-1. repository package layout and local toolchain;
-2. PDF extraction library and process isolation boundary;
-3. embedding model, vector dimension, and distance metric;
-4. Bedrock structured-output schema version `classification.v1`;
-5. cloud compute, storage, queue, authentication, and network topology;
-6. desktop-to-cloud identity and role matrix;
-7. confidence scoring formula and review thresholds;
-8. raw model-response and extracted-text retention policy.
+The current evidence-weighted Schedule Performance Indicator is **28%**. This
+is a planning estimate, not a product-completion or production-readiness claim.
+It is calculated from fixed milestone weights and conservative completion
+estimates based only on merged or locally verified evidence:
 
-## 6. Day-one implementation slice
+| Milestone | Project weight | Evidence-complete estimate | Weighted contribution |
+| --- | ---: | ---: | ---: |
+| M0 - Baseline complete | 8% | 100% | 8.0% |
+| M1 - Decisions and scaffolding | 14% | 85% | 11.9% |
+| M2 - CockroachDB foundation | 18% | 35% | 6.3% |
+| M3 - Real analysis slice | 18% | 0% | 0.0% |
+| M4 - Review and safe operations | 15% | 10% | 1.5% |
+| M5 - Product surfaces | 12% | 0% | 0.0% |
+| M6 - Evaluation and hardening | 9% | 0% | 0.0% |
+| M7 - Submission readiness | 6% | 0% | 0.0% |
+| **Total** | **100%** |  | **27.7%, rounded to 28%** |
 
-The smallest useful implementation slice after this plan is:
+The project is **on plan overall and slightly ahead on the database
+foundation**. M1 is active inside its planned window. The first clean live
+migration validation from M2 was completed three days before the M2 window
+opens, while the remaining M2 application-persistence work is not complete.
+No schedule credit is taken for the unimplemented Bedrock analysis, PySide6
+user interface, cloud product, AWS deployment, evaluation corpus, or
+submission package.
 
-1. add the repository scaffolding for the shared Python core and tests;
-2. add deterministic formatting, linting, type checking, and unit-test commands;
-3. add no cloud resources and no database schema yet;
-4. verify that a clean local run can execute the empty quality gates.
+The principal schedule risk is now the vertical integration path: application
+transactions and persistence, genuine Bedrock analysis, human review, safe
+operations, and both product surfaces must be connected before the evaluation
+and submission windows. The plan retains the original 2026-08-18 deadline and
+does not assume additional time.
 
-This creates the quality runway required before the first application behavior
-or migration is introduced.
+## 6. Remaining implementation decisions
 
-## 7. Operating rules during delivery
+The repository package layout, local toolchain, and initial migration tooling
+are decided. The next vertical slices still require the following approved
+decisions before their respective implementation begins:
+
+1. PDF extraction library and process isolation boundary;
+2. embedding model, vector dimension, and distance metric;
+3. Bedrock structured-output schema version `classification.v1`;
+4. cloud compute, storage, queue, authentication, and network topology;
+5. desktop-to-cloud identity and role matrix;
+6. confidence scoring formula and review thresholds;
+7. raw model-response and extracted-text retention policy;
+8. runtime CockroachDB identities and least-privilege authorization model.
+
+## 7. Next implementation slice
+
+The smallest safe next implementation slice is the local CockroachDB
+persistence boundary:
+
+1. define the application-facing repository and transaction contracts;
+2. implement serializable retry behavior with bounded, observable failures;
+3. persist batch, operation-result, and append-only audit records without
+   connecting the user interface or invoking Bedrock;
+4. test rollback, idempotency, workspace isolation, and interrupted-operation
+   reconciliation against controlled test targets;
+5. keep runtime identity creation, production data, cloud resources, and paid
+   operations behind separate explicit approval.
+
+This slice converts the validated physical foundation into durable application
+behavior while keeping cost, credentials, and external side effects bounded.
+
+## 8. Operating rules during delivery
 
 - Every feature PR must state what is implemented and what remains planned.
 - Cloud, database, dependency, and model-invocation changes require explicit

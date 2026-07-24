@@ -57,7 +57,7 @@ is reproducible.
 | QUAL-001 | Formatting and linting | Ruff format and lint run locally and through `.github/workflows/ci.yml` | Local check output and GitHub Actions logs | In progress |
 | QUAL-002 | Static type safety | Strict MyPy check run locally and through `.github/workflows/ci.yml` | Local check output and GitHub Actions logs | In progress |
 | QUAL-003 | Unit tests | Pytest with coverage run locally and through `.github/workflows/ci.yml` | Test, coverage, and GitHub Actions reports | In progress |
-| QUAL-004 | Integration and contract tests | Real CockroachDB and mocked or sandboxed AWS boundaries as appropriate | Integration report | In progress; offline migration contract tests implemented, live database tests pending |
+| QUAL-004 | Integration and contract tests | Real CockroachDB and mocked or sandboxed AWS boundaries as appropriate | Integration report | In progress; offline contracts and initial clean live-database schema validation complete, online driver and application integration tests pending |
 | QUAL-005 | End-to-end critical journeys | Browser and service end-to-end suite | Video and machine-readable report | Planned |
 | QUAL-006 | Agent regression evaluation | Versioned corpus and evaluation runner | Evaluation report | Planned |
 | QUAL-007 | Resilience testing | Failure injection, retries, idempotency, and recovery tests | Resilience report | In progress; local batch retry and reconciliation tests implemented |
@@ -92,7 +92,7 @@ is reproducible.
 | ID | Item | Current evidence | Status |
 | --- | --- | --- | --- |
 | ENV-001 | Local repository | `D:\repo\cockroachdb-aws-agentic-memory-docweave` | Verified |
-| ENV-002 | CockroachDB Cloud cluster | `docweave-memory`, CockroachDB Cloud Basic on AWS Frankfurt with free-resource limits | Verified environment only; application schema not created |
+| ENV-002 | CockroachDB Cloud cluster | `docweave-memory`, CockroachDB Cloud Basic on AWS Frankfurt with free-resource limits | Verified environment with isolated initial validation schema; no application connection or production deployment |
 | ENV-003 | CockroachDB Managed Model Context Protocol connection | OAuth connection configured and previously queried | Verified environment only; product integration pending |
 | ENV-004 | AWS authentication | AWS Command-Line Interface login verified | Verified environment only |
 | ENV-005 | AWS Model Context Protocol | Proxy handshake and read-only region query succeeded | Verified environment only; product integration pending |
@@ -114,7 +114,7 @@ is reproducible.
 | PROD-008 | Complete desktop and cloud product parity | `product-requirements.md` FR-047–FR-050 | Cross-surface contract and end-to-end tests | Planned |
 | PROD-009 | Bounded memory and database stewardship agent | `product-requirements.md` FR-051–FR-054 | Tool-authorization, provenance, anomaly, and audit tests | Planned |
 | PROD-010 | Relational-first domain data and safe synthetic provenance | `product-requirements.md` FR-055–FR-060 and `domain-data-requirements.md` | Schema, constraints, provenance checks, and corpus audit | Planned |
-| PROD-011 | Approved physical CockroachDB data model | `docs/architecture/decisions/0002-cockroachdb-physical-data-model.md`, physical-schema specification, and Entity Relationship model | Migration, constraint, transaction, authorization, vector, and provenance tests | In progress; initial operational revision renders offline, live and remaining schema evidence pending |
+| PROD-011 | Approved physical CockroachDB data model | `docs/architecture/decisions/0002-cockroachdb-physical-data-model.md`, physical-schema specification, and Entity Relationship model | Migration, constraint, transaction, authorization, vector, and provenance tests | In progress; initial operational revision validated offline and in an isolated live database, remaining schema and runtime evidence pending |
 
 ## 9. Capacity baseline
 
