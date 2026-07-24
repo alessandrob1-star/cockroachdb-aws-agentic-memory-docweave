@@ -13,8 +13,9 @@ complete judged product will run on Amazon Web Services.
 
 DocWeave is in the approved requirements and architecture phase with an initial
 local Python engineering scaffold, deterministic local filesystem discovery
-contracts, and local content fingerprinting. No database migration, deployed
-schema, cloud integration, or intelligent document analysis is claimed yet.
+contracts, local content fingerprinting, and PDF signature inspection. No
+database migration, deployed schema, cloud integration, or intelligent document
+analysis is claimed yet.
 
 The current approved product direction includes:
 
