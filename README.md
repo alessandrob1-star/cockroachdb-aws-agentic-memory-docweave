@@ -17,9 +17,11 @@ contracts, local content fingerprinting, PDF signature inspection, and
 deterministic intake records with duplicate grouping, and safe file-operation
 planning, approval, single-operation execution, bounded local batch execution,
 per-item results, in-memory idempotency, interrupted-operation reconciliation,
-and append-only local audit event contracts. These local contracts are not
-durable persistence. No restore, database migration, deployed schema, cloud
-integration, or intelligent document analysis is claimed yet.
+and append-only local audit event contracts. The first non-vector CockroachDB
+migration is authored and validated offline but has not been applied to any
+database. These local contracts are not durable persistence. No deployed
+schema, restore, cloud integration, or intelligent document analysis is
+claimed yet.
 
 The current approved product direction includes:
 
@@ -52,6 +54,7 @@ Approved architecture:
 
 - [Amazon Bedrock primary-model decision](docs/architecture/decisions/0001-amazon-bedrock-primary-model.md)
 - [CockroachDB physical-data-model decision](docs/architecture/decisions/0002-cockroachdb-physical-data-model.md)
+- [CockroachDB migration-tooling decision](docs/architecture/decisions/0003-cockroachdb-migration-tooling.md)
 - [Document-processing pipeline](docs/architecture/document-processing-pipeline.md)
 - [CockroachDB physical-schema specification](docs/architecture/cockroachdb-physical-schema.md)
 - [CockroachDB Entity Relationship model](docs/architecture/cockroachdb-entity-relationship.md)
@@ -70,17 +73,19 @@ Approved architecture:
 
 ## Local development
 
-The initial Python scaffold contains no runtime cloud integration and no
-database migration. It exists to establish reproducible local quality gates
-before product behavior is implemented.
+The Python scaffold contains no runtime cloud integration and does not connect
+to a database by default. It includes an initial CockroachDB migration that is
+rendered and tested offline only; no application schema has been deployed.
+The scaffold establishes reproducible local quality gates before durable or
+cloud-connected product behavior is implemented.
 
 Create a virtual environment, install the pinned development tools, and run the
 local checks:
 
 ```powershell
 python -m venv .venv
-.\.venv\Scripts\python -m pip install -r requirements-dev.txt
-.\.venv\Scripts\python -m pip install -e .
+.\.venv\Scripts\python -m pip install -r requirements-lock.txt
+.\.venv\Scripts\python -m pip install -e . --no-deps
 .\scripts\check.ps1
 ```
 

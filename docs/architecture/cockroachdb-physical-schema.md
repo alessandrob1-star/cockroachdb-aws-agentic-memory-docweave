@@ -3,7 +3,7 @@
 **Project:** DocWeave
 **Version:** 0.1
 **Decision status:** Approved by ADR-0002
-**Implementation status:** Not started
+**Implementation status:** In progress; initial operational migration authored offline
 
 ## 1. Purpose
 

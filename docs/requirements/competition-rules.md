@@ -3,7 +3,7 @@
 **Competition:** CockroachDB x AWS Hackathon - Build with Agentic Memory
 **Official title in the rules:** CockroachDB x AWS Hackathon - Build the Future
 of Agentic Memory
-**Last verified:** 2026-07-21
+**Last verified:** 2026-07-24
 **Operational owner:** Project owner
 
 ## 1. Authority and source links
@@ -20,6 +20,12 @@ outdated, or inconsistent.
 
 The Official Rules may change. Re-verify them before architecture approval,
 public launch, and final submission.
+
+The 2026-07-24 verification confirmed the published submission deadline,
+meaningful CockroachDB and AWS integration requirements, the minimum of two
+eligible CockroachDB tools, public-source and demonstration requirements, and
+the entrant's responsibility for usage above applicable free tiers. No
+material conflict with the current DocWeave baseline was identified.
 
 ## 2. Dates
 

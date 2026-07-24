@@ -21,12 +21,12 @@ is reproducible.
 | COMP-005 | At least two CockroachDB tools | Managed Model Context Protocol Server and Distributed Vector Indexing; optional Agent Skills | Per-tool implementation and demo evidence | Planned |
 | COMP-006 | At least one AWS service | Amazon Bedrock and Amazon Simple Storage Service, plus approved compute | Runtime traces and architecture evidence | Planned |
 | COMP-007 | Components meaningfully integrated | Each service supports a real user or agent workflow | Integration tests and video steps | Planned |
-| COMP-008 | Consistent installation and operation | Pinned dependencies, setup automation, smoke tests, health checks | Clean-machine test report | In progress |
+| COMP-008 | Consistent installation and operation | Pinned dependencies, setup automation, smoke tests, health checks | Clean-machine test report | In progress; runtime, development, and resolved dependency versions pinned |
 | COMP-009 | Public open-source repository | Public GitHub repository with approved license and complete source | Public URL and license detection | Planned |
 | COMP-010 | Functional demo | Public, free, stable deployment through judging | URL, uptime evidence, testing instructions | Planned |
 | COMP-011 | Video under three minutes | Scripted demonstration of product and CockroachDB memory | Public YouTube or Vimeo URL | Planned |
 | COMP-012 | English submission | English README, text, video narration or captions, and instructions | Submission review checklist | Planned |
-| COMP-013 | Authorized third-party use | Dependency, data, media, trademark, and model license inventory | Software Bill of Materials and attribution file | Planned |
+| COMP-013 | Authorized third-party use | Dependency, data, media, trademark, and model license inventory | Software Bill of Materials and attribution file | In progress; initial migration dependency license inventory recorded |
 | COMP-014 | Truthful submission | Claims generated from verified release evidence | Final validation report and tagged release | Planned |
 
 ## 3. Judging criteria
@@ -57,12 +57,12 @@ is reproducible.
 | QUAL-001 | Formatting and linting | Ruff format and lint run locally and through `.github/workflows/ci.yml` | Local check output and GitHub Actions logs | In progress |
 | QUAL-002 | Static type safety | Strict MyPy check run locally and through `.github/workflows/ci.yml` | Local check output and GitHub Actions logs | In progress |
 | QUAL-003 | Unit tests | Pytest with coverage run locally and through `.github/workflows/ci.yml` | Test, coverage, and GitHub Actions reports | In progress |
-| QUAL-004 | Integration and contract tests | Real CockroachDB and mocked or sandboxed AWS boundaries as appropriate | Integration report | Planned |
+| QUAL-004 | Integration and contract tests | Real CockroachDB and mocked or sandboxed AWS boundaries as appropriate | Integration report | In progress; offline migration contract tests implemented, live database tests pending |
 | QUAL-005 | End-to-end critical journeys | Browser and service end-to-end suite | Video and machine-readable report | Planned |
 | QUAL-006 | Agent regression evaluation | Versioned corpus and evaluation runner | Evaluation report | Planned |
 | QUAL-007 | Resilience testing | Failure injection, retries, idempotency, and recovery tests | Resilience report | In progress; local batch retry and reconciliation tests implemented |
 | QUAL-008 | Accessibility | Automated scanner plus manual keyboard and screen review | Web Content Accessibility Guidelines checklist | Planned |
-| QUAL-009 | Reproducible setup | Pinned dependencies, containers, and clean-machine smoke test | Setup validation artifact | Planned |
+| QUAL-009 | Reproducible setup | Pinned dependencies, containers, and clean-machine smoke test | Setup validation artifact | In progress; direct and resolved Python versions pinned, clean-machine evidence pending |
 | QUAL-010 | Benchmark parity | Compare gates and evidence with AI Act benchmark | Benchmark comparison report | In progress |
 
 ## 6. Security controls
@@ -114,7 +114,7 @@ is reproducible.
 | PROD-008 | Complete desktop and cloud product parity | `product-requirements.md` FR-047–FR-050 | Cross-surface contract and end-to-end tests | Planned |
 | PROD-009 | Bounded memory and database stewardship agent | `product-requirements.md` FR-051–FR-054 | Tool-authorization, provenance, anomaly, and audit tests | Planned |
 | PROD-010 | Relational-first domain data and safe synthetic provenance | `product-requirements.md` FR-055–FR-060 and `domain-data-requirements.md` | Schema, constraints, provenance checks, and corpus audit | Planned |
-| PROD-011 | Approved physical CockroachDB data model | `docs/architecture/decisions/0002-cockroachdb-physical-data-model.md`, physical-schema specification, and Entity Relationship model | Migration, constraint, transaction, authorization, vector, and provenance tests | Planned; design approved |
+| PROD-011 | Approved physical CockroachDB data model | `docs/architecture/decisions/0002-cockroachdb-physical-data-model.md`, physical-schema specification, and Entity Relationship model | Migration, constraint, transaction, authorization, vector, and provenance tests | In progress; initial operational revision renders offline, live and remaining schema evidence pending |
 
 ## 9. Capacity baseline
 
