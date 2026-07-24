@@ -12,10 +12,15 @@ license = { text = "License not selected yet" }
 authors = [
   { name = "DocWeave contributors" },
 ]
-dependencies = []
+dependencies = [
+  "psycopg[binary]==3.3.4",
+  "SQLAlchemy==2.0.51",
+  "sqlalchemy-cockroachdb==2.0.4",
+]
 
 [project.optional-dependencies]
 dev = [
+  "alembic==1.18.5",
   "mypy==1.17.1",
   "pytest==8.4.1",
   "pytest-cov==6.2.1",

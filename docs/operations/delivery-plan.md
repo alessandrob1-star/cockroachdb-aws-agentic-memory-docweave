@@ -93,9 +93,11 @@ The critical path is:
 - Bounded local batch execution, per-item result records, in-memory
   idempotency, interrupted-operation reconciliation, and append-only local audit
   event contracts are implemented and tested.
-- CockroachDB persistence, durable Activity History, restore, AWS
-  infrastructure, Bedrock invocation, and user interfaces remain not
-  implemented.
+- The CockroachDB migration toolchain is pinned and the initial non-vector
+  operational migration is authored and tested through offline SQL rendering.
+- No migration has been applied. CockroachDB persistence, durable Activity
+  History, restore, AWS infrastructure, Bedrock invocation, and user interfaces
+  remain not implemented.
 - The preparatory notes
   [`local-core-status.md`](local-core-status.md) and
   [`local-batch-operation-design-note.md`](../architecture/local-batch-operation-design-note.md)
@@ -113,6 +115,17 @@ The critical path is:
 - Add migration tests for clean database creation and idempotent setup.
 - Add transaction helper patterns for serializable retries.
 - Add initial authorization and workspace-isolation test scaffolding.
+
+**Current progress on 2026-07-24:**
+
+- ADR-0003 records the approved Alembic, SQLAlchemy, CockroachDB dialect, and
+  Psycopg migration toolchain.
+- Direct and transitive dependency versions are pinned.
+- Revision `0001_operational_foundation` renders offline for workspace, actor,
+  operation, and audit tables.
+- Offline contract tests are implemented.
+- Live clean-database migration, runtime roles, Row-Level Security, transaction
+  helpers, and persistent application services remain pending.
 
 **Exit criteria:**
 

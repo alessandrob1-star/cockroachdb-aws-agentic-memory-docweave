@@ -3,7 +3,7 @@
 **Status:** Accepted
 **Decision date:** 2026-07-23
 **Decision owner:** Project owner
-**Implementation status:** Not started
+**Implementation status:** In progress; initial operational migration authored offline
 
 ## Context
 

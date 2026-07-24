@@ -3,7 +3,7 @@
 **Project:** DocWeave
 **Version:** 0.1
 **Decision status:** Approved by ADR-0002
-**Implementation status:** Not started
+**Implementation status:** In progress; initial operational migration authored offline
 
 ## Purpose
 
@@ -122,4 +122,6 @@ The diagram does not imply:
 - that file operations are atomic with SQL;
 - that vector dimensions are already approved;
 - that taxonomy seed data or classification contracts have been implemented; or
-- that implementation or database creation has started.
+- that a database schema has been deployed or live persistence has been
+  verified. The initial operational migration is an offline repository
+  artifact only.

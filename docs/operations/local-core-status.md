@@ -12,6 +12,10 @@ next batch, audit, CockroachDB, AWS, or user-interface work.
 
 It is an evidence index, not a release-readiness claim.
 
+The initial CockroachDB operational migration is now authored and validated
+offline. It is not part of the implemented local runtime core and has not been
+applied to a database.
+
 ## 2. Current implemented local core
 
 The repository currently contains a tested Python package with:
@@ -41,16 +45,22 @@ The repository currently contains a tested Python package with:
 ## 3. Current local quality evidence
 
 The latest verified local quality gate on
-`codex/local-batch-audit-results` reported:
+`codex/cockroachdb-migration-foundation` reported:
 
-- 132 tests passed;
-- 99 percent total package coverage, with 100 percent coverage in the audit,
-  result-ledger, approval, planning, and single-operation execution modules;
+- 144 tests passed;
+- 99 percent total package coverage;
 - Ruff format check passed;
 - Ruff lint check passed;
 - MyPy strict check passed;
-- GitHub Actions evidence remains pending until an explicitly authorized pull
-  request is published.
+- offline migration upgrade and downgrade rendering passed;
+- one ordered Alembic migration head was verified; and
+- online migration execution was verified to fail closed when no database URL
+  is explicitly supplied.
+
+The previous 132-test local-core baseline also passed GitHub Actions on pull
+request 21 and on its merge to `main`. GitHub Actions evidence for the current
+migration branch remains pending until an explicitly authorized pull request
+is published.
 
 The check command is:
 
@@ -62,7 +72,7 @@ The check command is:
 
 DocWeave does not yet implement or claim:
 
-- CockroachDB migrations or application tables;
+- deployed CockroachDB application tables or a successful live migration;
 - persistent operational, semantic, episodic, preference, or audit memory;
 - AWS infrastructure or deployed DocWeave workloads;
 - Amazon Bedrock invocation inside the product;
@@ -102,18 +112,17 @@ must be closed before production-grade batch execution:
 
 ## 6. Recommended next implementation block
 
-The next smallest safe block is the reviewed CockroachDB migration foundation
-for the non-vector operational subset. It should:
+The next smallest safe database block is controlled live validation of the
+offline operational migration. It should:
 
-- map the implemented batch, result, intent, and audit contracts to the
-  approved physical schema;
-- preserve serializable transaction boundaries and external-effect separation;
-- add clean-database, idempotency, retry, contention, and workspace-isolation
-  tests; and
-- create no vector dimension or cloud resource.
+- verify current Basic-plan usage and the no-paid-usage boundary;
+- use a controlled clean target and least-privilege migration identity;
+- apply and introspect the exact approved revision;
+- test invalid states and workspace-scoped constraints; and
+- preserve sanitized evidence without exposing the connection URL.
 
-Migration implementation requires a new initiative explanation and explicit
-user approval.
+Live validation requires a new cost and target preflight plus explicit user
+approval.
 
 ## 7. Readiness for CockroachDB, AWS, and UI
 
