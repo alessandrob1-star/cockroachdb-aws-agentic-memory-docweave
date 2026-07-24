@@ -78,7 +78,7 @@ is reproducible.
 | SEC-007 | Container security | Image scanning and non-root runtime | Image report | Planned |
 | SEC-008 | Least privilege | Dedicated human, deployment, and runtime identities | Identity and Access Management policy review | Planned |
 | SEC-009 | Secure secrets | Runtime secret resolution and no plaintext storage | Configuration test and audit evidence | Planned |
-| SEC-010 | Secure uploads | Type, signature, size, structure, malware, and quarantine controls | Malicious-file test suite | Planned |
+| SEC-010 | Secure uploads | Type, signature, size, structure, malware, and quarantine controls | Malicious-file test suite | In progress |
 | SEC-011 | Prompt injection resistance | Instruction-data separation and adversarial evaluations | Red-team report | Planned |
 | SEC-012 | Memory poisoning resistance | Provenance, trust labels, quarantine, revocation, and retrieval authorization | Memory attack evaluation | Planned |
 | SEC-013 | Tool misuse prevention | Allowlisted tools, typed arguments, scoped identities, and approval gates | Authorization tests and audit traces | Planned |
