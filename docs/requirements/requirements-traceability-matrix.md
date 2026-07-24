@@ -108,7 +108,7 @@ is reproducible.
 | PROD-002 | Stable logical document and physical-instance identity | `product-requirements.md` FR-007–FR-010 | Identity, copy, move, and version tests | In progress |
 | PROD-003 | Explainable analysis, classification, naming, and relationships | `product-requirements.md` FR-011–FR-017, `domain-data-requirements.md` taxonomy baseline, and `classification-and-confidence-specification.md` | Curated-corpus evaluation and trace evidence | Planned |
 | PROD-004 | Confidence-driven and sampled human review | `product-requirements.md` FR-018–FR-024 | User-flow tests and calibration report | Planned |
-| PROD-005 | Safe copy, move, resume, and restore | `product-requirements.md` FR-025–FR-034 | Planning, failure-injection, and end-to-end tests | In progress |
+| PROD-005 | Safe copy, move, resume, and restore | `product-requirements.md` FR-025–FR-034 | Planning, execution, failure-injection, and end-to-end tests | In progress |
 | PROD-006 | Team roles and append-only Activity History | `product-requirements.md` FR-035–FR-040 | Authorization and audit tests | Planned |
 | PROD-007 | Four persistent memory classes in CockroachDB | `product-requirements.md` FR-041–FR-046 | Schema, retrieval, authorization, and demo evidence | Planned |
 | PROD-008 | Complete desktop and cloud product parity | `product-requirements.md` FR-047–FR-050 | Cross-surface contract and end-to-end tests | Planned |
@@ -131,7 +131,7 @@ is reproducible.
 | --- | --- | --- | --- | --- |
 | MVP-001 | Repeated scan and safe resume | AC-001, AC-002 | Automated end-to-end and fault-injection evidence | Planned |
 | MVP-002 | Confidence review and quality sampling | AC-003, AC-004 | User-flow tests and calibration evidence | Planned |
-| MVP-003 | Identity-safe move and copy | AC-005, AC-006 | Filesystem and persistence integrity tests | In progress |
+| MVP-003 | Identity-safe move and copy | AC-005, AC-006 | Filesystem execution and persistence integrity tests | In progress |
 | MVP-004 | Collision and individual restore | AC-007–AC-009 | Cross-platform operation tests | In progress |
 | MVP-005 | Batch restore and accountability | AC-010, AC-011 | Role, audit, and partial-failure tests | Planned |
 | MVP-006 | Visible persistent agentic memory | AC-012 | Trace, database, restart, and demo evidence | Planned |
