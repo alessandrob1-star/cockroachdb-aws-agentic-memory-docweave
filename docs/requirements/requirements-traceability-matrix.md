@@ -54,9 +54,9 @@ is reproducible.
 
 | ID | Requirement | Automated control | Evidence | Status |
 | --- | --- | --- | --- | --- |
-| QUAL-001 | Formatting and linting | Language-specific formatter and linter | Continuous Integration logs | In progress |
-| QUAL-002 | Static type safety | Strict type checker | Continuous Integration logs | In progress |
-| QUAL-003 | Unit tests | Test runner with coverage | Test and coverage reports | In progress |
+| QUAL-001 | Formatting and linting | Ruff format and lint run locally and through `.github/workflows/ci.yml` | Local check output and GitHub Actions logs | In progress |
+| QUAL-002 | Static type safety | Strict MyPy check run locally and through `.github/workflows/ci.yml` | Local check output and GitHub Actions logs | In progress |
+| QUAL-003 | Unit tests | Pytest with coverage run locally and through `.github/workflows/ci.yml` | Test, coverage, and GitHub Actions reports | In progress |
 | QUAL-004 | Integration and contract tests | Real CockroachDB and mocked or sandboxed AWS boundaries as appropriate | Integration report | Planned |
 | QUAL-005 | End-to-end critical journeys | Browser and service end-to-end suite | Video and machine-readable report | Planned |
 | QUAL-006 | Agent regression evaluation | Versioned corpus and evaluation runner | Evaluation report | Planned |
