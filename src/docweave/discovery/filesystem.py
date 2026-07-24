@@ -118,7 +118,12 @@ def discover_files(
 
 def _iter_files(root: Path) -> Iterable[Path]:
     for path in sorted(root.rglob("*"), key=lambda candidate: candidate.as_posix()):
-        if path.is_symlink() or path.is_file():
+        try:
+            is_discoverable = path.is_symlink() or path.is_file()
+        except OSError:
+            is_discoverable = True
+
+        if is_discoverable:
             yield path
 
 
@@ -133,7 +138,12 @@ def _inspect_file(
         case_sensitive=config.case_sensitive_paths,
     )
 
-    if path.is_symlink():
+    try:
+        is_symlink = path.is_symlink()
+    except OSError as exc:
+        return _unreadable_file(path, root, relative_path, comparison_key, exc)
+
+    if is_symlink:
         return DiscoveredFile(
             root=root,
             absolute_path=path,
@@ -157,15 +167,7 @@ def _inspect_file(
     try:
         stat = path.stat()
     except OSError as exc:
-        return DiscoveredFile(
-            root=root,
-            absolute_path=path,
-            relative_path=relative_path,
-            comparison_key=comparison_key,
-            status=DiscoveryStatus.UNREADABLE,
-            byte_size=None,
-            error=exc.__class__.__name__,
-        )
+        return _unreadable_file(path, root, relative_path, comparison_key, exc)
 
     return DiscoveredFile(
         root=root,
@@ -174,4 +176,22 @@ def _inspect_file(
         comparison_key=comparison_key,
         status=DiscoveryStatus.CANDIDATE,
         byte_size=stat.st_size,
+    )
+
+
+def _unreadable_file(
+    path: Path,
+    root: Path,
+    relative_path: str,
+    comparison_key: str,
+    exc: OSError,
+) -> DiscoveredFile:
+    return DiscoveredFile(
+        root=root,
+        absolute_path=path,
+        relative_path=relative_path,
+        comparison_key=comparison_key,
+        status=DiscoveryStatus.UNREADABLE,
+        byte_size=None,
+        error=exc.__class__.__name__,
     )

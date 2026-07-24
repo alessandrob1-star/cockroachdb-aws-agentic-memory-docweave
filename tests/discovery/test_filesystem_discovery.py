@@ -94,6 +94,29 @@ def test_marks_supported_file_unreadable_when_metadata_fails(
     assert result.files[0].error == "PermissionError"
 
 
+def test_marks_supported_file_unreadable_when_symlink_check_fails(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    unreadable = tmp_path / "blocked.pdf"
+    write_file(unreadable)
+    original_is_symlink = Path.is_symlink
+
+    def fake_is_symlink(path: Path) -> bool:
+        if path == unreadable:
+            raise PermissionError
+        return original_is_symlink(path)
+
+    monkeypatch.setattr(Path, "is_symlink", fake_is_symlink)
+
+    result = discover_files([tmp_path])
+
+    assert result.unreadable_count == 1
+    assert result.files[0].relative_path == "blocked.pdf"
+    assert result.files[0].status is DiscoveryStatus.UNREADABLE
+    assert result.files[0].error == "PermissionError"
+
+
 def test_comparison_key_is_case_insensitive_by_default(tmp_path: Path) -> None:
     write_file(tmp_path / "Folder" / "Invoice.PDF")
 
