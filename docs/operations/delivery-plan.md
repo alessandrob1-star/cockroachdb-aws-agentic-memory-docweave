@@ -3,7 +3,7 @@
 **Project:** DocWeave
 **Plan date:** 2026-07-23
 **Submission deadline:** 2026-08-18 17:00 EDT / 2026-08-18 23:00 CEST
-**Implementation status:** Planned
+**Implementation status:** In progress
 
 ## 1. Purpose
 
@@ -82,6 +82,21 @@ The critical path is:
   above choices.
 - Local quality commands run without cloud access.
 - The repository contains no runtime secret values.
+
+**Current progress on 2026-07-24:**
+
+- Local Python package and quality gates are implemented.
+- GitHub Actions runs the Python quality gate on pull requests.
+- Local discovery, fingerprinting, PDF signature inspection, intake, duplicate
+  grouping, operation planning, approval validation, and single-operation
+  execution primitives are implemented and tested.
+- Batch execution, audit events, CockroachDB migrations, AWS infrastructure,
+  Bedrock invocation, and user interfaces remain not implemented.
+- The preparatory notes
+  [`local-core-status.md`](local-core-status.md) and
+  [`local-batch-operation-design-note.md`](../architecture/local-batch-operation-design-note.md)
+  define the recommended handoff into the next batch and audit implementation
+  block.
 
 ### M2 - CockroachDB memory foundation
 
