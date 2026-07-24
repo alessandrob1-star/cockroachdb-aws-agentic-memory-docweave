@@ -1,8 +1,8 @@
 # Verified Environment Baseline
 
 **Project:** DocWeave
-**Last verified:** 2026-07-23
-**Implementation status:** Environment available; product deployment not started
+**Last verified:** 2026-07-24
+**Implementation status:** Validation schema available; product deployment not started
 
 ## 1. Purpose
 
@@ -52,22 +52,30 @@ and evaluation evidence.
 | Storage limit | 10 GiB |
 | Network visibility | Public endpoint |
 | SQL administration | Administrative SQL user exists; credentials are not stored in the repository |
-| Application schema | Not created or verified; no migration implementation is claimed |
+| Validation database | `docweave_validation`, created on 2026-07-24 |
+| Initial schema | Revision `0001_operational_foundation` accepted and introspected in the isolated validation database |
+| Application connection | Not implemented; the validation schema is not a runtime or production deployment |
 
 The current resource limits match the organization's documented monthly Basic
 free-resource allowance. They are not permission to increase capacity or
 enable unlimited usage.
 
-The public endpoint is an explicit pre-implementation security item. Before an
-application connects, the architecture must define approved network controls,
-Transport Layer Security, certificate validation, application authentication,
-separate migration and runtime roles, Row-Level Security, secret resolution,
-connection pooling, and workspace-context cleanup.
+The public endpoint is an explicit pre-implementation security item. The
+project owner approved existing root and administrator access for
+predevelopment control-plane validation without exposing credentials. Before
+an application connects, the architecture must define approved network
+controls, Transport Layer Security, certificate validation, application
+authentication, separate runtime identities, Row-Level Security, secret
+resolution, connection pooling, and workspace-context cleanup. Least-privilege
+deployment and runtime identities remain separately approval-gated.
 
 ## 4. Tool evidence
 
 - `ccloud` version 0.6.12 authenticated successfully and was used to list and
   inspect the real `docweave-memory` cluster and SQL-user names.
+- The exact offline-rendered initial migration was accepted through the
+  authenticated CockroachDB Cloud SQL Shell in a clean validation database.
+  See [`cockroachdb-live-validation.md`](cockroachdb-live-validation.md).
 - The AWS Model Context Protocol server was used for the verified read-only
   account, budget, Free plan, Cost Explorer, anomaly detection, resource, and
   Bedrock inventory.
@@ -81,10 +89,10 @@ The following decisions or artifacts remain mandatory:
 1. seed and test the approved taxonomy baseline before classification
    contracts depend on it;
 2. approve the embedding model, vector dimension, and distance metric;
-3. implement reviewed CockroachDB migrations from ADR-0002;
-4. test constraints, serializable retries, workspace isolation, and recovery;
-5. create separate least-privilege migration, runtime, audit, and bounded
-   Model Context Protocol identities;
+3. implement the remaining reviewed CockroachDB migrations from ADR-0002;
+4. complete transaction, workspace-isolation, and recovery tests;
+5. create separately approved least-privilege migration, runtime, audit, and
+   bounded Model Context Protocol identities before application deployment;
 6. approve the local-versus-cloud extraction and privacy boundary;
 7. approve the AWS compute, storage, queue, authentication, and network
    topology through Infrastructure as Code;
@@ -92,5 +100,5 @@ The following decisions or artifacts remain mandatory:
 9. record cost, latency, quality, security, and recovery evidence.
 
 Until these gates are closed, the correct compliant state is to preserve the
-existing free-capacity environments without creating a database schema or
+isolated validation schema without treating it as application persistence or
 deploying DocWeave workloads.

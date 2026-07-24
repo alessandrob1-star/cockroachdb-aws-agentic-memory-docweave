@@ -12,9 +12,9 @@ next batch, audit, CockroachDB, AWS, or user-interface work.
 
 It is an evidence index, not a release-readiness claim.
 
-The initial CockroachDB operational migration is now authored and validated
-offline. It is not part of the implemented local runtime core and has not been
-applied to a database.
+The initial CockroachDB operational migration is authored, validated offline,
+and accepted by an isolated live validation database. It is not part of the
+implemented local runtime core, and no application code connects to it.
 
 ## 2. Current implemented local core
 
@@ -44,8 +44,7 @@ The repository currently contains a tested Python package with:
 
 ## 3. Current local quality evidence
 
-The latest verified local quality gate on
-`codex/cockroachdb-migration-foundation` reported:
+The latest verified local quality gate on `main` reported:
 
 - 144 tests passed;
 - 99 percent total package coverage;
@@ -57,10 +56,9 @@ The latest verified local quality gate on
 - online migration execution was verified to fail closed when no database URL
   is explicitly supplied.
 
-The previous 132-test local-core baseline also passed GitHub Actions on pull
-request 21 and on its merge to `main`. GitHub Actions evidence for the current
-migration branch remains pending until an explicitly authorized pull request
-is published.
+The 144-test migration baseline passed GitHub Actions on pull request 22 and
+after its merge to `main`. The Node.js 24 workflow update passed on pull request
+23 and after its merge to `main`.
 
 The check command is:
 
@@ -72,7 +70,7 @@ The check command is:
 
 DocWeave does not yet implement or claim:
 
-- deployed CockroachDB application tables or a successful live migration;
+- an application connection to CockroachDB or a production schema;
 - persistent operational, semantic, episodic, preference, or audit memory;
 - AWS infrastructure or deployed DocWeave workloads;
 - Amazon Bedrock invocation inside the product;
@@ -110,25 +108,25 @@ must be closed before production-grade batch execution:
 | No restore contract | Move and copy outcomes are not yet reversible through tested restore semantics | Add restore planning after batch result and audit semantics |
 | No workspace/user authorization model | Approval uses user identifiers but no role policy yet | Add authorization contract before user interface or cloud execution |
 
-## 6. Recommended next implementation block
+## 6. Completed live validation boundary
 
-The next smallest safe database block is controlled live validation of the
-offline operational migration. It should:
+The 2026-07-24 controlled validation:
 
-- verify current Basic-plan usage and the no-paid-usage boundary;
-- use a controlled clean target and least-privilege migration identity;
-- apply and introspect the exact approved revision;
-- test invalid states and workspace-scoped constraints; and
-- preserve sanitized evidence without exposing the connection URL.
+- verified the Basic-plan usage and no-paid-usage boundary;
+- created the isolated `docweave_validation` target;
+- applied the exact offline-rendered initial revision;
+- introspected the revision, six tables, critical constraints, and indexes;
+- proved two invalid states were rejected without persisted rows; and
+- preserved sanitized evidence without exposing a connection URL or secret.
 
-Live validation requires a new cost and target preflight plus explicit user
-approval.
+It did not validate the online Alembic and Psycopg connection path, application
+persistence, cross-workspace behavior, serializable retries, or recovery.
 
 ## 7. Readiness for CockroachDB, AWS, and UI
 
-CockroachDB implementation can now begin after separate approval because the
-local batch and audit contracts define the persistent transaction and audit
-shape.
+CockroachDB application persistence can now begin after separate approval
+because both the local contracts and initial live schema shape have current
+evidence.
 
 The PySide6 desktop preview interface is no longer blocked by a missing batch
 model. Its first implementation should still wait for an approved surface
