@@ -1,4 +1,4 @@
-"""Safe file operation planning contracts."""
+"""Safe local file operation, batch, approval, audit, and result contracts."""
 
 from docweave.operations.approval import (
     ApprovalValidation,
@@ -8,6 +8,33 @@ from docweave.operations.approval import (
     approve_operation_plan,
     operation_plan_fingerprint,
     validate_operation_approval,
+)
+from docweave.operations.audit import (
+    AppendOnlyAuditTrail,
+    AuditActorType,
+    AuditEvent,
+    AuditEventType,
+)
+from docweave.operations.batch import (
+    MAX_OPERATION_BATCH_ITEMS,
+    BatchApproval,
+    BatchApprovalRequest,
+    BatchCreationRequest,
+    BatchExecutionReport,
+    BatchExecutionRequest,
+    BatchItemRequest,
+    BatchItemState,
+    BatchState,
+    BatchSummary,
+    OperationBatch,
+    OperationBatchItem,
+    approve_operation_batch,
+    create_operation_batch,
+    derive_batch_state,
+    execute_operation_batch,
+    operation_batch_fingerprint,
+    operation_execution_key,
+    summarize_batch,
 )
 from docweave.operations.execution import (
     ExecutionReason,
@@ -23,11 +50,30 @@ from docweave.operations.planning import (
     FileOperationStatus,
     plan_file_operation,
 )
+from docweave.operations.results import (
+    InMemoryExecutionLedger,
+    OperationResultRecord,
+    ResultDisposition,
+)
 
 __all__ = [
+    "MAX_OPERATION_BATCH_ITEMS",
+    "AppendOnlyAuditTrail",
     "ApprovalValidation",
     "ApprovalValidationReason",
     "ApprovalValidationStatus",
+    "AuditActorType",
+    "AuditEvent",
+    "AuditEventType",
+    "BatchApproval",
+    "BatchApprovalRequest",
+    "BatchCreationRequest",
+    "BatchExecutionReport",
+    "BatchExecutionRequest",
+    "BatchItemRequest",
+    "BatchItemState",
+    "BatchState",
+    "BatchSummary",
     "ExecutionReason",
     "ExecutionResult",
     "ExecutionStatus",
@@ -36,10 +82,22 @@ __all__ = [
     "FileOperationReason",
     "FileOperationRequest",
     "FileOperationStatus",
+    "InMemoryExecutionLedger",
     "OperationApproval",
+    "OperationBatch",
+    "OperationBatchItem",
+    "OperationResultRecord",
+    "ResultDisposition",
+    "approve_operation_batch",
     "approve_operation_plan",
+    "create_operation_batch",
+    "derive_batch_state",
     "execute_file_operation",
+    "execute_operation_batch",
+    "operation_batch_fingerprint",
+    "operation_execution_key",
     "operation_plan_fingerprint",
     "plan_file_operation",
+    "summarize_batch",
     "validate_operation_approval",
 ]

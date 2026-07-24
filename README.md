@@ -15,9 +15,11 @@ DocWeave is in the approved requirements and architecture phase with an initial
 local Python engineering scaffold, deterministic local filesystem discovery
 contracts, local content fingerprinting, PDF signature inspection, and
 deterministic intake records with duplicate grouping, and safe file-operation
-planning, approval, and single-operation execution contracts. No batch
-execution, restore, database migration, deployed schema, cloud integration, or
-intelligent document analysis is claimed yet.
+planning, approval, single-operation execution, bounded local batch execution,
+per-item results, in-memory idempotency, interrupted-operation reconciliation,
+and append-only local audit event contracts. These local contracts are not
+durable persistence. No restore, database migration, deployed schema, cloud
+integration, or intelligent document analysis is claimed yet.
 
 The current approved product direction includes:
 

@@ -158,7 +158,7 @@ def test_blocks_if_source_disappears_after_approval(tmp_path: Path) -> None:
     assert result.destination_exists_after is False
 
 
-def test_reports_file_operation_failure(
+def test_reports_partial_file_operation_as_verification_failure(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -178,8 +178,88 @@ def test_reports_file_operation_failure(
         now_utc=now + timedelta(minutes=1),
     )
 
+    assert result.status is ExecutionStatus.VERIFICATION_FAILED
+    assert result.reason is ExecutionReason.VERIFICATION_FAILED
+    assert result.error == "OSError"
+
+
+def test_reports_file_operation_failure_before_destination_exists(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    plan, approval, now = approved_plan(tmp_path, operation=FileOperation.COPY)
+
+    def fake_copy(_plan: FileOperationPlan) -> None:
+        raise OSError
+
+    monkeypatch.setattr(
+        "docweave.operations.execution._copy_file_exclusively",
+        fake_copy,
+    )
+
+    result = execute_file_operation(
+        plan,
+        approval,
+        execution_id="execution-001",
+        now_utc=now + timedelta(minutes=1),
+    )
+
     assert result.status is ExecutionStatus.FAILED
     assert result.reason is ExecutionReason.FILE_OPERATION_FAILED
+    assert result.error == "OSError"
+
+
+@pytest.mark.parametrize("exception", [OSError, ValueError])
+def test_blocks_if_replanning_cannot_prove_current_state(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    exception: type[Exception],
+) -> None:
+    plan, approval, now = approved_plan(tmp_path, operation=FileOperation.COPY)
+
+    def fail_replan(_request: FileOperationRequest) -> FileOperationPlan:
+        raise exception
+
+    monkeypatch.setattr(
+        "docweave.operations.execution.plan_file_operation",
+        fail_replan,
+    )
+
+    result = execute_file_operation(
+        plan,
+        approval,
+        execution_id="execution-001",
+        now_utc=now + timedelta(minutes=1),
+    )
+
+    assert result.status is ExecutionStatus.BLOCKED
+    assert result.reason is ExecutionReason.PLAN_CHANGED_BEFORE_EXECUTION
+    assert result.error == exception.__name__
+
+
+def test_blocks_if_source_becomes_unreadable_after_replanning(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    plan, approval, now = approved_plan(tmp_path, operation=FileOperation.COPY)
+
+    def fail_fingerprint(_path: Path) -> ContentFingerprint:
+        raise OSError
+
+    monkeypatch.setattr(
+        "docweave.operations.execution.compute_sha256_fingerprint",
+        fail_fingerprint,
+    )
+
+    result = execute_file_operation(
+        plan,
+        approval,
+        execution_id="execution-001",
+        now_utc=now + timedelta(minutes=1),
+    )
+
+    assert result.status is ExecutionStatus.BLOCKED
+    assert result.reason is ExecutionReason.PLAN_CHANGED_BEFORE_EXECUTION
     assert result.error == "OSError"
 
 
