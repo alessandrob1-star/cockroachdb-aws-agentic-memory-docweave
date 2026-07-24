@@ -28,19 +28,29 @@ The repository currently contains a tested Python package with:
 - human approval contracts bound to exact operation plan fingerprints;
 - single-operation local copy and move execution for already-ready and
   already-approved plans;
+- bounded local operation batches with a maximum of 1,000 items;
+- per-item source fingerprint and byte-size approval preconditions;
+- independent per-item outcomes and truthful partial-batch summaries;
+- append-only in-memory audit event contracts with minimized diagnostics;
+- an in-memory execution-intent and result ledger for local idempotency tests;
+- duplicate-request replay without repeated successful filesystem effects;
+- explicit interrupted-operation reconciliation before retry;
 - local and GitHub Actions quality gates for formatting, linting, strict type
   checking, tests, and coverage.
 
 ## 3. Current local quality evidence
 
-The latest verified local quality gate on `main` after PR #19 reported:
+The latest verified local quality gate on
+`codex/local-batch-audit-results` reported:
 
-- 77 tests passed;
-- 100 percent package coverage;
+- 132 tests passed;
+- 99 percent total package coverage, with 100 percent coverage in the audit,
+  result-ledger, approval, planning, and single-operation execution modules;
 - Ruff format check passed;
 - Ruff lint check passed;
 - MyPy strict check passed;
-- GitHub Actions `Python quality (3.12)` passed on PR #19.
+- GitHub Actions evidence remains pending until an explicitly authorized pull
+  request is published.
 
 The check command is:
 
@@ -59,16 +69,16 @@ DocWeave does not yet implement or claim:
 - PySide6 desktop or cloud user interface;
 - PDF text extraction;
 - model-driven classification, naming, confidence, or relationship analysis;
-- operation batch execution;
 - persistent idempotency;
 - restore planning or restore execution;
-- Activity History;
+- durable Activity History;
 - release security scanning beyond the current Python quality gate.
 
-The single-operation executor is a local primitive. It is not yet a complete
-product workflow because it does not persist intent before mutation, does not
-record append-only audit events, and does not yet use CockroachDB to enforce
-idempotency or workspace authorization.
+The batch executor is a local primitive. It records intent before mutation in
+an in-memory ledger and emits append-only local events, but a process loss also
+loses those records. It is not yet a complete product workflow because it does
+not use CockroachDB to make intent, audit, idempotency, or workspace
+authorization durable and transactional.
 
 ## 5. Contract review findings
 
@@ -84,39 +94,36 @@ must be closed before production-grade batch execution:
 
 | Gap | Impact | Required next control |
 | --- | --- | --- |
-| No persistent idempotency key registry | Repeating the same request across process restarts could execute again | Batch item state and execution idempotency must be persisted in CockroachDB |
-| No append-only audit event | The system cannot yet prove who approved, executed, or observed a result | Add local audit event contracts before CockroachDB persistence |
-| No durable pre-mutation intent record | A crash after filesystem mutation but before state recording would be ambiguous | Persist intent before mutation in the batch workflow |
-| Approval is bound to plan paths and status, not persisted source identity | A source content change after approval must be detected by the future batch contract | Include observed source fingerprint and metadata in batch item preconditions |
+| No persistent idempotency key registry | Process loss removes the local replay registry | Enforce workspace-scoped unique keys in CockroachDB |
+| Audit events are local and in-memory | Activity History cannot survive restart or prove database ordering | Persist append-only audit events with transaction and integrity evidence |
+| Pre-mutation intent is not durable | A process or machine failure can still leave an ambiguous external outcome | Persist intent before mutation and claim it with a bounded lease |
 | No restore contract | Move and copy outcomes are not yet reversible through tested restore semantics | Add restore planning after batch result and audit semantics |
 | No workspace/user authorization model | Approval uses user identifiers but no role policy yet | Add authorization contract before user interface or cloud execution |
 
 ## 6. Recommended next implementation block
 
-The next implementation block should define the local batch, audit, and result
-contracts before adding CockroachDB persistence. It should produce:
+The next smallest safe block is the reviewed CockroachDB migration foundation
+for the non-vector operational subset. It should:
 
-- batch request and batch plan contracts;
-- batch item states;
-- per-item result records;
-- append-only audit event contracts;
-- idempotency key semantics;
-- explicit crash and retry behavior;
-- tests for partial success, duplicate execution request, stale source state,
-  collision isolation, and failed verification.
+- map the implemented batch, result, intent, and audit contracts to the
+  approved physical schema;
+- preserve serializable transaction boundaries and external-effect separation;
+- add clean-database, idempotency, retry, contention, and workspace-isolation
+  tests; and
+- create no vector dimension or cloud resource.
 
-This block is architecture-sensitive and should be performed with GPT-5.6 Sol
-before implementation.
+Migration implementation requires a new initiative explanation and explicit
+user approval.
 
 ## 7. Readiness for CockroachDB, AWS, and UI
 
-CockroachDB should begin after the local batch and audit contracts are
-approved, because those contracts define the persistent transaction and audit
+CockroachDB implementation can now begin after separate approval because the
+local batch and audit contracts define the persistent transaction and audit
 shape.
 
-The PySide6 desktop interface can begin after the batch preview model exists,
-because the first useful UI needs to display batch rows, per-file statuses,
-approval state, and explanations of blocked operations.
+The PySide6 desktop preview interface is no longer blocked by a missing batch
+model. Its first implementation should still wait for an approved surface
+contract so it does not invent persistence or authorization behavior.
 
 AWS infrastructure should begin after the CockroachDB migration strategy and
 first local vertical slice are ready, so cloud work deploys real product

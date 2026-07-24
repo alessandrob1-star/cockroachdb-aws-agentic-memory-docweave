@@ -1,7 +1,7 @@
 # Requirements Traceability Matrix
 
 **Project:** DocWeave
-**Last updated:** 2026-07-23
+**Last updated:** 2026-07-24
 **Status vocabulary:** Not started, Planned, In progress, Verified, Blocked
 
 ## 1. Purpose
@@ -60,7 +60,7 @@ is reproducible.
 | QUAL-004 | Integration and contract tests | Real CockroachDB and mocked or sandboxed AWS boundaries as appropriate | Integration report | Planned |
 | QUAL-005 | End-to-end critical journeys | Browser and service end-to-end suite | Video and machine-readable report | Planned |
 | QUAL-006 | Agent regression evaluation | Versioned corpus and evaluation runner | Evaluation report | Planned |
-| QUAL-007 | Resilience testing | Failure injection, retries, idempotency, and recovery tests | Resilience report | Planned |
+| QUAL-007 | Resilience testing | Failure injection, retries, idempotency, and recovery tests | Resilience report | In progress; local batch retry and reconciliation tests implemented |
 | QUAL-008 | Accessibility | Automated scanner plus manual keyboard and screen review | Web Content Accessibility Guidelines checklist | Planned |
 | QUAL-009 | Reproducible setup | Pinned dependencies, containers, and clean-machine smoke test | Setup validation artifact | Planned |
 | QUAL-010 | Benchmark parity | Compare gates and evidence with AI Act benchmark | Benchmark comparison report | In progress |
@@ -83,7 +83,7 @@ is reproducible.
 | SEC-012 | Memory poisoning resistance | Provenance, trust labels, quarantine, revocation, and retrieval authorization | Memory attack evaluation | Planned |
 | SEC-013 | Tool misuse prevention | Allowlisted tools, typed arguments, scoped identities, and approval gates | Authorization tests and audit traces | In progress |
 | SEC-014 | Human approval for material actions | Review decision and execution state machine | Approval contract tests and end-to-end tests | In progress |
-| SEC-015 | Immutable originals and audit | Content hashes, versioned objects, append-only events | Integrity tests and demo | Planned |
+| SEC-015 | Immutable originals and audit | Content hashes, versioned objects, append-only events | Integrity tests and demo | In progress; local append-only event contracts implemented, durable audit pending |
 | SEC-016 | Data protection | Encryption, minimization, retention, and deletion controls | Policy and configuration evidence | Planned |
 | SEC-017 | Incident and recovery readiness | Alarm, rollback, backup, and incident runbooks | Recovery exercise report | Planned |
 
@@ -109,7 +109,7 @@ is reproducible.
 | PROD-003 | Explainable analysis, classification, naming, and relationships | `product-requirements.md` FR-011–FR-017, `domain-data-requirements.md` taxonomy baseline, and `classification-and-confidence-specification.md` | Curated-corpus evaluation and trace evidence | Planned |
 | PROD-004 | Confidence-driven and sampled human review | `product-requirements.md` FR-018–FR-024 | User-flow tests and calibration report | Planned |
 | PROD-005 | Safe copy, move, resume, and restore | `product-requirements.md` FR-025–FR-034 | Planning, execution, failure-injection, and end-to-end tests | In progress |
-| PROD-006 | Team roles and append-only Activity History | `product-requirements.md` FR-035–FR-040 | Authorization and audit tests | Planned; local audit design note drafted |
+| PROD-006 | Team roles and append-only Activity History | `product-requirements.md` FR-035–FR-040 | Authorization and audit tests | In progress; local append-only audit contracts implemented, roles and persistence pending |
 | PROD-007 | Four persistent memory classes in CockroachDB | `product-requirements.md` FR-041–FR-046 | Schema, retrieval, authorization, and demo evidence | Planned |
 | PROD-008 | Complete desktop and cloud product parity | `product-requirements.md` FR-047–FR-050 | Cross-surface contract and end-to-end tests | Planned |
 | PROD-009 | Bounded memory and database stewardship agent | `product-requirements.md` FR-051–FR-054 | Tool-authorization, provenance, anomaly, and audit tests | Planned |
@@ -122,7 +122,7 @@ is reproducible.
 | --- | --- | ---: | --- | --- |
 | CAP-001 | Source-folder discovery | 10,000 files | Responsive discovery, restart, and reconciliation test | In progress |
 | CAP-002 | Active documents per MVP project | 5,000 files | Sorting, filtering, review, and persistence test | Planned |
-| CAP-003 | Maximum processing batch | 1,000 files | Checkpoint, interruption, resume, and duplicate-request test | Planned; local batch design note drafted |
+| CAP-003 | Maximum processing batch | 1,000 files | Checkpoint, interruption, resume, and duplicate-request test | In progress; local limit, interruption reconciliation, and duplicate-request tests implemented |
 | CAP-004 | Primary demonstration and evaluation corpus | Approximately 300 PDFs | Curated corpus, reference labels, license manifest, and evaluation report | Planned |
 
 ## 10. MVP acceptance baseline
@@ -133,7 +133,7 @@ is reproducible.
 | MVP-002 | Confidence review and quality sampling | AC-003, AC-004 | User-flow tests and calibration evidence | Planned |
 | MVP-003 | Identity-safe move and copy | AC-005, AC-006 | Filesystem execution and persistence integrity tests | In progress |
 | MVP-004 | Collision and individual restore | AC-007–AC-009 | Cross-platform operation tests | In progress |
-| MVP-005 | Batch restore and accountability | AC-010, AC-011 | Role, audit, and partial-failure tests | Planned; local batch and audit design note drafted |
+| MVP-005 | Batch restore and accountability | AC-010, AC-011 | Role, audit, and partial-failure tests | In progress; local batch accountability and partial-failure tests implemented, roles, persistence, and restore pending |
 | MVP-006 | Visible persistent agentic memory | AC-012 | Trace, database, restart, and demo evidence | Planned |
 | MVP-007 | Real desktop and cloud core | AC-013 | Deployment and parity evidence | Planned |
 | MVP-008 | 10,000-file scale discovery | AC-014 | Performance and reconciliation report | Planned |

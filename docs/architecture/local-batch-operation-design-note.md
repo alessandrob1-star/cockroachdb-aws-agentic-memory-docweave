@@ -1,7 +1,7 @@
 # Local Batch Operation Design Note
 
 **Project:** DocWeave
-**Status:** Preparatory design note
+**Status:** Local contracts implemented; durable persistence not started
 **Date:** 2026-07-24
 **Scope:** Local batch, audit, and operation result contracts
 
@@ -12,6 +12,10 @@ with per-file outcomes, idempotency semantics, and append-only audit events.
 
 It does not approve or implement CockroachDB migrations, AWS resources,
 Bedrock calls, restore execution, or user-interface behavior.
+
+The local contracts described here were implemented on
+`codex/local-batch-audit-results`. The in-memory audit trail and execution
+ledger are explicit development boundaries, not substitutes for CockroachDB.
 
 ## 2. Design goals
 
@@ -190,9 +194,9 @@ Default local policy should be:
 - stop only if a systemic safety failure is detected, such as policy mismatch,
   authorization failure, or batch-level approval invalidation.
 
-## 9. Test plan for the next block
+## 9. Implemented test evidence
 
-The next implementation should include tests for:
+The local implementation includes tests for:
 
 - empty batch rejection;
 - maximum item count enforcement;
@@ -208,12 +212,24 @@ The next implementation should include tests for:
 - audit events do not include document bytes or private content;
 - batch summary counts match item terminal states.
 
-## 10. Handoff to GPT-5.6 Sol
+It also verifies that sibling operations may safely share newly created
+destination directories, filesystem replanning failures block execution, and a
+partial external effect is reported as verification-failed rather than as a
+simple failure.
 
-Implementation of these contracts should be done with GPT-5.6 Sol because the
-state machine, idempotency, and audit semantics will shape the CockroachDB
-schema implementation and future user interface.
+## 10. Persistence handoff
 
-The first Sol task should start by reviewing this document, the local core
-status note, `src/docweave/operations`, and the approved physical CockroachDB
-schema before writing code.
+The next database block must map these contracts to the already approved
+CockroachDB physical model:
+
+- persist operation intent and audit evidence in one serializable transaction;
+- enforce workspace-scoped unique idempotency keys;
+- claim execution through bounded leases;
+- persist verified terminal results or an explicit reconciliation-required
+  state;
+- preserve append-only event order and attribution; and
+- prove clean migration, retry, contention, authorization, and recovery
+  behavior.
+
+That database work requires separate user approval. No migration or application
+table is created by the local implementation.

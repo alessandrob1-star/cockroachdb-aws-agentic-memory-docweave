@@ -124,7 +124,15 @@ def _pre_execution_blocker(
             evidence=_ExecutionEvidence(error=approval_validation.reason.value),
         )
 
-    current_plan = plan_file_operation(plan.request)
+    try:
+        current_plan = plan_file_operation(plan.request)
+    except (OSError, ValueError) as exc:
+        return _result(
+            context,
+            status=ExecutionStatus.BLOCKED,
+            reason=ExecutionReason.PLAN_CHANGED_BEFORE_EXECUTION,
+            evidence=_ExecutionEvidence(error=exc.__class__.__name__),
+        )
     if operation_plan_fingerprint(current_plan) != operation_plan_fingerprint(plan):
         return _result(
             context,
@@ -139,10 +147,18 @@ def _perform_execution(context: _ExecutionContext) -> ExecutionResult:
     plan = context.plan
     source_path = cast(Path, plan.source_path)
     destination_path = cast(Path, plan.destination_path)
-    source_digest_before = compute_sha256_fingerprint(source_path).hex_digest
+    try:
+        source_digest_before = compute_sha256_fingerprint(source_path).hex_digest
+    except OSError as exc:
+        return _result(
+            context,
+            status=ExecutionStatus.BLOCKED,
+            reason=ExecutionReason.PLAN_CHANGED_BEFORE_EXECUTION,
+            evidence=_ExecutionEvidence(error=exc.__class__.__name__),
+        )
     try:
         for directory in plan.planned_parent_directories:
-            directory.mkdir()
+            directory.mkdir(exist_ok=True)
         _copy_file_exclusively(plan)
         destination_digest_after = compute_sha256_fingerprint(
             destination_path,
@@ -171,10 +187,19 @@ def _perform_execution(context: _ExecutionContext) -> ExecutionResult:
             ),
         )
     except OSError as exc:
+        destination_may_exist = _destination_exists(plan)
         return _result(
             context,
-            status=ExecutionStatus.FAILED,
-            reason=ExecutionReason.FILE_OPERATION_FAILED,
+            status=(
+                ExecutionStatus.VERIFICATION_FAILED
+                if destination_may_exist
+                else ExecutionStatus.FAILED
+            ),
+            reason=(
+                ExecutionReason.VERIFICATION_FAILED
+                if destination_may_exist
+                else ExecutionReason.FILE_OPERATION_FAILED
+            ),
             evidence=_ExecutionEvidence(
                 source_digest_before=source_digest_before,
                 error=exc.__class__.__name__,

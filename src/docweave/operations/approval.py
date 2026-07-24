@@ -120,9 +120,6 @@ def operation_plan_fingerprint(plan: FileOperationPlan) -> str:
         "destination_root": plan.destination_root.as_posix(),
         "destination_relative_path": plan.destination_relative_path,
         "destination_comparison_key": plan.destination_comparison_key,
-        "planned_parent_directories": [
-            path.as_posix() for path in plan.planned_parent_directories
-        ],
         "status": plan.status.value,
         "reason": plan.reason.value,
     }

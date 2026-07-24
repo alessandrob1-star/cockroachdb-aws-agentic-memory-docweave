@@ -90,8 +90,12 @@ The critical path is:
 - Local discovery, fingerprinting, PDF signature inspection, intake, duplicate
   grouping, operation planning, approval validation, and single-operation
   execution primitives are implemented and tested.
-- Batch execution, audit events, CockroachDB migrations, AWS infrastructure,
-  Bedrock invocation, and user interfaces remain not implemented.
+- Bounded local batch execution, per-item result records, in-memory
+  idempotency, interrupted-operation reconciliation, and append-only local audit
+  event contracts are implemented and tested.
+- CockroachDB persistence, durable Activity History, restore, AWS
+  infrastructure, Bedrock invocation, and user interfaces remain not
+  implemented.
 - The preparatory notes
   [`local-core-status.md`](local-core-status.md) and
   [`local-batch-operation-design-note.md`](../architecture/local-batch-operation-design-note.md)
