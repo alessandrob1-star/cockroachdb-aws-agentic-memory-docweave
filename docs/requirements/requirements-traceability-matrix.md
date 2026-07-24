@@ -81,8 +81,8 @@ is reproducible.
 | SEC-010 | Secure uploads | Type, signature, size, structure, malware, and quarantine controls | Malicious-file test suite | In progress |
 | SEC-011 | Prompt injection resistance | Instruction-data separation and adversarial evaluations | Red-team report | Planned |
 | SEC-012 | Memory poisoning resistance | Provenance, trust labels, quarantine, revocation, and retrieval authorization | Memory attack evaluation | Planned |
-| SEC-013 | Tool misuse prevention | Allowlisted tools, typed arguments, scoped identities, and approval gates | Authorization tests and audit traces | Planned |
-| SEC-014 | Human approval for material actions | Review decision and execution state machine | End-to-end tests | Planned |
+| SEC-013 | Tool misuse prevention | Allowlisted tools, typed arguments, scoped identities, and approval gates | Authorization tests and audit traces | In progress |
+| SEC-014 | Human approval for material actions | Review decision and execution state machine | Approval contract tests and end-to-end tests | In progress |
 | SEC-015 | Immutable originals and audit | Content hashes, versioned objects, append-only events | Integrity tests and demo | Planned |
 | SEC-016 | Data protection | Encryption, minimization, retention, and deletion controls | Policy and configuration evidence | Planned |
 | SEC-017 | Incident and recovery readiness | Alarm, rollback, backup, and incident runbooks | Recovery exercise report | Planned |

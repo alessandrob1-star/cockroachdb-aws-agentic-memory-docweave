@@ -15,8 +15,9 @@ DocWeave is in the approved requirements and architecture phase with an initial
 local Python engineering scaffold, deterministic local filesystem discovery
 contracts, local content fingerprinting, PDF signature inspection, and
 deterministic intake records with duplicate grouping, and safe file-operation
-planning contracts. No file mutation, database migration, deployed schema,
-cloud integration, or intelligent document analysis is claimed yet.
+planning and approval contracts. No file mutation, database migration,
+deployed schema, cloud integration, or intelligent document analysis is claimed
+yet.
 
 The current approved product direction includes:
 
