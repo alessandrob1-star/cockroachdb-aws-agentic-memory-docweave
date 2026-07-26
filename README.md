@@ -41,6 +41,13 @@ delegation of eligible PDF hyperlinks to the user's default browser, and a
 virtualized document table. Document-controlled persistence values remain bound
 parameters rather than executable Structured Query Language.
 
+An initial, explicitly labelled corpus of 30 synthetic two-page PDFs is
+available in `pdf_sintetici` for desktop discovery, preview, guarded-link, and
+later relationship testing. Its manifest records deterministic provenance,
+expected categories, document relationships, page counts, and content hashes.
+It is reference data, not model-generated analysis and not the planned final
+evaluation corpus.
+
 The current approved product direction includes:
 
 - a complete PySide6 desktop application for authorized Windows folders;

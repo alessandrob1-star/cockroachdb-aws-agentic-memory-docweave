@@ -113,7 +113,7 @@ is reproducible.
 | PROD-007 | Four persistent memory classes in CockroachDB | `product-requirements.md` FR-041–FR-046 | Schema, retrieval, authorization, and demo evidence | Planned |
 | PROD-008 | Complete desktop and cloud product parity | `product-requirements.md` FR-047–FR-050 | Cross-surface contract and end-to-end tests | In progress; local desktop discovery, cancellation, session state, multi-selection, guarded read-only PDF preview, and confirmed safe external-link delegation exist, while complete review, desktop workflow, and cloud parity remain pending |
 | PROD-009 | Bounded memory and database stewardship agent | `product-requirements.md` FR-051–FR-054 | Tool-authorization, provenance, anomaly, and audit tests | Planned |
-| PROD-010 | Relational-first domain data and safe synthetic provenance | `product-requirements.md` FR-055–FR-060 and `domain-data-requirements.md` | Schema, constraints, provenance checks, and corpus audit | Planned |
+| PROD-010 | Relational-first domain data and safe synthetic provenance | `product-requirements.md` FR-055–FR-060 and `domain-data-requirements.md` | Schema, constraints, provenance checks, and corpus audit | In progress; initial 30-PDF corpus has explicit synthetic provenance, expected labels, relationships, and content hashes; production schema and final evaluation corpus remain pending |
 | PROD-011 | Approved physical CockroachDB data model | `docs/architecture/decisions/0002-cockroachdb-physical-data-model.md`, physical-schema specification, and Entity Relationship model | Migration, constraint, transaction, authorization, vector, and provenance tests | In progress; initial revision validated offline and live, with local serializable transaction and operation repository evidence; runtime, remaining schema, authorization, and vector evidence pending |
 
 ## 9. Capacity baseline
@@ -123,7 +123,7 @@ is reproducible.
 | CAP-001 | Source-folder discovery | 10,000 files | Responsive discovery, restart, and reconciliation test | In progress |
 | CAP-002 | Active documents per MVP project | 5,000 files | Sorting, filtering, review, and persistence test | Planned |
 | CAP-003 | Maximum processing batch | 1,000 files | Checkpoint, interruption, resume, and duplicate-request test | In progress; local limit, interruption reconciliation, duplicate-request, and durable restart-state tests implemented |
-| CAP-004 | Primary demonstration and evaluation corpus | Approximately 300 PDFs | Curated corpus, reference labels, license manifest, and evaluation report | Planned |
+| CAP-004 | Primary demonstration and evaluation corpus | Approximately 300 PDFs | Curated corpus, reference labels, license manifest, and evaluation report | In progress; 30-PDF initial desktop test corpus is verified, while the representative 300-PDF corpus and evaluation report remain pending |
 
 ## 10. MVP acceptance baseline
 
