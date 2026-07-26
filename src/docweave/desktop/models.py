@@ -25,6 +25,7 @@ class DocumentTableRow:
 
     name: str
     relative_path: str
+    comparison_key: str
     status: str
     byte_size: int | None
     reason: str | None
@@ -35,6 +36,7 @@ class DocumentTableRow:
         return cls(
             name=record.absolute_path.name,
             relative_path=record.relative_path,
+            comparison_key=record.discovered_file.comparison_key,
             status=record.status.value,
             byte_size=record.discovered_file.byte_size,
             reason=record.reason,
@@ -120,6 +122,12 @@ class DocumentTableModel(QAbstractTableModel):
         self.beginResetModel()
         self._rows = ()
         self.endResetModel()
+
+    def comparison_key_at(self, row: int) -> str | None:
+        """Return the stable, root-relative identity for one visible row."""
+        if not 0 <= row < len(self._rows):
+            return None
+        return self._rows[row].comparison_key
 
 
 def _status_label(status: str) -> str:

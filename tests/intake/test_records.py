@@ -164,7 +164,12 @@ def test_marks_fingerprint_read_failure_as_unreadable(
     write_file(path, b"%PDF-1.7\n")
     discovery = discover_files([tmp_path])
 
-    def fail_fingerprint(candidate: Path) -> ContentFingerprint:
+    def fail_fingerprint(
+        candidate: Path,
+        *,
+        cancellation_check: object = None,
+    ) -> ContentFingerprint:
+        del cancellation_check
         assert candidate == path
         raise PermissionError
 

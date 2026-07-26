@@ -2,11 +2,26 @@ from pathlib import Path
 from threading import Event
 
 import pytest
-from PySide6.QtCore import QEventLoop, QTimer
-from PySide6.QtWidgets import QFileDialog, QLabel, QLineEdit, QPushButton, QTableView
+from PySide6.QtCore import QEventLoop, QItemSelectionModel, QTimer
+from PySide6.QtWidgets import (
+    QFileDialog,
+    QLabel,
+    QLineEdit,
+    QProgressBar,
+    QPushButton,
+    QTableView,
+)
 
+from docweave.core.cancellation import CancellationCheck, CancellationRequestedError
 from docweave.desktop.main_window import DocWeaveMainWindow
-from docweave.desktop.scan import DesktopScanResult, scan_authorized_root
+from docweave.desktop.scan import (
+    DesktopScanResult,
+    ScanPhase,
+    ScanProgress,
+    ScanProgressCallback,
+    scan_authorized_root,
+)
+from docweave.desktop.workspace import WorkspacePhase
 
 
 def wait_for_scan(window: DocWeaveMainWindow) -> None:
@@ -58,7 +73,13 @@ def test_window_reports_background_failure_without_private_details(
     tmp_path: Path,
     qt_application: object,
 ) -> None:
-    def fail_scan(root: Path) -> DesktopScanResult:
+    def fail_scan(
+        root: Path,
+        *,
+        progress_callback: ScanProgressCallback | None = None,
+        cancellation_check: CancellationCheck | None = None,
+    ) -> DesktopScanResult:
+        del progress_callback, cancellation_check
         raise PermissionError(f"must not be displayed: {root}")
 
     window = DocWeaveMainWindow(scan_function=fail_scan)
@@ -97,7 +118,13 @@ def test_window_blocks_root_change_and_close_during_scan(
     started = Event()
     release = Event()
 
-    def controlled_scan(root: Path) -> DesktopScanResult:
+    def controlled_scan(
+        root: Path,
+        *,
+        progress_callback: ScanProgressCallback | None = None,
+        cancellation_check: CancellationCheck | None = None,
+    ) -> DesktopScanResult:
+        del progress_callback, cancellation_check
         started.set()
         release.wait(timeout=2)
         return scan_authorized_root(root)
@@ -128,6 +155,78 @@ def test_window_blocks_root_change_and_close_during_scan(
     window.close()
 
 
+def test_window_cancels_scan_and_discards_partial_results(
+    tmp_path: Path,
+    qt_application: object,
+) -> None:
+    started = Event()
+
+    def cancellable_scan(
+        root: Path,
+        *,
+        progress_callback: ScanProgressCallback | None = None,
+        cancellation_check: CancellationCheck | None = None,
+    ) -> DesktopScanResult:
+        del root, progress_callback
+        started.set()
+        assert cancellation_check is not None
+        while not cancellation_check():
+            started.wait(timeout=0.01)
+        raise CancellationRequestedError
+
+    window = DocWeaveMainWindow(scan_function=cancellable_scan)
+    window.set_authorized_root(tmp_path)
+    window.start_scan()
+    assert started.wait(timeout=1)
+    cancel_button = window.findChild(QPushButton, "secondaryButton")
+    progress_bar = window.findChild(QProgressBar, "scanProgress")
+    assert progress_bar is not None
+    assert progress_bar.isVisible() is window.isVisible()
+
+    window.cancel_scan()
+    loop = QEventLoop()
+    window.scan_finished.connect(loop.quit)
+    QTimer.singleShot(3_000, loop.quit)
+    loop.exec()
+
+    assert window.workspace_snapshot.phase is WorkspacePhase.CANCELLED
+    assert window.workspace_snapshot.result is None
+    assert cancel_button is not None
+    status = window.findChild(QLabel, "status")
+    assert status is not None
+    assert "cancelled safely" in status.text()
+    window.close()
+
+
+def test_window_tracks_multiple_document_selection_in_memory(
+    tmp_path: Path,
+    qt_application: object,
+) -> None:
+    (tmp_path / "invoice.pdf").write_bytes(b"%PDF-1.7\ninvoice")
+    (tmp_path / "payment.pdf").write_bytes(b"%PDF-1.7\npayment")
+    window = DocWeaveMainWindow()
+    window.set_authorized_root(tmp_path)
+    wait_for_scan(window)
+    table = window.findChild(QTableView, "documentTable")
+    selection_status = window.findChild(QLabel, "selectionStatus")
+    assert table is not None
+    selection_model = table.selectionModel()
+    flags = (
+        QItemSelectionModel.SelectionFlag.Select
+        | QItemSelectionModel.SelectionFlag.Rows
+    )
+
+    selection_model.select(table.model().index(0, 0), flags)
+    selection_model.select(table.model().index(1, 0), flags)
+
+    assert window.workspace_snapshot.selected_document_keys == frozenset(
+        {"invoice.pdf", "payment.pdf"}
+    )
+    assert selection_status is not None
+    assert selection_status.text() == "2 selected"
+    window.close()
+
+
 def test_window_explains_missing_folder_and_invalid_result(
     qt_application: object,
 ) -> None:
@@ -146,6 +245,32 @@ def test_window_explains_missing_folder_and_invalid_result(
     assert status.text() == (
         "Scan failed safely (InvalidScanResult). No files were changed."
     )
+    window.close()
+
+
+def test_window_fails_closed_for_invalid_progress_and_mismatched_result(
+    tmp_path: Path,
+    qt_application: object,
+) -> None:
+    other = tmp_path / "other"
+    other.mkdir()
+    window = DocWeaveMainWindow()
+    window.cancel_scan()
+    window.set_authorized_root(tmp_path)
+    window._workspace.start_scan()
+    status = window.findChild(QLabel, "status")
+    assert status is not None
+
+    window._handle_scan_progress(object())
+    assert "progress was invalid" in status.text()
+
+    window._handle_scan_progress(ScanProgress(ScanPhase.DISCOVERY, 2, None))
+    window._handle_scan_progress(ScanProgress(ScanPhase.DISCOVERY, 1, None))
+    assert "progress was inconsistent" in status.text()
+
+    window._handle_scan_completed(scan_authorized_root(other))
+    assert window.workspace_snapshot.phase is WorkspacePhase.FAILED
+    assert "ValueError" in status.text()
     window.close()
 
 

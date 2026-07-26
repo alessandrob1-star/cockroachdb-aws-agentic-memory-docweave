@@ -51,9 +51,10 @@ The repository currently contains a tested Python package with:
   reconciliation without duplicate filesystem execution;
 - side-effect-free composition of one coherent transaction runner, repository,
   restart ledger, lifecycle recorder, and execution hook set;
-- an initial read-only PySide6 desktop shell for authorized-folder selection,
-  non-blocking discovery, deterministic intake metrics, status, and document
-  table presentation;
+- a read-only PySide6 desktop shell for authorized-folder selection,
+  non-blocking phase progress, cooperative cancellation, deterministic intake
+  metrics, validated in-memory workspace state, multiple selection, status, and
+  document table presentation;
 - fail-closed behavior that prevents mutation when intent persistence fails and
   preserves an in-progress state when result persistence fails;
 - bounded serializable transaction execution with SQLSTATE `40001` retry,
@@ -68,9 +69,9 @@ The repository currently contains a tested Python package with:
 ## 3. Current local quality evidence
 
 The latest verified local quality gate on
-`codex/desktop-discovery-shell` reported:
+`codex/progressive-desktop-scan` reported:
 
-- 238 tests passed;
+- 251 tests passed;
 - 95 percent total package coverage;
 - Ruff format check passed;
 - Ruff lint check passed;
@@ -80,10 +81,10 @@ The latest verified local quality gate on
 - online migration execution was verified to fail closed when no database URL
   is explicitly supplied.
 
-The 144-test migration baseline passed GitHub Actions on pull request 22 and
-after its merge to `main`. The Node.js 24 workflow update passed on pull request
-23 and after its merge to `main`. The 238-test desktop-shell increment is local
-evidence until a separately authorized pull request passes GitHub Actions.
+The 238-test desktop-shell baseline passed GitHub Actions on pull request 29
+and after its merge to `main`. The 251-test progressive-scan increment remains
+local evidence until a separately authorized pull request passes GitHub
+Actions.
 
 The check command is:
 
@@ -158,9 +159,11 @@ To preserve time for manual testing and personalization, the first desktop
 surface is now scheduled in parallel with the remaining live-integration work
 instead of waiting for the whole CockroachDB milestone to finish.
 
-The initial desktop discovery shell is implemented but intentionally read-only.
-Its next increment must add progressive scan presentation and workspace state
-without inventing CockroachDB persistence or user authorization.
+The desktop discovery shell now presents phase progress, cooperative
+cancellation, process-local workspace state, and multiple selection while
+remaining intentionally read-only. Its next increment must connect a reviewed
+local project workflow without inventing CockroachDB persistence or user
+authorization.
 
 AWS infrastructure should begin after the CockroachDB migration strategy and
 first local vertical slice are ready, so cloud work deploys real product

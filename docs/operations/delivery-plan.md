@@ -254,7 +254,7 @@ The critical path is:
 
 **Measurement date:** 2026-07-26
 
-The current evidence-weighted Schedule Performance Indicator is **35%**. This
+The current evidence-weighted Schedule Performance Indicator is **36%**. This
 is a planning estimate, not a product-completion or production-readiness claim.
 It is calculated from fixed milestone weights and conservative completion
 estimates based only on merged or locally verified evidence:
@@ -266,10 +266,10 @@ estimates based only on merged or locally verified evidence:
 | M2 - CockroachDB foundation | 18% | 70% | 12.6% |
 | M3 - Real analysis slice | 18% | 0% | 0.0% |
 | M4 - Review and safe operations | 15% | 10% | 1.5% |
-| M5 - Product surfaces | 12% | 10% | 1.2% |
+| M5 - Product surfaces | 12% | 20% | 2.4% |
 | M6 - Evaluation and hardening | 9% | 0% | 0.0% |
 | M7 - Submission readiness | 6% | 0% | 0.0% |
-| **Total** | **100%** |  | **35.2%, rounded to 35%** |
+| **Total** | **100%** |  | **36.4%, rounded to 36%** |
 
 The project is **on plan overall and ahead on the database foundation**. M1 is
 at the end of its planned window with some later-slice decisions still open.
@@ -279,7 +279,7 @@ application persistence is not complete.
 No schedule credit is taken for the unimplemented Bedrock analysis, complete
 PySide6 workflow, cloud product, AWS deployment, evaluation corpus, or
 submission package. Limited credit is taken for the locally verified read-only
-desktop discovery shell.
+desktop discovery, cancellation, session-state, and selection workflow.
 
 The principal schedule risk is now the vertical integration path: application
 transactions and persistence, genuine Bedrock analysis, human review, safe
@@ -324,11 +324,12 @@ The approved local CockroachDB persistence boundary currently has:
 
 Durable state loading, restart reconciliation, and side-effect-free runtime
 composition are implemented and locally verified at the adapter boundary. The
-next product increment is the first desktop surface contract and approved
-PySide6 dependency, while live engine configuration and controlled restart
-integration proceed as a separately approved track. Live CockroachDB execution,
-runtime identities, dependencies, and paid operations remain explicit approval
-gates.
+desktop now has a read-only progressive discovery workflow and validated
+process-local session state. The next product increment is a reviewed local
+project workflow leading toward the real analysis slice, while live engine
+configuration and controlled restart integration proceed as a separately
+approved track. Live CockroachDB execution, runtime identities, dependencies,
+and paid operations remain explicit approval gates.
 
 ## 8. Operating rules during delivery
 

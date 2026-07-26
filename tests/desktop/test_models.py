@@ -64,6 +64,8 @@ def test_virtualized_model_presents_intake_evidence(
     )
     assert model.data(model.index(-1, -1)) is None
     assert model.data(model.createIndex(0, 99)) is None
+    assert model.comparison_key_at(large_row) == "large.pdf"
+    assert model.comparison_key_at(-1) is None
     assert (
         model.headerData(
             0,
