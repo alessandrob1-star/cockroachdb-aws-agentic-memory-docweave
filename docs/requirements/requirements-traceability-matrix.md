@@ -1,7 +1,7 @@
 # Requirements Traceability Matrix
 
 **Project:** DocWeave
-**Last updated:** 2026-07-24
+**Last updated:** 2026-07-26
 **Status vocabulary:** Not started, Planned, In progress, Verified, Blocked
 
 ## 1. Purpose
@@ -57,10 +57,10 @@ is reproducible.
 | QUAL-001 | Formatting and linting | Ruff format and lint run locally and through `.github/workflows/ci.yml` | Local check output and GitHub Actions logs | In progress |
 | QUAL-002 | Static type safety | Strict MyPy check run locally and through `.github/workflows/ci.yml` | Local check output and GitHub Actions logs | In progress |
 | QUAL-003 | Unit tests | Pytest with coverage run locally and through `.github/workflows/ci.yml` | Test, coverage, and GitHub Actions reports | In progress |
-| QUAL-004 | Integration and contract tests | Real CockroachDB and mocked or sandboxed AWS boundaries as appropriate | Integration report | In progress; offline contracts and initial clean live-database schema validation complete, online driver and application integration tests pending |
+| QUAL-004 | Integration and contract tests | Real CockroachDB and mocked or sandboxed AWS boundaries as appropriate | Integration report | In progress; offline migration, local transaction and repository contracts, and initial clean live-database schema validation complete; online application integration pending |
 | QUAL-005 | End-to-end critical journeys | Browser and service end-to-end suite | Video and machine-readable report | Planned |
 | QUAL-006 | Agent regression evaluation | Versioned corpus and evaluation runner | Evaluation report | Planned |
-| QUAL-007 | Resilience testing | Failure injection, retries, idempotency, and recovery tests | Resilience report | In progress; local batch retry and reconciliation tests implemented |
+| QUAL-007 | Resilience testing | Failure injection, retries, idempotency, and recovery tests | Resilience report | In progress; local batch recovery plus bounded serializable rollback, retry, conflict, and idempotency tests implemented |
 | QUAL-008 | Accessibility | Automated scanner plus manual keyboard and screen review | Web Content Accessibility Guidelines checklist | Planned |
 | QUAL-009 | Reproducible setup | Pinned dependencies, containers, and clean-machine smoke test | Setup validation artifact | In progress; direct and resolved Python versions pinned, clean-machine evidence pending |
 | QUAL-010 | Benchmark parity | Compare gates and evidence with AI Act benchmark | Benchmark comparison report | In progress |
@@ -83,7 +83,7 @@ is reproducible.
 | SEC-012 | Memory poisoning resistance | Provenance, trust labels, quarantine, revocation, and retrieval authorization | Memory attack evaluation | Planned |
 | SEC-013 | Tool misuse prevention | Allowlisted tools, typed arguments, scoped identities, and approval gates | Authorization tests and audit traces | In progress |
 | SEC-014 | Human approval for material actions | Review decision and execution state machine | Approval contract tests and end-to-end tests | In progress |
-| SEC-015 | Immutable originals and audit | Content hashes, versioned objects, append-only events | Integrity tests and demo | In progress; local append-only event contracts implemented, durable audit pending |
+| SEC-015 | Immutable originals and audit | Content hashes, versioned objects, append-only events | Integrity tests and demo | In progress; local events and atomic hash-chained CockroachDB audit adapter implemented, live durable audit pending |
 | SEC-016 | Data protection | Encryption, minimization, retention, and deletion controls | Policy and configuration evidence | Planned |
 | SEC-017 | Incident and recovery readiness | Alarm, rollback, backup, and incident runbooks | Recovery exercise report | Planned |
 
@@ -109,12 +109,12 @@ is reproducible.
 | PROD-003 | Explainable analysis, classification, naming, and relationships | `product-requirements.md` FR-011–FR-017, `domain-data-requirements.md` taxonomy baseline, and `classification-and-confidence-specification.md` | Curated-corpus evaluation and trace evidence | Planned |
 | PROD-004 | Confidence-driven and sampled human review | `product-requirements.md` FR-018–FR-024 | User-flow tests and calibration report | Planned |
 | PROD-005 | Safe copy, move, resume, and restore | `product-requirements.md` FR-025–FR-034 | Planning, execution, failure-injection, and end-to-end tests | In progress |
-| PROD-006 | Team roles and append-only Activity History | `product-requirements.md` FR-035–FR-040 | Authorization and audit tests | In progress; local append-only audit contracts implemented, roles and persistence pending |
+| PROD-006 | Team roles and append-only Activity History | `product-requirements.md` FR-035–FR-040 | Authorization and audit tests | In progress; local audit contracts and CockroachDB append adapter implemented, runtime persistence and roles pending |
 | PROD-007 | Four persistent memory classes in CockroachDB | `product-requirements.md` FR-041–FR-046 | Schema, retrieval, authorization, and demo evidence | Planned |
 | PROD-008 | Complete desktop and cloud product parity | `product-requirements.md` FR-047–FR-050 | Cross-surface contract and end-to-end tests | Planned |
 | PROD-009 | Bounded memory and database stewardship agent | `product-requirements.md` FR-051–FR-054 | Tool-authorization, provenance, anomaly, and audit tests | Planned |
 | PROD-010 | Relational-first domain data and safe synthetic provenance | `product-requirements.md` FR-055–FR-060 and `domain-data-requirements.md` | Schema, constraints, provenance checks, and corpus audit | Planned |
-| PROD-011 | Approved physical CockroachDB data model | `docs/architecture/decisions/0002-cockroachdb-physical-data-model.md`, physical-schema specification, and Entity Relationship model | Migration, constraint, transaction, authorization, vector, and provenance tests | In progress; initial operational revision validated offline and in an isolated live database, remaining schema and runtime evidence pending |
+| PROD-011 | Approved physical CockroachDB data model | `docs/architecture/decisions/0002-cockroachdb-physical-data-model.md`, physical-schema specification, and Entity Relationship model | Migration, constraint, transaction, authorization, vector, and provenance tests | In progress; initial revision validated offline and live, with local serializable transaction and operation repository evidence; runtime, remaining schema, authorization, and vector evidence pending |
 
 ## 9. Capacity baseline
 

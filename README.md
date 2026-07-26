@@ -17,12 +17,14 @@ contracts, local content fingerprinting, PDF signature inspection, and
 deterministic intake records with duplicate grouping, and safe file-operation
 planning, approval, single-operation execution, bounded local batch execution,
 per-item results, in-memory idempotency, interrupted-operation reconciliation,
-and append-only local audit event contracts. The first non-vector CockroachDB
-migration is validated offline and against a clean, isolated live validation
-database. The application does not yet connect to that schema, so the local
-contracts are not durable persistence. No runtime database integration,
-restore, AWS workload, user interface, or intelligent document analysis is
-claimed yet.
+and append-only local audit event contracts. A typed CockroachDB operation
+persistence adapter now defines atomic batch, execution-intent, terminal-result,
+and hash-chained audit writes with bounded serializable retry behavior. The
+first non-vector CockroachDB migration is validated offline and against a
+clean, isolated live validation database. The adapter is not connected to that
+schema or to the local execution orchestrator, so durable application
+persistence is not yet claimed. No runtime database integration, restore, AWS
+workload, user interface, or intelligent document analysis is claimed yet.
 
 The current approved product direction includes:
 
@@ -59,6 +61,7 @@ Approved architecture:
 - [Document-processing pipeline](docs/architecture/document-processing-pipeline.md)
 - [CockroachDB physical-schema specification](docs/architecture/cockroachdb-physical-schema.md)
 - [CockroachDB Entity Relationship model](docs/architecture/cockroachdb-entity-relationship.md)
+- [CockroachDB operation persistence boundary](docs/architecture/cockroachdb-operation-persistence.md)
 - [Verified AWS and CockroachDB environment baseline](docs/operations/environment-baseline.md)
 - [CockroachDB live validation evidence](docs/operations/cockroachdb-live-validation.md)
 - [Delivery plan](docs/operations/delivery-plan.md)

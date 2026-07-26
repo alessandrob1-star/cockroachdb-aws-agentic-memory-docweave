@@ -1,8 +1,8 @@
 # Local Core Status
 
 **Project:** DocWeave
-**Status date:** 2026-07-24
-**Scope:** Local deterministic core only
+**Status date:** 2026-07-26
+**Scope:** Local deterministic core and database adapter contracts
 
 ## 1. Purpose
 
@@ -13,8 +13,9 @@ next batch, audit, CockroachDB, AWS, or user-interface work.
 It is an evidence index, not a release-readiness claim.
 
 The initial CockroachDB operational migration is authored, validated offline,
-and accepted by an isolated live validation database. It is not part of the
-implemented local runtime core, and no application code connects to it.
+and accepted by an isolated live validation database. A local CockroachDB
+adapter now targets that shape, but no application code connects to the live
+target.
 
 ## 2. Current implemented local core
 
@@ -39,15 +40,25 @@ The repository currently contains a tested Python package with:
 - an in-memory execution-intent and result ledger for local idempotency tests;
 - duplicate-request replay without repeated successful filesystem effects;
 - explicit interrupted-operation reconciliation before retry;
+- typed database-ready batch, intent, result, and audit command contracts;
+- explicit domain-to-database identity, root-reference, batch, intent, result,
+  and audit mappings;
+- bounded serializable transaction execution with SQLSTATE `40001` retry,
+  rollback, capped backoff, and sanitized failures;
+- atomic CockroachDB statement contracts for batch creation, execution claim,
+  terminal result, aggregate counts, and audit append;
+- exact idempotent replay without silent overwrite;
+- workspace-scoped queries and tamper-evident audit digest chaining;
 - local and GitHub Actions quality gates for formatting, linting, strict type
   checking, tests, and coverage.
 
 ## 3. Current local quality evidence
 
-The latest verified local quality gate on `main` reported:
+The latest verified local quality gate on
+`codex/cockroachdb-persistence-boundary` reported:
 
-- 144 tests passed;
-- 99 percent total package coverage;
+- 186 tests passed;
+- 94 percent total package coverage;
 - Ruff format check passed;
 - Ruff lint check passed;
 - MyPy strict check passed;
@@ -58,7 +69,8 @@ The latest verified local quality gate on `main` reported:
 
 The 144-test migration baseline passed GitHub Actions on pull request 22 and
 after its merge to `main`. The Node.js 24 workflow update passed on pull request
-23 and after its merge to `main`.
+23 and after its merge to `main`. The 186-test persistence boundary is local
+evidence until a separately authorized pull request passes GitHub Actions.
 
 The check command is:
 
@@ -77,16 +89,15 @@ DocWeave does not yet implement or claim:
 - PySide6 desktop or cloud user interface;
 - PDF text extraction;
 - model-driven classification, naming, confidence, or relationship analysis;
-- persistent idempotency;
+- durable idempotency in the running application;
 - restore planning or restore execution;
 - durable Activity History;
 - release security scanning beyond the current Python quality gate.
 
-The batch executor is a local primitive. It records intent before mutation in
-an in-memory ledger and emits append-only local events, but a process loss also
-loses those records. It is not yet a complete product workflow because it does
-not use CockroachDB to make intent, audit, idempotency, or workspace
-authorization durable and transactional.
+The batch executor is still a local primitive. The database adapter can express
+durable atomic writes, but it is not yet connected to the executor or a live
+runtime engine. A process loss therefore still loses the active in-memory
+records. The project does not yet claim persistent application behavior.
 
 ## 5. Contract review findings
 
@@ -102,9 +113,9 @@ must be closed before production-grade batch execution:
 
 | Gap | Impact | Required next control |
 | --- | --- | --- |
-| No persistent idempotency key registry | Process loss removes the local replay registry | Enforce workspace-scoped unique keys in CockroachDB |
-| Audit events are local and in-memory | Activity History cannot survive restart or prove database ordering | Persist append-only audit events with transaction and integrity evidence |
-| Pre-mutation intent is not durable | A process or machine failure can still leave an ambiguous external outcome | Persist intent before mutation and claim it with a bounded lease |
+| Persistence adapter is not connected | Process loss still removes the active local replay registry | Map domain commands and orchestrate durable writes around file mutation |
+| Audit adapter has no live runtime evidence | Activity History cannot yet survive restart | Run approved integration and restart tests against CockroachDB |
+| Execution lease is not orchestrated | A process failure can still leave an ambiguous external outcome | Connect claim, mutation, result, and reconciliation as one workflow |
 | No restore contract | Move and copy outcomes are not yet reversible through tested restore semantics | Add restore planning after batch result and audit semantics |
 | No workspace/user authorization model | Approval uses user identifiers but no role policy yet | Add authorization contract before user interface or cloud execution |
 
@@ -120,13 +131,14 @@ The 2026-07-24 controlled validation:
 - preserved sanitized evidence without exposing a connection URL or secret.
 
 It did not validate the online Alembic and Psycopg connection path, application
-persistence, cross-workspace behavior, serializable retries, or recovery.
+persistence, cross-workspace runtime authorization, live serialization
+contention, or recovery.
 
 ## 7. Readiness for CockroachDB, AWS, and UI
 
-CockroachDB application persistence can now begin after separate approval
-because both the local contracts and initial live schema shape have current
-evidence.
+The next CockroachDB application step is local orchestration of the implemented
+domain mappings around the new adapter. Live execution remains behind separate
+approval and a current cost preflight.
 
 The PySide6 desktop preview interface is no longer blocked by a missing batch
 model. Its first implementation should still wait for an approved surface

@@ -83,7 +83,7 @@ The critical path is:
 - Local quality commands run without cloud access.
 - The repository contains no runtime secret values.
 
-**Current progress on 2026-07-24:**
+**Current progress on 2026-07-26:**
 
 - Local Python package and quality gates are implemented.
 - GitHub Actions runs the Python quality gate on pull requests.
@@ -97,9 +97,12 @@ The critical path is:
   operational migration is tested through offline SQL rendering and an
   isolated live clean-database validation.
 - The application does not connect to the validation schema. CockroachDB
-  application persistence, durable Activity History, restore, AWS
-  infrastructure, Bedrock invocation, and user interfaces remain not
-  implemented.
+  runtime persistence, durable Activity History, restore, AWS infrastructure,
+  Bedrock invocation, and user interfaces remain not implemented.
+- Typed persistence commands, a bounded serializable retry runner, and an
+  atomic CockroachDB operation repository are implemented and tested locally.
+  Explicit domain identity and operation mappings are also implemented. They
+  are not yet connected to the application orchestrator or a live engine.
 - The preparatory notes
   [`local-core-status.md`](local-core-status.md) and
   [`local-batch-operation-design-note.md`](../architecture/local-batch-operation-design-note.md)
@@ -118,7 +121,7 @@ The critical path is:
 - Add transaction helper patterns for serializable retries.
 - Add initial authorization and workspace-isolation test scaffolding.
 
-**Current progress on 2026-07-24:**
+**Current progress on 2026-07-26:**
 
 - ADR-0003 records the approved Alembic, SQLAlchemy, CockroachDB dialect, and
   Psycopg migration toolchain.
@@ -129,7 +132,11 @@ The critical path is:
 - The exact rendered revision was accepted and introspected in the isolated
   live `docweave_validation` database.
 - Online Alembic driver execution, runtime roles, Row-Level Security,
-  transaction helpers, and persistent application services remain pending.
+  persistent application orchestration, and live contention tests remain
+  pending.
+- Serializable transaction retries, workspace-scoped repository statements,
+  idempotent batch and operation writes, aggregate result updates, and
+  hash-chained audit appends have local contract evidence.
 
 **Exit criteria:**
 
@@ -238,9 +245,9 @@ The critical path is:
 
 ## 5. Status measurement
 
-**Measurement date:** 2026-07-24
+**Measurement date:** 2026-07-26
 
-The current evidence-weighted Schedule Performance Indicator is **28%**. This
+The current evidence-weighted Schedule Performance Indicator is **30%**. This
 is a planning estimate, not a product-completion or production-readiness claim.
 It is calculated from fixed milestone weights and conservative completion
 estimates based only on merged or locally verified evidence:
@@ -249,18 +256,19 @@ estimates based only on merged or locally verified evidence:
 | --- | ---: | ---: | ---: |
 | M0 - Baseline complete | 8% | 100% | 8.0% |
 | M1 - Decisions and scaffolding | 14% | 85% | 11.9% |
-| M2 - CockroachDB foundation | 18% | 35% | 6.3% |
+| M2 - CockroachDB foundation | 18% | 50% | 9.0% |
 | M3 - Real analysis slice | 18% | 0% | 0.0% |
 | M4 - Review and safe operations | 15% | 10% | 1.5% |
 | M5 - Product surfaces | 12% | 0% | 0.0% |
 | M6 - Evaluation and hardening | 9% | 0% | 0.0% |
 | M7 - Submission readiness | 6% | 0% | 0.0% |
-| **Total** | **100%** |  | **27.7%, rounded to 28%** |
+| **Total** | **100%** |  | **30.4%, rounded to 30%** |
 
-The project is **on plan overall and slightly ahead on the database
-foundation**. M1 is active inside its planned window. The first clean live
-migration validation from M2 was completed three days before the M2 window
-opens, while the remaining M2 application-persistence work is not complete.
+The project is **on plan overall and ahead on the database foundation**. M1 is
+at the end of its planned window with some later-slice decisions still open.
+The clean live migration validation and local transaction and repository
+contracts from M2 were completed before the M2 window opens, while runtime
+application persistence is not complete.
 No schedule credit is taken for the unimplemented Bedrock analysis, PySide6
 user interface, cloud product, AWS deployment, evaluation corpus, or
 submission package.
@@ -288,20 +296,20 @@ decisions before their respective implementation begins:
 
 ## 7. Next implementation slice
 
-The smallest safe next implementation slice is the local CockroachDB
-persistence boundary:
+The approved local CockroachDB persistence boundary currently has:
 
-1. define the application-facing repository and transaction contracts;
-2. implement serializable retry behavior with bounded, observable failures;
-3. persist batch, operation-result, and append-only audit records without
-   connecting the user interface or invoking Bedrock;
-4. test rollback, idempotency, workspace isolation, and interrupted-operation
-   reconciliation against controlled test targets;
+1. implemented application-facing repository and transaction contracts;
+2. implemented serializable retry behavior with bounded, observable failures;
+3. implemented atomic batch, operation-result, and append-only audit statement
+   contracts without connecting the user interface or invoking Bedrock;
+4. verified rollback, idempotency, workspace scoping, and fail-closed conflict
+   behavior using controlled local tests;
 5. keep runtime identity creation, production data, cloud resources, and paid
    operations behind separate explicit approval.
 
-This slice converts the validated physical foundation into durable application
-behavior while keeping cost, credentials, and external side effects bounded.
+The next increment is orchestration of the implemented persistence mapping
+around filesystem mutation. Live CockroachDB execution, runtime identities,
+and paid operations remain separate approval gates.
 
 ## 8. Operating rules during delivery
 
