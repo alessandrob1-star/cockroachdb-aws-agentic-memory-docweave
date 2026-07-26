@@ -322,6 +322,20 @@ class CockroachOperationRepository(OperationPersistenceRepository):
 
         return self._transactions.run(persist).value
 
+    def append_audit_events(
+        self,
+        events: tuple[AuditAppend, ...],
+    ) -> PersistenceDisposition:
+        """Append non-result lifecycle evidence in one transaction."""
+        if not events:
+            raise ValueError("events must not be empty")
+
+        def persist(connection: Connection) -> PersistenceDisposition:
+            _append_audit_events(connection, events)
+            return PersistenceDisposition.APPLIED
+
+        return self._transactions.run(persist).value
+
 
 def _batch_parameters(command: CreateBatch) -> dict[str, object]:
     return {

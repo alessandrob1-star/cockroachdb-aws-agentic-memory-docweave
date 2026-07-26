@@ -60,7 +60,7 @@ is reproducible.
 | QUAL-004 | Integration and contract tests | Real CockroachDB and mocked or sandboxed AWS boundaries as appropriate | Integration report | In progress; offline migration, local transaction and repository contracts, and initial clean live-database schema validation complete; online application integration pending |
 | QUAL-005 | End-to-end critical journeys | Browser and service end-to-end suite | Video and machine-readable report | Planned |
 | QUAL-006 | Agent regression evaluation | Versioned corpus and evaluation runner | Evaluation report | Planned |
-| QUAL-007 | Resilience testing | Failure injection, retries, idempotency, and recovery tests | Resilience report | In progress; local batch recovery plus bounded serializable rollback, retry, conflict, and idempotency tests implemented |
+| QUAL-007 | Resilience testing | Failure injection, retries, idempotency, and recovery tests | Resilience report | In progress; local batch recovery, serializable retry, and durable intent/result boundary failures are tested; restart state loading remains pending |
 | QUAL-008 | Accessibility | Automated scanner plus manual keyboard and screen review | Web Content Accessibility Guidelines checklist | Planned |
 | QUAL-009 | Reproducible setup | Pinned dependencies, containers, and clean-machine smoke test | Setup validation artifact | In progress; direct and resolved Python versions pinned, clean-machine evidence pending |
 | QUAL-010 | Benchmark parity | Compare gates and evidence with AI Act benchmark | Benchmark comparison report | In progress |
@@ -83,7 +83,7 @@ is reproducible.
 | SEC-012 | Memory poisoning resistance | Provenance, trust labels, quarantine, revocation, and retrieval authorization | Memory attack evaluation | Planned |
 | SEC-013 | Tool misuse prevention | Allowlisted tools, typed arguments, scoped identities, and approval gates | Authorization tests and audit traces | In progress |
 | SEC-014 | Human approval for material actions | Review decision and execution state machine | Approval contract tests and end-to-end tests | In progress |
-| SEC-015 | Immutable originals and audit | Content hashes, versioned objects, append-only events | Integrity tests and demo | In progress; local events and atomic hash-chained CockroachDB audit adapter implemented, live durable audit pending |
+| SEC-015 | Immutable originals and audit | Content hashes, versioned objects, append-only events | Integrity tests and demo | In progress; local events, atomic hash-chained adapter, and fail-closed execution ordering implemented; live durable audit pending |
 | SEC-016 | Data protection | Encryption, minimization, retention, and deletion controls | Policy and configuration evidence | Planned |
 | SEC-017 | Incident and recovery readiness | Alarm, rollback, backup, and incident runbooks | Recovery exercise report | Planned |
 
@@ -108,7 +108,7 @@ is reproducible.
 | PROD-002 | Stable logical document and physical-instance identity | `product-requirements.md` FR-007–FR-010 | Identity, copy, move, and version tests | In progress |
 | PROD-003 | Explainable analysis, classification, naming, and relationships | `product-requirements.md` FR-011–FR-017, `domain-data-requirements.md` taxonomy baseline, and `classification-and-confidence-specification.md` | Curated-corpus evaluation and trace evidence | Planned |
 | PROD-004 | Confidence-driven and sampled human review | `product-requirements.md` FR-018–FR-024 | User-flow tests and calibration report | Planned |
-| PROD-005 | Safe copy, move, resume, and restore | `product-requirements.md` FR-025–FR-034 | Planning, execution, failure-injection, and end-to-end tests | In progress |
+| PROD-005 | Safe copy, move, resume, and restore | `product-requirements.md` FR-025–FR-034 | Planning, execution, failure-injection, and end-to-end tests | In progress; durable intent/result orchestration is locally tested, restart loading and restore pending |
 | PROD-006 | Team roles and append-only Activity History | `product-requirements.md` FR-035–FR-040 | Authorization and audit tests | In progress; local audit contracts and CockroachDB append adapter implemented, runtime persistence and roles pending |
 | PROD-007 | Four persistent memory classes in CockroachDB | `product-requirements.md` FR-041–FR-046 | Schema, retrieval, authorization, and demo evidence | Planned |
 | PROD-008 | Complete desktop and cloud product parity | `product-requirements.md` FR-047–FR-050 | Cross-surface contract and end-to-end tests | Planned |

@@ -102,7 +102,8 @@ The critical path is:
 - Typed persistence commands, a bounded serializable retry runner, and an
   atomic CockroachDB operation repository are implemented and tested locally.
   Explicit domain identity and operation mappings are also implemented. They
-  are not yet connected to the application orchestrator or a live engine.
+  are connected to the local batch executor through an optional fail-closed
+  lifecycle recorder, but not to a live engine.
 - The preparatory notes
   [`local-core-status.md`](local-core-status.md) and
   [`local-batch-operation-design-note.md`](../architecture/local-batch-operation-design-note.md)
@@ -137,6 +138,8 @@ The critical path is:
 - Serializable transaction retries, workspace-scoped repository statements,
   idempotent batch and operation writes, aggregate result updates, and
   hash-chained audit appends have local contract evidence.
+- Intent-before-mutation, result-after-mutation, replay event, and
+  reconciliation-state ordering have local orchestration evidence.
 
 **Exit criteria:**
 
@@ -247,7 +250,7 @@ The critical path is:
 
 **Measurement date:** 2026-07-26
 
-The current evidence-weighted Schedule Performance Indicator is **30%**. This
+The current evidence-weighted Schedule Performance Indicator is **32%**. This
 is a planning estimate, not a product-completion or production-readiness claim.
 It is calculated from fixed milestone weights and conservative completion
 estimates based only on merged or locally verified evidence:
@@ -256,13 +259,13 @@ estimates based only on merged or locally verified evidence:
 | --- | ---: | ---: | ---: |
 | M0 - Baseline complete | 8% | 100% | 8.0% |
 | M1 - Decisions and scaffolding | 14% | 85% | 11.9% |
-| M2 - CockroachDB foundation | 18% | 50% | 9.0% |
+| M2 - CockroachDB foundation | 18% | 60% | 10.8% |
 | M3 - Real analysis slice | 18% | 0% | 0.0% |
 | M4 - Review and safe operations | 15% | 10% | 1.5% |
 | M5 - Product surfaces | 12% | 0% | 0.0% |
 | M6 - Evaluation and hardening | 9% | 0% | 0.0% |
 | M7 - Submission readiness | 6% | 0% | 0.0% |
-| **Total** | **100%** |  | **30.4%, rounded to 30%** |
+| **Total** | **100%** |  | **32.2%, rounded to 32%** |
 
 The project is **on plan overall and ahead on the database foundation**. M1 is
 at the end of its planned window with some later-slice decisions still open.
@@ -307,9 +310,9 @@ The approved local CockroachDB persistence boundary currently has:
 5. keep runtime identity creation, production data, cloud resources, and paid
    operations behind separate explicit approval.
 
-The next increment is orchestration of the implemented persistence mapping
-around filesystem mutation. Live CockroachDB execution, runtime identities,
-and paid operations remain separate approval gates.
+The next increment is durable state loading and restart reconciliation through
+the implemented orchestration boundary. Live CockroachDB execution, runtime
+identities, and paid operations remain separate approval gates.
 
 ## 8. Operating rules during delivery
 

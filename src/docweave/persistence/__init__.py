@@ -23,6 +23,10 @@ from docweave.persistence.operation_repository import (
     PersistenceConflictError,
     PersistenceNotFoundError,
 )
+from docweave.persistence.orchestration import (
+    DurableOperationLifecycleRecorder,
+    PersistenceEvidenceError,
+)
 from docweave.persistence.transactions import (
     CockroachTransactionRunner,
     TransactionExecutionError,
@@ -38,11 +42,13 @@ __all__ = [
     "CockroachOperationRepository",
     "CockroachTransactionRunner",
     "CreateBatch",
+    "DurableOperationLifecycleRecorder",
     "ExecutionIntentMapping",
     "OperationPersistenceRepository",
     "OperationResultMapping",
     "PersistenceConflictError",
     "PersistenceDisposition",
+    "PersistenceEvidenceError",
     "PersistenceIdentityMap",
     "PersistenceNotFoundError",
     "RecordExecutionIntent",

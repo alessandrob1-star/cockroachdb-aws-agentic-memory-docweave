@@ -43,6 +43,10 @@ The repository currently contains a tested Python package with:
 - typed database-ready batch, intent, result, and audit command contracts;
 - explicit domain-to-database identity, root-reference, batch, intent, result,
   and audit mappings;
+- optional durable lifecycle recording around filesystem execution, with
+  intent-before-mutation and result-after-mutation ordering;
+- fail-closed behavior that prevents mutation when intent persistence fails and
+  preserves an in-progress state when result persistence fails;
 - bounded serializable transaction execution with SQLSTATE `40001` retry,
   rollback, capped backoff, and sanitized failures;
 - atomic CockroachDB statement contracts for batch creation, execution claim,
@@ -57,7 +61,7 @@ The repository currently contains a tested Python package with:
 The latest verified local quality gate on
 `codex/cockroachdb-persistence-boundary` reported:
 
-- 186 tests passed;
+- 195 tests passed;
 - 94 percent total package coverage;
 - Ruff format check passed;
 - Ruff lint check passed;
@@ -69,8 +73,9 @@ The latest verified local quality gate on
 
 The 144-test migration baseline passed GitHub Actions on pull request 22 and
 after its merge to `main`. The Node.js 24 workflow update passed on pull request
-23 and after its merge to `main`. The 186-test persistence boundary is local
-evidence until a separately authorized pull request passes GitHub Actions.
+23 and after its merge to `main`. The 195-test durable orchestration increment
+is local evidence until a separately authorized pull request passes GitHub
+Actions.
 
 The check command is:
 
@@ -94,10 +99,11 @@ DocWeave does not yet implement or claim:
 - durable Activity History;
 - release security scanning beyond the current Python quality gate.
 
-The batch executor is still a local primitive. The database adapter can express
-durable atomic writes, but it is not yet connected to the executor or a live
-runtime engine. A process loss therefore still loses the active in-memory
-records. The project does not yet claim persistent application behavior.
+The batch executor remains a local primitive, but its optional lifecycle
+recorder now connects execution ordering to the durable adapter contract. No
+live runtime engine constructs that recorder, and restart bootstrap does not
+yet reload database state. The project therefore does not claim persistent
+application behavior.
 
 ## 5. Contract review findings
 
@@ -113,9 +119,9 @@ must be closed before production-grade batch execution:
 
 | Gap | Impact | Required next control |
 | --- | --- | --- |
-| Persistence adapter is not connected | Process loss still removes the active local replay registry | Map domain commands and orchestrate durable writes around file mutation |
+| Runtime recorder is not constructed from durable state | Restart does not yet reload terminal or in-progress operations | Add workspace-scoped state reads and restart bootstrap |
 | Audit adapter has no live runtime evidence | Activity History cannot yet survive restart | Run approved integration and restart tests against CockroachDB |
-| Execution lease is not orchestrated | A process failure can still leave an ambiguous external outcome | Connect claim, mutation, result, and reconciliation as one workflow |
+| Lease state is not reloaded after restart | A new process cannot yet discover an interrupted durable claim | Load workspace-scoped claims and reconcile expired leases |
 | No restore contract | Move and copy outcomes are not yet reversible through tested restore semantics | Add restore planning after batch result and audit semantics |
 | No workspace/user authorization model | Approval uses user identifiers but no role policy yet | Add authorization contract before user interface or cloud execution |
 
@@ -136,9 +142,9 @@ contention, or recovery.
 
 ## 7. Readiness for CockroachDB, AWS, and UI
 
-The next CockroachDB application step is local orchestration of the implemented
-domain mappings around the new adapter. Live execution remains behind separate
-approval and a current cost preflight.
+The next CockroachDB application step is workspace-scoped loading of durable
+terminal and in-progress execution state, followed by restart reconciliation.
+Live execution remains behind separate approval and a current cost preflight.
 
 The PySide6 desktop preview interface is no longer blocked by a missing batch
 model. Its first implementation should still wait for an approved surface

@@ -187,6 +187,39 @@ class OperationExecutor(Protocol):
     ) -> ExecutionResult: ...
 
 
+class OperationLifecycleRecorder(Protocol):
+    """Optional durable boundary around filesystem execution side effects."""
+
+    def record_intent(
+        self,
+        batch: OperationBatch,
+        item: OperationBatchItem,
+        event: AuditEvent,
+    ) -> None: ...
+
+    def record_result(
+        self,
+        batch: OperationBatch,
+        item: OperationBatchItem,
+        result: OperationResultRecord,
+        event: AuditEvent,
+    ) -> None: ...
+
+    def record_event(
+        self,
+        batch: OperationBatch,
+        event: AuditEvent,
+    ) -> None: ...
+
+
+@dataclass(frozen=True, slots=True)
+class BatchExecutionHooks:
+    """Injectable execution and durable lifecycle boundaries."""
+
+    operation_executor: OperationExecutor = execute_file_operation
+    lifecycle_recorder: OperationLifecycleRecorder | None = None
+
+
 @dataclass(frozen=True, slots=True)
 class _BatchExecutionContext:
     batch: OperationBatch
@@ -195,6 +228,7 @@ class _BatchExecutionContext:
     audit_trail: AppendOnlyAuditTrail
     execution_ledger: InMemoryExecutionLedger
     operation_executor: OperationExecutor
+    lifecycle_recorder: OperationLifecycleRecorder | None
 
 
 @dataclass(frozen=True, slots=True)
@@ -410,7 +444,7 @@ def execute_operation_batch(
     *,
     audit_trail: AppendOnlyAuditTrail,
     execution_ledger: InMemoryExecutionLedger,
-    operation_executor: OperationExecutor = execute_file_operation,
+    hooks: BatchExecutionHooks | None = None,
 ) -> BatchExecutionReport:
     """Execute independent approved items with fail-closed local idempotency."""
     _require_non_empty("executed_by_actor_id", request.executed_by_actor_id)
@@ -420,13 +454,15 @@ def execute_operation_batch(
         raise ValueError("batch approval does not match the current preview")
 
     timestamp = normalize_utc(request.now_utc)
+    execution_hooks = hooks or BatchExecutionHooks()
     context = _BatchExecutionContext(
         batch=batch,
         request=request,
         now_utc=timestamp,
         audit_trail=audit_trail,
         execution_ledger=execution_ledger,
-        operation_executor=operation_executor,
+        operation_executor=execution_hooks.operation_executor,
+        lifecycle_recorder=execution_hooks.lifecycle_recorder,
     )
     updated_items: list[OperationBatchItem] = []
     results: list[OperationResultRecord] = []
@@ -452,8 +488,8 @@ def execute_operation_batch(
         if final_state is BatchState.COMPLETED
         else AuditEventType.BATCH_COMPLETED_WITH_FAILURES
     )
-    _append_batch_event(
-        audit_trail,
+    _record_batch_event(
+        context,
         final_batch,
         _EventTransition(
             event_type=completion_type,
@@ -606,7 +642,7 @@ def _execute_batch_item(
             state=_item_state_for_status(replay.status),
             latest_result=replay,
         )
-        _append_result_event(
+        _record_result_event(
             context,
             replayed_item,
             replay,
@@ -625,7 +661,6 @@ def _execute_batch_item(
             execution_key=execution_key,
         )
         if reconciled is not None:
-            context.execution_ledger.record_result(reconciled)
             reconciled_item = replace(
                 item,
                 state=_item_state_for_status(reconciled.status),
@@ -639,14 +674,13 @@ def _execute_batch_item(
             now_utc=context.now_utc,
         )
         if stale_result is not None:
-            context.execution_ledger.record_result(stale_result)
             blocked_item = replace(
                 item,
                 state=BatchItemState.BLOCKED,
                 latest_result=stale_result,
                 block_reason=stale_result.reason.value,
             )
-            _append_result_event(
+            _record_result_event(
                 context,
                 blocked_item,
                 stale_result,
@@ -658,8 +692,8 @@ def _execute_batch_item(
             )
             return blocked_item, stale_result, False
 
-        _append_item_event(
-            context.audit_trail,
+        _record_intent_event(
+            context,
             batch,
             item,
             _EventTransition(
@@ -674,7 +708,6 @@ def _execute_batch_item(
                 approval_id=cast(OperationApproval, item.approval).approval_id,
             ),
         )
-        context.execution_ledger.record_intent(execution_key)
 
     item_approval = cast(OperationApproval, item.approval)
     execution_id = f"{batch.batch_id}:{item.item_id}"
@@ -690,7 +723,6 @@ def _execute_batch_item(
         execution_key,
         execution,
     )
-    context.execution_ledger.record_result(result)
     updated_item = replace(
         item,
         state=_item_state_for_status(result.status),
@@ -699,7 +731,7 @@ def _execute_batch_item(
             result.reason.value if result.status is ExecutionStatus.BLOCKED else None
         ),
     )
-    _append_result_event(
+    _record_result_event(
         context,
         updated_item,
         result,
@@ -806,8 +838,8 @@ def _reconcile_interrupted_item(
     elif not destination_exists and source_exists:
         source_matches = _source_still_matches(item)
         if source_matches:
-            _append_item_event(
-                context.audit_trail,
+            _record_item_event(
+                context,
                 batch,
                 item,
                 _EventTransition(
@@ -816,7 +848,7 @@ def _reconcile_interrupted_item(
                     actor_id=context.request.executed_by_actor_id,
                     occurred_at_utc=context.now_utc,
                     previous_state=BatchItemState.EXECUTING.value,
-                    new_state=BatchItemState.APPROVED.value,
+                    new_state=BatchItemState.EXECUTING.value,
                     reason="no_effect_observed_safe_to_retry",
                     idempotency_key=execution_key,
                 ),
@@ -848,7 +880,7 @@ def _reconcile_interrupted_item(
         )
         event_reason = "ambiguous_filesystem_state_after_interruption"
 
-    _append_result_event(
+    _record_result_event(
         context,
         item,
         result,
@@ -944,14 +976,13 @@ def _event_type_for_status(status: ExecutionStatus) -> AuditEventType:
     }[status]
 
 
-def _append_result_event(
+def _record_result_event(
     context: _BatchExecutionContext,
     item: OperationBatchItem,
     result: OperationResultRecord,
     result_audit: _ResultAudit,
 ) -> None:
-    _append_item_event(
-        context.audit_trail,
+    event = _item_event(
         context.batch,
         item,
         _EventTransition(
@@ -972,6 +1003,57 @@ def _append_result_event(
             ),
         ),
     )
+    if context.lifecycle_recorder is not None:
+        if result.disposition is ResultDisposition.IDEMPOTENT_REPLAY:
+            context.lifecycle_recorder.record_event(context.batch, event)
+        else:
+            context.lifecycle_recorder.record_result(
+                context.batch,
+                item,
+                result,
+                event,
+            )
+    if result.disposition is not ResultDisposition.IDEMPOTENT_REPLAY:
+        context.execution_ledger.record_result(result)
+    context.audit_trail.append(event)
+
+
+def _record_intent_event(
+    context: _BatchExecutionContext,
+    batch: OperationBatch,
+    item: OperationBatchItem,
+    transition: _EventTransition,
+) -> None:
+    event = _item_event(batch, item, transition)
+    if transition.idempotency_key is None:
+        raise ValueError("execution intent requires an idempotency key")
+    if context.lifecycle_recorder is not None:
+        context.lifecycle_recorder.record_intent(batch, item, event)
+    context.execution_ledger.record_intent(transition.idempotency_key)
+    context.audit_trail.append(event)
+
+
+def _record_item_event(
+    context: _BatchExecutionContext,
+    batch: OperationBatch,
+    item: OperationBatchItem,
+    transition: _EventTransition,
+) -> None:
+    event = _item_event(batch, item, transition)
+    if context.lifecycle_recorder is not None:
+        context.lifecycle_recorder.record_event(batch, event)
+    context.audit_trail.append(event)
+
+
+def _record_batch_event(
+    context: _BatchExecutionContext,
+    batch: OperationBatch,
+    transition: _EventTransition,
+) -> None:
+    event = _batch_event(batch, transition)
+    if context.lifecycle_recorder is not None:
+        context.lifecycle_recorder.record_event(batch, event)
+    context.audit_trail.append(event)
 
 
 def _append_batch_event(
@@ -979,23 +1061,7 @@ def _append_batch_event(
     batch: OperationBatch,
     transition: _EventTransition,
 ) -> None:
-    audit_trail.append(
-        AuditEvent(
-            event_id=str(uuid4()),
-            workspace_id=batch.workspace_id,
-            batch_id=batch.batch_id,
-            event_type=transition.event_type,
-            actor_type=transition.actor_type,
-            actor_id=transition.actor_id,
-            occurred_at_utc=transition.occurred_at_utc,
-            correlation_id=batch.correlation_id,
-            idempotency_key=transition.idempotency_key,
-            previous_state=transition.previous_state,
-            new_state=transition.new_state,
-            reason=transition.reason,
-            approval_id=transition.approval_id,
-        )
-    )
+    audit_trail.append(_batch_event(batch, transition))
 
 
 def _append_item_event(
@@ -1004,28 +1070,55 @@ def _append_item_event(
     item: OperationBatchItem,
     transition: _EventTransition,
 ) -> None:
-    audit_trail.append(
-        AuditEvent(
-            event_id=str(uuid4()),
-            workspace_id=batch.workspace_id,
-            batch_id=batch.batch_id,
-            batch_item_id=item.item_id,
-            event_type=transition.event_type,
-            actor_type=transition.actor_type,
-            actor_id=transition.actor_id,
-            occurred_at_utc=transition.occurred_at_utc,
-            correlation_id=batch.correlation_id,
-            idempotency_key=transition.idempotency_key,
-            previous_state=transition.previous_state,
-            new_state=transition.new_state,
-            reason=transition.reason,
-            plan_fingerprint=operation_plan_fingerprint(item.plan),
-            approval_id=transition.approval_id,
-            source_relative_path=item.plan.source_relative_path,
-            destination_relative_path=item.plan.destination_relative_path,
-            error_class=transition.error_class,
-            error_category=transition.error_category,
-        )
+    audit_trail.append(_item_event(batch, item, transition))
+
+
+def _batch_event(
+    batch: OperationBatch,
+    transition: _EventTransition,
+) -> AuditEvent:
+    return AuditEvent(
+        event_id=str(uuid4()),
+        workspace_id=batch.workspace_id,
+        batch_id=batch.batch_id,
+        event_type=transition.event_type,
+        actor_type=transition.actor_type,
+        actor_id=transition.actor_id,
+        occurred_at_utc=transition.occurred_at_utc,
+        correlation_id=batch.correlation_id,
+        idempotency_key=transition.idempotency_key,
+        previous_state=transition.previous_state,
+        new_state=transition.new_state,
+        reason=transition.reason,
+        approval_id=transition.approval_id,
+    )
+
+
+def _item_event(
+    batch: OperationBatch,
+    item: OperationBatchItem,
+    transition: _EventTransition,
+) -> AuditEvent:
+    return AuditEvent(
+        event_id=str(uuid4()),
+        workspace_id=batch.workspace_id,
+        batch_id=batch.batch_id,
+        batch_item_id=item.item_id,
+        event_type=transition.event_type,
+        actor_type=transition.actor_type,
+        actor_id=transition.actor_id,
+        occurred_at_utc=transition.occurred_at_utc,
+        correlation_id=batch.correlation_id,
+        idempotency_key=transition.idempotency_key,
+        previous_state=transition.previous_state,
+        new_state=transition.new_state,
+        reason=transition.reason,
+        plan_fingerprint=operation_plan_fingerprint(item.plan),
+        approval_id=transition.approval_id,
+        source_relative_path=item.plan.source_relative_path,
+        destination_relative_path=item.plan.destination_relative_path,
+        error_class=transition.error_class,
+        error_category=transition.error_category,
     )
 
 

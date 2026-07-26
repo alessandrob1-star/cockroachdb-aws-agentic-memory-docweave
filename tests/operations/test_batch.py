@@ -11,9 +11,11 @@ from docweave.core.fingerprints import (
 from docweave.operations import (
     MAX_OPERATION_BATCH_ITEMS,
     AppendOnlyAuditTrail,
+    AuditEvent,
     AuditEventType,
     BatchApprovalRequest,
     BatchCreationRequest,
+    BatchExecutionHooks,
     BatchExecutionRequest,
     BatchItemRequest,
     BatchItemState,
@@ -27,10 +29,14 @@ from docweave.operations import (
     InMemoryExecutionLedger,
     OperationApproval,
     OperationBatch,
+    OperationBatchItem,
+    OperationLifecycleRecorder,
+    OperationResultRecord,
     ResultDisposition,
     approve_operation_batch,
     create_operation_batch,
     derive_batch_state,
+    execute_file_operation,
     execute_operation_batch,
     operation_batch_fingerprint,
     operation_execution_key,
@@ -665,7 +671,7 @@ def test_maps_executor_failure_outcomes_without_false_success(
         BatchExecutionRequest("local-executor", BASE_TIME + timedelta(minutes=2)),
         audit_trail=trail,
         execution_ledger=InMemoryExecutionLedger(),
-        operation_executor=controlled_executor,
+        hooks=BatchExecutionHooks(operation_executor=controlled_executor),
     )
 
     assert report.batch.items[0].state is expected_state
@@ -748,3 +754,145 @@ def test_batch_summary_and_derived_states_cover_terminal_variants(
     assert summary.total == 1
     assert summary.skipped == 1
     assert summary.planned == 0
+
+
+class RecordingLifecycleRecorder(OperationLifecycleRecorder):
+    def __init__(self, *, fail_on: str | None = None) -> None:
+        self.calls: list[str] = []
+        self.fail_on = fail_on
+
+    def record_intent(
+        self,
+        batch: OperationBatch,
+        item: OperationBatchItem,
+        event: AuditEvent,
+    ) -> None:
+        self.calls.append("intent")
+        if self.fail_on == "intent":
+            raise RuntimeError("intent persistence failed")
+
+    def record_result(
+        self,
+        batch: OperationBatch,
+        item: OperationBatchItem,
+        result: OperationResultRecord,
+        event: AuditEvent,
+    ) -> None:
+        self.calls.append("result")
+        if self.fail_on == "result":
+            raise RuntimeError("result persistence failed")
+
+    def record_event(
+        self,
+        batch: OperationBatch,
+        event: AuditEvent,
+    ) -> None:
+        self.calls.append(f"event:{event.event_type.value}")
+
+
+def test_durable_lifecycle_orders_intent_before_mutation_and_result_after(
+    tmp_path: Path,
+) -> None:
+    trail = AppendOnlyAuditTrail()
+    plan = operation_plan(tmp_path, item_name="durable.pdf")
+    approved = approve_batch(
+        create_batch((BatchItemRequest("item-001", plan),), trail),
+        trail,
+    )
+    recorder = RecordingLifecycleRecorder()
+
+    def ordered_executor(
+        plan: FileOperationPlan,
+        approval: OperationApproval,
+        *,
+        execution_id: str,
+        now_utc: datetime,
+    ) -> ExecutionResult:
+        recorder.calls.append("filesystem")
+        return execute_file_operation(
+            plan,
+            approval,
+            execution_id=execution_id,
+            now_utc=now_utc,
+        )
+
+    report = execute_operation_batch(
+        approved,
+        BatchExecutionRequest("executor-001", BASE_TIME + timedelta(minutes=2)),
+        audit_trail=trail,
+        execution_ledger=InMemoryExecutionLedger(),
+        hooks=BatchExecutionHooks(
+            operation_executor=ordered_executor,
+            lifecycle_recorder=recorder,
+        ),
+    )
+
+    assert report.summary.succeeded == 1
+    assert recorder.calls == [
+        "intent",
+        "filesystem",
+        "result",
+        "event:batch_completed",
+    ]
+
+
+def test_failed_durable_intent_prevents_filesystem_mutation(tmp_path: Path) -> None:
+    trail = AppendOnlyAuditTrail()
+    plan = operation_plan(tmp_path, item_name="blocked-before-mutation.pdf")
+    approved = approve_batch(
+        create_batch((BatchItemRequest("item-001", plan),), trail),
+        trail,
+    )
+    recorder = RecordingLifecycleRecorder(fail_on="intent")
+    ledger = InMemoryExecutionLedger()
+    events_before = trail.events
+
+    with pytest.raises(RuntimeError, match="intent persistence failed"):
+        execute_operation_batch(
+            approved,
+            BatchExecutionRequest(
+                "executor-001",
+                BASE_TIME + timedelta(minutes=2),
+            ),
+            audit_trail=trail,
+            execution_ledger=ledger,
+            hooks=BatchExecutionHooks(lifecycle_recorder=recorder),
+        )
+
+    execution_key = operation_execution_key(approved, approved.items[0])
+    assert approved.items[0].plan.destination_path is not None
+    assert not approved.items[0].plan.destination_path.exists()
+    assert not ledger.is_in_progress(execution_key)
+    assert trail.events == events_before
+
+
+def test_failed_durable_result_leaves_intent_for_reconciliation(
+    tmp_path: Path,
+) -> None:
+    trail = AppendOnlyAuditTrail()
+    plan = operation_plan(tmp_path, item_name="result-failure.pdf")
+    approved = approve_batch(
+        create_batch((BatchItemRequest("item-001", plan),), trail),
+        trail,
+    )
+    recorder = RecordingLifecycleRecorder(fail_on="result")
+    ledger = InMemoryExecutionLedger()
+
+    with pytest.raises(RuntimeError, match="result persistence failed"):
+        execute_operation_batch(
+            approved,
+            BatchExecutionRequest(
+                "executor-001",
+                BASE_TIME + timedelta(minutes=2),
+            ),
+            audit_trail=trail,
+            execution_ledger=ledger,
+            hooks=BatchExecutionHooks(lifecycle_recorder=recorder),
+        )
+
+    execution_key = operation_execution_key(approved, approved.items[0])
+    assert approved.items[0].plan.destination_path is not None
+    assert approved.items[0].plan.destination_path.exists()
+    assert ledger.is_in_progress(execution_key)
+    assert recorder.calls == ["intent", "result"]
+    assert trail.events[-1].event_type is AuditEventType.ITEM_EXECUTION_INTENT_RECORDED
