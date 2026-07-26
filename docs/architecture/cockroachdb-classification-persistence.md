@@ -44,16 +44,38 @@ than fabricated probabilities. Persistence therefore requires a caller-supplied
 converts ordinal model words into numeric confidence on its own.
 
 The confidence method and calibration process remain pending. Until approved,
-the adapter is ready but the desktop runtime must not manufacture scores merely
-to write a proposal.
+the runtime requires an injected score provider and has no fallback. The
+desktop must not manufacture scores merely to write a proposal.
+
+## Runtime sequence
+
+The side-effect-free runtime builder composes one transaction runner, the
+document and taxonomy repository, and the classification repository around
+caller-supplied engine, Bedrock gateway, and score provider dependencies.
+Construction opens no connection and invokes no model.
+
+One explicit classification request then:
+
+1. extracts the authorized PDF in the existing disposable worker;
+2. rejects unusable text or incomplete extraction provenance before database
+   or model input/output;
+3. registers or exactly replays the logical document and verified version;
+4. installs or verifies the complete approved taxonomy with human authority;
+5. invokes Bedrock outside every database transaction;
+6. obtains versioned scores from the mandatory injected provider; and
+7. atomically persists the run, proposal subtype, and evidence.
+
+Document registration is durable even if later model analysis fails. That
+record is verified intake state, not a fabricated classification success.
 
 ## Current limitations
 
 - No application runtime composes this repository with extraction and Bedrock.
-- Document registration and taxonomy seeding are not implemented.
+- No file-instance registration is implemented.
 - No review, canonical promotion, workflow checkpoint, or classification audit
   event is implemented in this revision.
 - No vector column or index is created; embedding parameters remain unresolved.
-- Local tests prove statement shape, transaction grouping, parameter binding,
-  exact replay behavior, conflict handling, and offline migration rendering.
-  Live validation evidence is recorded separately.
+- Local tests prove document and taxonomy replay behavior, statement
+  parameterization, runtime ordering, fail-closed extraction gates, transaction
+  grouping, conflict handling, side-effect-free composition, and offline
+  migration rendering. Live validation evidence is recorded separately.

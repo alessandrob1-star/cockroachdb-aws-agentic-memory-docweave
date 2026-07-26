@@ -141,8 +141,13 @@ bounded side-effect-free Converse request fields, and decodes the closed
 structured response into a non-authoritative typed proposal. Deterministic
 validation confirms taxonomy and contract versions, page existence, exact
 evidence quotations, cross-references, alternatives, abstention, and
-application-side budgets. No Bedrock invocation, model-quality result,
-confidence calculation, or persistence is claimed.
+application-side budgets. The pinned Bedrock gateway has completed one bounded
+synthetic live classification. Local CockroachDB adapters now register verified
+document versions, initialize the approved taxonomy with human authority, and
+atomically persist validated run, proposal, provenance, and evidence records.
+The composed runtime requires an injected confidence provider and has no
+configured application engine; confidence calculation, corpus quality, human
+review, and live end-to-end persistence are not claimed.
 
 ### 5.3 Independent review
 
