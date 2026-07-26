@@ -153,7 +153,7 @@ The critical path is:
 
 ### M3 - Real document analysis slice
 
-**Target window:** 2026-07-31 to 2026-08-03
+**Accelerated target window:** 2026-07-29 to 2026-08-01
 
 **Objectives:**
 
@@ -173,7 +173,7 @@ The critical path is:
 
 ### M4 - Human review and safe operations
 
-**Target window:** 2026-08-04 to 2026-08-07
+**Accelerated target window:** 2026-08-02 to 2026-08-05
 
 **Objectives:**
 
@@ -193,7 +193,7 @@ The critical path is:
 
 ### M5 - Desktop and cloud product surfaces
 
-**Target window:** 2026-08-08 to 2026-08-11
+**Accelerated target window:** 2026-08-04 to 2026-08-08
 
 **Objectives:**
 
@@ -212,7 +212,7 @@ The critical path is:
 
 ### M6 - Evaluation, security, and scale evidence
 
-**Target window:** 2026-08-12 to 2026-08-15
+**Accelerated target window:** 2026-08-09 to 2026-08-14
 
 **Objectives:**
 
@@ -232,7 +232,7 @@ The critical path is:
 
 ### M7 - Submission readiness
 
-**Target window:** 2026-08-16 to 2026-08-18
+**Accelerated target window:** 2026-08-15 to 2026-08-18
 
 **Objectives:**
 
@@ -286,6 +286,13 @@ operations, and both product surfaces must be connected before the evaluation
 and submission windows. The plan retains the original 2026-08-18 deadline and
 does not assume additional time.
 
+The accelerated sequence intentionally overlaps the first desktop surface with
+the final CockroachDB and analysis work. The target is a manually testable
+PySide6 shell by 2026-08-02, a representative desktop vertical slice by
+2026-08-05, and at least ten days for owner testing, personalization, and
+regression correction before submission. Parallel work does not relax quality,
+security, cost, or truthful-integration gates.
+
 ## 6. Remaining implementation decisions
 
 The repository package layout, local toolchain, and initial migration tooling
@@ -314,11 +321,13 @@ The approved local CockroachDB persistence boundary currently has:
 5. keep runtime identity creation, production data, cloud resources, and paid
    operations behind separate explicit approval.
 
-The durable state-loading and restart-reconciliation increment is now
-implemented and locally verified at the adapter boundary. The next increment
-is approved runtime engine construction and a controlled restart integration
-test. Live CockroachDB execution, runtime identities, and paid operations
-remain separate approval gates.
+Durable state loading, restart reconciliation, and side-effect-free runtime
+composition are implemented and locally verified at the adapter boundary. The
+next product increment is the first desktop surface contract and approved
+PySide6 dependency, while live engine configuration and controlled restart
+integration proceed as a separately approved track. Live CockroachDB execution,
+runtime identities, dependencies, and paid operations remain explicit approval
+gates.
 
 ## 8. Operating rules during delivery
 

@@ -17,6 +17,7 @@ The implementation is in:
 - `src/docweave/persistence/contracts.py`;
 - `src/docweave/persistence/mappers.py`;
 - `src/docweave/persistence/orchestration.py`;
+- `src/docweave/persistence/runtime.py`;
 - `src/docweave/persistence/transactions.py`; and
 - `src/docweave/persistence/operation_repository.py`.
 
@@ -130,6 +131,12 @@ Lease expiry permits reconciliation but is not a claim that long-running
 execution fencing or lease renewal is implemented. Those controls remain
 required before concurrent production workers are enabled.
 
+The runtime composer binds one transaction runner and repository to both the
+restart ledger and lifecycle recorder. It accepts an already constructed
+SQLAlchemy engine and performs no connection, credential lookup, schema
+mutation, or data access during composition. Engine configuration and runtime
+secret delivery remain separate approved responsibilities.
+
 ## 7. Workspace isolation
 
 Every batch, operation, and audit lookup or mutation includes `workspace_id`.
@@ -162,8 +169,10 @@ Local tests cover:
 - terminal durable results replay without invoking filesystem execution;
 - active durable leases block a second process before mutation;
 - expired durable leases reconcile verified postconditions;
-- persisted identity or evidence mismatches fail closed; and
-- result and in-progress checks reuse one workspace-scoped read.
+- persisted identity or evidence mismatches fail closed;
+- result and in-progress checks reuse one workspace-scoped read; and
+- runtime composition performs no database input/output and rejects mismatched
+  batch identities before use.
 
 The tests use controlled local doubles and SQLite only for transaction rollback
 semantics. They do not claim that the application adapter has executed against
@@ -173,9 +182,8 @@ CockroachDB.
 
 The following remain pending:
 
-- runtime engine construction and approved secret delivery;
-- runtime construction of the lifecycle recorder and restart-aware ledger
-  around the application workflow;
+- approved engine configuration and runtime secret delivery;
+- application bootstrap invocation of the composed runtime;
 - live Psycopg execution and contention tests against an approved target;
 - runtime identities, authorization, and Row-Level Security;
 - restart, lease expiry, renewal, and fencing evidence against CockroachDB;

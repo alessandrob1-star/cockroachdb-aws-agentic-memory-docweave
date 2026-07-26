@@ -31,6 +31,11 @@ from docweave.persistence.orchestration import (
     DurableOperationLifecycleRecorder,
     PersistenceEvidenceError,
 )
+from docweave.persistence.runtime import (
+    DurableOperationRuntime,
+    DurableRuntimeOptions,
+    build_durable_operation_runtime,
+)
 from docweave.persistence.transactions import (
     CockroachTransactionRunner,
     TransactionExecutionError,
@@ -49,6 +54,8 @@ __all__ = [
     "CreateBatch",
     "DurableExecutionLedger",
     "DurableOperationLifecycleRecorder",
+    "DurableOperationRuntime",
+    "DurableRuntimeOptions",
     "ExecutionIntentMapping",
     "OperationExecutionIdentity",
     "OperationPersistenceRepository",
@@ -66,6 +73,7 @@ __all__ = [
     "TransactionRetryHooks",
     "TransactionRetryPolicy",
     "TransactionRun",
+    "build_durable_operation_runtime",
     "map_audit_event",
     "map_create_batch",
     "map_execution_intent",
