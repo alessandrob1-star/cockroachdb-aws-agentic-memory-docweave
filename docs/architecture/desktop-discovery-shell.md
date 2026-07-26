@@ -83,6 +83,23 @@ The preview exposes no editing, annotation, printing, exporting, or shell
 execution. Invalid, password-protected, or unsupported documents remain in an
 explicit safe error state.
 
+Interactive external links are resolved from the PDF link model only after an
+explicit left click. DocWeave accepts absolute HTTP or HTTPS destinations,
+rejects credentials, local and private-address destinations, oversized URLs,
+and every non-web scheme, then presents the normalized host and full address in
+a plain-text confirmation dialog. Cancel is the default action. An accepted
+link is delegated to the user's default browser; DocWeave never fetches it.
+Unencrypted HTTP destinations receive an additional warning. Internal PDF links
+remain inside the preview.
+
+PDF names, paths, metadata, extracted content, and link destinations are
+untrusted data. Current CockroachDB application statements are static
+SQLAlchemy text clauses with named bind parameters; document-controlled values
+are never interpolated into Structured Query Language. Adversarial repository
+tests preserve this boundary with quote, comment, statement-separator, and
+destructive-keyword payloads. Extracted document content is not persisted by
+the current desktop shell, so end-to-end content persistence is not claimed.
+
 ## 6. Presentation and accessibility baseline
 
 The document table uses a read-only `QAbstractTableModel` rather than one widget
@@ -129,6 +146,10 @@ Automated evidence covers:
   before embedded PDF preview;
 - real Qt PDF loading, multipage mode, zoom controls, and malformed-document
   states using controlled test files;
+- guarded HTTP and HTTPS link policy, explicit confirmation, blocked local and
+  executable destinations, and fail-closed browser-launch outcomes;
+- adversarial document-name and document-text payloads remaining bound
+  database parameters rather than executable Structured Query Language;
 - root-change and close protection during an active scan;
 - missing-root, invalid-result, and non-directory failure states; and
 - folder-picker authorization.

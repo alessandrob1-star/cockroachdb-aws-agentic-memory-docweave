@@ -248,6 +248,52 @@ def test_creates_batch_items_and_hash_chained_audit_atomically() -> None:
     assert second_audit["previous_event_sha256"] == first_audit["event_sha256"]
 
 
+def test_untrusted_document_text_remains_bound_data_not_sql() -> None:
+    injection_payload = "invoice'); DROP TABLE docweave.audit_events; --.pdf"
+    command = batch_command()
+    malicious_item = replace(
+        command.items[0],
+        source_relative_path=f"incoming/{injection_payload}",
+        destination_relative_path=f"review/{injection_payload}",
+    )
+    malicious_event = replace(
+        command.audit_events[0],
+        reason=injection_payload,
+        source_relative_path=f"incoming/{injection_payload}",
+    )
+    command = replace(
+        command,
+        items=(malicious_item,),
+        audit_events=(malicious_event,),
+    )
+    adapter, transaction_runner = repository(
+        [
+            FakeResult(scalar=BATCH_ID),
+            FakeResult(),
+            FakeResult(scalar=WORKSPACE_ID),
+            FakeResult(mapping=None),
+            FakeResult(),
+        ]
+    )
+
+    assert adapter.create_batch(command) is PersistenceDisposition.APPLIED
+
+    connection = transaction_runner.connection
+    connection.assert_consumed()
+    assert all(injection_payload not in statement for statement, _ in connection.calls)
+    bound_values = [
+        value
+        for _, parameters in connection.calls
+        if parameters is not None
+        for parameter_set in (
+            parameters if isinstance(parameters, list) else [parameters]
+        )
+        for value in parameter_set.values()
+    ]
+    assert injection_payload in bound_values
+    assert f"incoming/{injection_payload}" in bound_values
+
+
 def test_exact_batch_replay_performs_no_duplicate_writes() -> None:
     adapter, transaction_runner = repository(
         [

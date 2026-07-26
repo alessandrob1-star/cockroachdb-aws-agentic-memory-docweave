@@ -36,7 +36,10 @@ claimed yet. An initial read-only PySide6 desktop shell now exposes
 authorized-folder selection, non-blocking local discovery, deterministic intake
 counts, phase-aware progress, cooperative cancellation, explicit in-memory
 workspace state, multiple document selection, safe user-initiated opening of
-ready PDFs in a read-only embedded preview, and a virtualized document table.
+ready PDFs in a read-only embedded preview, confirmed and policy-validated
+delegation of eligible PDF hyperlinks to the user's default browser, and a
+virtualized document table. Document-controlled persistence values remain bound
+parameters rather than executable Structured Query Language.
 
 The current approved product direction includes:
 
