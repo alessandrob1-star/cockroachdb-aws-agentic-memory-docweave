@@ -61,6 +61,15 @@ completed real extraction, model invocation, evidence reconstruction, and
 validation. This proves the integration slice, not classification quality or
 production readiness.
 
+A second non-vector CockroachDB migration and typed repository now define the
+atomic, idempotent persistence of a validated Bedrock agent run, one
+non-authoritative classification proposal, minimized evidence excerpts, and
+runtime provenance. Model and document values remain bound SQL parameters, and
+the schema deliberately omits canonical classifications and review decisions
+until the human-review workflow is implemented. Runtime wiring, document
+registration, taxonomy seeding, and the approved numeric confidence method
+remain pending.
+
 An initial, explicitly labelled corpus of 30 synthetic two-page PDFs is
 available in `pdf_sintetici` for desktop discovery, preview, guarded-link, and
 later relationship testing. Its manifest records deterministic provenance,
@@ -107,6 +116,7 @@ Approved architecture:
 - [CockroachDB physical-schema specification](docs/architecture/cockroachdb-physical-schema.md)
 - [CockroachDB Entity Relationship model](docs/architecture/cockroachdb-entity-relationship.md)
 - [CockroachDB operation persistence boundary](docs/architecture/cockroachdb-operation-persistence.md)
+- [CockroachDB classification persistence boundary](docs/architecture/cockroachdb-classification-persistence.md)
 - [Desktop discovery shell](docs/architecture/desktop-discovery-shell.md)
 - [Verified AWS and CockroachDB environment baseline](docs/operations/environment-baseline.md)
 - [CockroachDB live validation evidence](docs/operations/cockroachdb-live-validation.md)
@@ -125,12 +135,11 @@ Approved architecture:
 
 ## Local development
 
-The Python scaffold contains no runtime cloud integration and does not connect
-to a database by default. It includes an initial CockroachDB migration that is
-rendered and tested offline and whose exact SQL has been accepted by a clean
-live validation database. The validation schema is not a runtime or production
-deployment. The scaffold establishes reproducible local quality gates before
-durable or cloud-connected product behavior is implemented.
+The Python scaffold does not connect to a database by default. Its non-vector
+CockroachDB migrations are rendered and tested offline; live validation
+evidence is documented separately. A validation schema is not a runtime or
+production deployment. The scaffold establishes reproducible local quality
+gates before durable application wiring is enabled.
 
 Create a virtual environment, install the pinned development tools, and run the
 local checks:
