@@ -2,7 +2,7 @@
 
 **Version:** 0.1
 **Baseline approved:** 2026-07-21
-**Implementation status:** Not started
+**Implementation status:** In progress; no complete MVP workflow claimed
 
 ## 1. Definition of Minimum Viable Product
 

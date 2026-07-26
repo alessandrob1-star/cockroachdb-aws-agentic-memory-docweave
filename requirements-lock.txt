@@ -16,7 +16,11 @@ psycopg-binary==3.3.4
 Pygments==2.20.0
 pytest==8.4.1
 pytest-cov==6.2.1
+PySide6==6.11.1
+PySide6_Addons==6.11.1
+PySide6_Essentials==6.11.1
 ruff==0.12.5
+shiboken6==6.11.1
 SQLAlchemy==2.0.51
 sqlalchemy-cockroachdb==2.0.4
 trove-classifiers==2026.6.1.19

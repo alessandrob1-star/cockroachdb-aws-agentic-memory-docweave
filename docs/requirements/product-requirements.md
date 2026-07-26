@@ -2,7 +2,8 @@
 
 **Version:** 0.1
 **Baseline approved:** 2026-07-21
-**Implementation status:** Not started
+**Implementation status:** In progress; initial read-only desktop discovery
+surface implemented
 **Product surfaces:** PySide6 desktop application and complete cloud application
 
 ## 1. Product vision

@@ -6,6 +6,7 @@ REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
 
 EXPECTED_RUNTIME_REQUIREMENTS = {
     "psycopg[binary]==3.3.4",
+    "PySide6==6.11.1",
     "SQLAlchemy==2.0.51",
     "sqlalchemy-cockroachdb==2.0.4",
 }
@@ -13,6 +14,10 @@ EXPECTED_INSTALLED_VERSIONS = {
     "alembic": "1.18.5",
     "psycopg": "3.3.4",
     "psycopg-binary": "3.3.4",
+    "PySide6": "6.11.1",
+    "PySide6-Addons": "6.11.1",
+    "PySide6-Essentials": "6.11.1",
+    "shiboken6": "6.11.1",
     "SQLAlchemy": "2.0.51",
     "sqlalchemy-cockroachdb": "2.0.4",
 }
@@ -41,6 +46,10 @@ def test_resolved_lock_contains_every_direct_dependency() -> None:
 
     assert "psycopg==3.3.4" in locked_requirements
     assert "psycopg-binary==3.3.4" in locked_requirements
+    assert "PySide6==6.11.1" in locked_requirements
+    assert "PySide6_Addons==6.11.1" in locked_requirements
+    assert "PySide6_Essentials==6.11.1" in locked_requirements
+    assert "shiboken6==6.11.1" in locked_requirements
     assert "SQLAlchemy==2.0.51" in locked_requirements
     assert "sqlalchemy-cockroachdb==2.0.4" in locked_requirements
     assert "alembic==1.18.5" in locked_requirements

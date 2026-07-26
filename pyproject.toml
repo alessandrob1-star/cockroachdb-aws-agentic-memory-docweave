@@ -14,9 +14,13 @@ authors = [
 ]
 dependencies = [
   "psycopg[binary]==3.3.4",
+  "PySide6==6.11.1",
   "SQLAlchemy==2.0.51",
   "sqlalchemy-cockroachdb==2.0.4",
 ]
+
+[project.scripts]
+docweave-desktop = "docweave.desktop.application:main"
 
 [project.optional-dependencies]
 dev = [
@@ -76,6 +80,7 @@ ignore = [
 ]
 
 [tool.ruff.lint.per-file-ignores]
+"src/docweave/desktop/*.py" = ["N802"]
 "tests/**/*.py" = ["PLR2004"]
 
 [tool.mypy]
