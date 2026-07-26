@@ -24,12 +24,14 @@ optional lifecycle recorder now orders durable intent before filesystem
 mutation and durable results after mutation, failing closed at both
 boundaries. A restart-aware ledger can now load one workspace-scoped terminal
 result or execution claim, replay completed work, reject active leases, and
-route expired claims through filesystem reconciliation. The first non-vector
-CockroachDB migration is validated offline and against a clean, isolated live
-validation database. No runtime engine connects these boundaries to that
-schema, so durable application persistence is not yet claimed. No runtime
-database integration, restore, AWS workload, user interface, or intelligent
-document analysis is claimed yet.
+route expired claims through filesystem reconciliation. A side-effect-free
+runtime composer now assembles the transaction runner, repository, ledger,
+recorder, and execution hooks around a caller-supplied engine without opening a
+connection. The first non-vector CockroachDB migration is validated offline and
+against a clean, isolated live validation database. No configured runtime
+engine connects these boundaries to that schema, so durable application
+persistence is not yet claimed. No runtime database integration, restore, AWS
+workload, user interface, or intelligent document analysis is claimed yet.
 
 The current approved product direction includes:
 

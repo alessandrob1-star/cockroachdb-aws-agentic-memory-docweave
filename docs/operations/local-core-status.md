@@ -49,6 +49,8 @@ The repository currently contains a tested Python package with:
   through the repository boundary;
 - restart-aware terminal replay, active-lease rejection, and expired-lease
   reconciliation without duplicate filesystem execution;
+- side-effect-free composition of one coherent transaction runner, repository,
+  restart ledger, lifecycle recorder, and execution hook set;
 - fail-closed behavior that prevents mutation when intent persistence fails and
   preserves an in-progress state when result persistence fails;
 - bounded serializable transaction execution with SQLSTATE `40001` retry,
@@ -63,9 +65,9 @@ The repository currently contains a tested Python package with:
 ## 3. Current local quality evidence
 
 The latest verified local quality gate on
-`codex/durable-restart-state-loading` reported:
+`codex/durable-runtime-composition` reported:
 
-- 221 tests passed;
+- 224 tests passed;
 - 94 percent total package coverage;
 - Ruff format check passed;
 - Ruff lint check passed;
@@ -77,8 +79,9 @@ The latest verified local quality gate on
 
 The 144-test migration baseline passed GitHub Actions on pull request 22 and
 after its merge to `main`. The Node.js 24 workflow update passed on pull request
-23 and after its merge to `main`. The 221-test restart-state increment is local
-evidence until a separately authorized pull request passes GitHub Actions.
+23 and after its merge to `main`. The 224-test runtime-composition increment is
+local evidence until a separately authorized pull request passes GitHub
+Actions.
 
 The check command is:
 
@@ -122,7 +125,7 @@ must be closed before production-grade batch execution:
 
 | Gap | Impact | Required next control |
 | --- | --- | --- |
-| Runtime components are not constructed against a live engine | The tested restart path is not yet an application integration | Add approved engine, recorder, ledger, and bootstrap wiring |
+| No approved engine configuration or application bootstrap | The composed restart path is not yet a live application integration | Add approved engine configuration and bootstrap invocation |
 | Audit adapter has no live runtime evidence | Activity History cannot yet survive restart | Run approved integration and restart tests against CockroachDB |
 | Lease renewal and execution fencing are not implemented | A worker that outlives its lease is not yet safe for concurrent production execution | Add renewal or fencing before enabling multiple workers |
 | No restore contract | Move and copy outcomes are not yet reversible through tested restore semantics | Add restore planning after batch result and audit semantics |
@@ -145,10 +148,13 @@ contention, or recovery.
 
 ## 7. Readiness for CockroachDB, AWS, and UI
 
-The next CockroachDB application step is approved runtime engine construction
-and a controlled restart integration test using the implemented
-workspace-scoped loader. Live execution remains behind separate approval and a
-current cost preflight.
+The next CockroachDB application step is approved engine configuration and a
+controlled restart integration test using the implemented runtime composer.
+Live execution remains behind separate approval and a current cost preflight.
+
+To preserve time for manual testing and personalization, the first desktop
+surface is now scheduled in parallel with the remaining live-integration work
+instead of waiting for the whole CockroachDB milestone to finish.
 
 The PySide6 desktop preview interface is no longer blocked by a missing batch
 model. Its first implementation should still wait for an approved surface
