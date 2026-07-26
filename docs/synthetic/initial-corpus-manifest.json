@@ -1,0 +1,551 @@
+{
+  "manifest_version": "1.0",
+  "corpus_id": "docweave-initial-synthetic-pdf-corpus",
+  "generated_on": "2026-07-26",
+  "generator": "Deterministic curated source records rendered with ReportLab 4.4.9",
+  "purpose": "Initial desktop discovery, preview, link, and relationship testing",
+  "document_count": 30,
+  "category_counts": {
+    "delivery_note": 7,
+    "invoice": 8,
+    "payment_confirmation": 7,
+    "purchase_order": 8
+  },
+  "contains_real_personal_data": false,
+  "documents": [
+    {
+      "filename": "scan_000184.pdf",
+      "sha256": "865b1b9645f8803f0f5afcb5a497878ce5b7251c84efb99ef5d4a023dabb0edf",
+      "page_count": 2,
+      "category": "purchase_order",
+      "document_id": "PO-2026-001",
+      "dossier_id": "DOS-2026-001",
+      "related_document_ids": [],
+      "issued_on": "2026-07-01",
+      "status": "Approved",
+      "amount": "594.38",
+      "currency": "EUR",
+      "synthetic": true,
+      "contains_real_personal_data": false,
+      "model_generated": false
+    },
+    {
+      "filename": "attachment_07.pdf",
+      "sha256": "d57248fcb16d2069f3837c180c508d77f2aa424b380526f43d145bf7433f44d0",
+      "page_count": 2,
+      "category": "delivery_note",
+      "document_id": "DN-2026-001",
+      "dossier_id": "DOS-2026-001",
+      "related_document_ids": [
+        "PO-2026-001"
+      ],
+      "issued_on": "2026-07-05",
+      "status": "Delivered",
+      "amount": "594.38",
+      "currency": "EUR",
+      "synthetic": true,
+      "contains_real_personal_data": false,
+      "model_generated": false
+    },
+    {
+      "filename": "received_file_003.pdf",
+      "sha256": "0fa82b780a009800d90f743ee3bd0d8dbc805f401d4bbf66f1ba1056b7153772",
+      "page_count": 2,
+      "category": "invoice",
+      "document_id": "INV-2026-001",
+      "dossier_id": "DOS-2026-001",
+      "related_document_ids": [
+        "PO-2026-001",
+        "DN-2026-001"
+      ],
+      "issued_on": "2026-07-06",
+      "status": "Approved for payment",
+      "amount": "594.38",
+      "currency": "EUR",
+      "synthetic": true,
+      "contains_real_personal_data": false,
+      "model_generated": false
+    },
+    {
+      "filename": "document_20260713.pdf",
+      "sha256": "7c6e77c3c8410703e2be492cbe55595a771bb488ac41468f79001849b7f02bbc",
+      "page_count": 2,
+      "category": "payment_confirmation",
+      "document_id": "PAY-2026-001",
+      "dossier_id": "DOS-2026-001",
+      "related_document_ids": [
+        "INV-2026-001",
+        "PO-2026-001"
+      ],
+      "issued_on": "2026-07-13",
+      "status": "Settled",
+      "amount": "594.38",
+      "currency": "EUR",
+      "synthetic": true,
+      "contains_real_personal_data": false,
+      "model_generated": false
+    },
+    {
+      "filename": "mobile_scan_41.pdf",
+      "sha256": "29d2e740d04d1cd579f54dcafbb4c6b3df9aab4566408a61c34abbe98a4b65da",
+      "page_count": 2,
+      "category": "purchase_order",
+      "document_id": "PO-2026-002",
+      "dossier_id": "DOS-2026-002",
+      "related_document_ids": [],
+      "issued_on": "2026-07-04",
+      "status": "Approved",
+      "amount": "574.62",
+      "currency": "EUR",
+      "synthetic": true,
+      "contains_real_personal_data": false,
+      "model_generated": false
+    },
+    {
+      "filename": "archive_export_009.pdf",
+      "sha256": "3d6a2d0a9e0f61495dc660133d826ce2caf4be38c2d827b0259dbdc6f66f4606",
+      "page_count": 2,
+      "category": "delivery_note",
+      "document_id": "DN-2026-002",
+      "dossier_id": "DOS-2026-002",
+      "related_document_ids": [
+        "PO-2026-002"
+      ],
+      "issued_on": "2026-07-08",
+      "status": "Delivered",
+      "amount": "574.62",
+      "currency": "EUR",
+      "synthetic": true,
+      "contains_real_personal_data": false,
+      "model_generated": false
+    },
+    {
+      "filename": "untitled_06.pdf",
+      "sha256": "ae6adcd6f1612a06fa5d2b32ca7c71aa1adee3e728b51afb794f438b8799d0d1",
+      "page_count": 2,
+      "category": "invoice",
+      "document_id": "INV-2026-002",
+      "dossier_id": "DOS-2026-002",
+      "related_document_ids": [
+        "PO-2026-002",
+        "DN-2026-002"
+      ],
+      "issued_on": "2026-07-09",
+      "status": "Approved for payment",
+      "amount": "574.62",
+      "currency": "EUR",
+      "synthetic": true,
+      "contains_real_personal_data": false,
+      "model_generated": false
+    },
+    {
+      "filename": "inbox_item_112.pdf",
+      "sha256": "d405ee1423e2e671d5329055cea1f4c3c0470560733c61daed1691eaad5b6119",
+      "page_count": 2,
+      "category": "payment_confirmation",
+      "document_id": "PAY-2026-002",
+      "dossier_id": "DOS-2026-002",
+      "related_document_ids": [
+        "INV-2026-002",
+        "PO-2026-002"
+      ],
+      "issued_on": "2026-07-16",
+      "status": "Settled",
+      "amount": "574.62",
+      "currency": "EUR",
+      "synthetic": true,
+      "contains_real_personal_data": false,
+      "model_generated": false
+    },
+    {
+      "filename": "scan_20260707_02.pdf",
+      "sha256": "45425167cf029bbb79bd8018c6c393b5ec3c1f0ffb682bf06ae1d7b449ffc83c",
+      "page_count": 2,
+      "category": "purchase_order",
+      "document_id": "PO-2026-003",
+      "dossier_id": "DOS-2026-003",
+      "related_document_ids": [],
+      "issued_on": "2026-07-07",
+      "status": "Approved",
+      "amount": "1333.46",
+      "currency": "EUR",
+      "synthetic": true,
+      "contains_real_personal_data": false,
+      "model_generated": false
+    },
+    {
+      "filename": "received_00038.pdf",
+      "sha256": "ff1057a3caa77b601255f95ff9ac3fc25b00b43bf5fce02e6108918bae35643b",
+      "page_count": 2,
+      "category": "delivery_note",
+      "document_id": "DN-2026-003",
+      "dossier_id": "DOS-2026-003",
+      "related_document_ids": [
+        "PO-2026-003"
+      ],
+      "issued_on": "2026-07-11",
+      "status": "Delivered",
+      "amount": "1333.46",
+      "currency": "EUR",
+      "synthetic": true,
+      "contains_real_personal_data": false,
+      "model_generated": false
+    },
+    {
+      "filename": "document_copy_14.pdf",
+      "sha256": "5883e3cfe000f45999fa842ced7c7aabe1af751d72d848d7d04076ce9cc07a2a",
+      "page_count": 2,
+      "category": "invoice",
+      "document_id": "INV-2026-003",
+      "dossier_id": "DOS-2026-003",
+      "related_document_ids": [
+        "PO-2026-003",
+        "DN-2026-003"
+      ],
+      "issued_on": "2026-07-12",
+      "status": "Approved for payment",
+      "amount": "1333.46",
+      "currency": "EUR",
+      "synthetic": true,
+      "contains_real_personal_data": false,
+      "model_generated": false
+    },
+    {
+      "filename": "external_file_025.pdf",
+      "sha256": "bfb620c4203a054a15c03fa6190d0f6b43e17eadf1cd61218bac1494da6dfcfc",
+      "page_count": 2,
+      "category": "payment_confirmation",
+      "document_id": "PAY-2026-003",
+      "dossier_id": "DOS-2026-003",
+      "related_document_ids": [
+        "INV-2026-003",
+        "PO-2026-003"
+      ],
+      "issued_on": "2026-07-19",
+      "status": "Settled",
+      "amount": "1333.46",
+      "currency": "EUR",
+      "synthetic": true,
+      "contains_real_personal_data": false,
+      "model_generated": false
+    },
+    {
+      "filename": "paper_scan_73.pdf",
+      "sha256": "7cd09505d718a504e3cc936e670f4c1d48c6ba00da41101d5e715b3b5d7d2bf3",
+      "page_count": 2,
+      "category": "purchase_order",
+      "document_id": "PO-2026-004",
+      "dossier_id": "DOS-2026-004",
+      "related_document_ids": [],
+      "issued_on": "2026-07-10",
+      "status": "Approved",
+      "amount": "814.96",
+      "currency": "EUR",
+      "synthetic": true,
+      "contains_real_personal_data": false,
+      "model_generated": false
+    },
+    {
+      "filename": "file_000921.pdf",
+      "sha256": "b12c68bd5fbe4a6dd1063dd1e349666ab39dd8bdce54e7e0e682accaa7e35689",
+      "page_count": 2,
+      "category": "delivery_note",
+      "document_id": "DN-2026-004",
+      "dossier_id": "DOS-2026-004",
+      "related_document_ids": [
+        "PO-2026-004"
+      ],
+      "issued_on": "2026-07-14",
+      "status": "Delivered",
+      "amount": "814.96",
+      "currency": "EUR",
+      "synthetic": true,
+      "contains_real_personal_data": false,
+      "model_generated": false
+    },
+    {
+      "filename": "attachment_2026_17.pdf",
+      "sha256": "f5009771557c74b4904d51889dd5b67d3ce241e00ab171a9ca54ceac4f5ccec1",
+      "page_count": 2,
+      "category": "invoice",
+      "document_id": "INV-2026-004",
+      "dossier_id": "DOS-2026-004",
+      "related_document_ids": [
+        "PO-2026-004",
+        "DN-2026-004"
+      ],
+      "issued_on": "2026-07-15",
+      "status": "Approved for payment",
+      "amount": "814.96",
+      "currency": "EUR",
+      "synthetic": true,
+      "contains_real_personal_data": false,
+      "model_generated": false
+    },
+    {
+      "filename": "exported_document_008.pdf",
+      "sha256": "a380e9fd6155b870a857e70ece19907a97cd7f2da298d024361ea351431e1ebe",
+      "page_count": 2,
+      "category": "payment_confirmation",
+      "document_id": "PAY-2026-004",
+      "dossier_id": "DOS-2026-004",
+      "related_document_ids": [
+        "INV-2026-004",
+        "PO-2026-004"
+      ],
+      "issued_on": "2026-07-22",
+      "status": "Settled",
+      "amount": "814.96",
+      "currency": "EUR",
+      "synthetic": true,
+      "contains_real_personal_data": false,
+      "model_generated": false
+    },
+    {
+      "filename": "scan_batch_a_005.pdf",
+      "sha256": "e519ea62ab5355de5aaad7f3a3de55ab48a615ccb9455ce0b43150aaa588732d",
+      "page_count": 2,
+      "category": "purchase_order",
+      "document_id": "PO-2026-005",
+      "dossier_id": "DOS-2026-005",
+      "related_document_ids": [],
+      "issued_on": "2026-07-13",
+      "status": "Approved",
+      "amount": "614.88",
+      "currency": "EUR",
+      "synthetic": true,
+      "contains_real_personal_data": false,
+      "model_generated": false
+    },
+    {
+      "filename": "shared_file_29.pdf",
+      "sha256": "c296d47d011265d6b413cd12090a6593ac913ac296592c3c8f9a5f2abd37395f",
+      "page_count": 2,
+      "category": "delivery_note",
+      "document_id": "DN-2026-005",
+      "dossier_id": "DOS-2026-005",
+      "related_document_ids": [
+        "PO-2026-005"
+      ],
+      "issued_on": "2026-07-17",
+      "status": "Delivered",
+      "amount": "614.88",
+      "currency": "EUR",
+      "synthetic": true,
+      "contains_real_personal_data": false,
+      "model_generated": false
+    },
+    {
+      "filename": "received_document_004.pdf",
+      "sha256": "75b0a14f9f12cd1aa9aaf27db6bae9baa6fa512ae551e3be6e55ec4e3b7eb323",
+      "page_count": 2,
+      "category": "invoice",
+      "document_id": "INV-2026-005",
+      "dossier_id": "DOS-2026-005",
+      "related_document_ids": [
+        "PO-2026-005",
+        "DN-2026-005"
+      ],
+      "issued_on": "2026-07-18",
+      "status": "Approved for payment",
+      "amount": "614.88",
+      "currency": "EUR",
+      "synthetic": true,
+      "contains_real_personal_data": false,
+      "model_generated": false
+    },
+    {
+      "filename": "document_00067.pdf",
+      "sha256": "c3fd87176716c5c79c40e74cc3182c74bdbb7e0170cb06c77a7d060243b0b20f",
+      "page_count": 2,
+      "category": "payment_confirmation",
+      "document_id": "PAY-2026-005",
+      "dossier_id": "DOS-2026-005",
+      "related_document_ids": [
+        "INV-2026-005",
+        "PO-2026-005"
+      ],
+      "issued_on": "2026-07-25",
+      "status": "Settled",
+      "amount": "614.88",
+      "currency": "EUR",
+      "synthetic": true,
+      "contains_real_personal_data": false,
+      "model_generated": false
+    },
+    {
+      "filename": "image_to_pdf_11.pdf",
+      "sha256": "7e293a50788977e67f09776deaa9fc631554dfa5558d1ba696bb3e1c946b9153",
+      "page_count": 2,
+      "category": "purchase_order",
+      "document_id": "PO-2026-006",
+      "dossier_id": "DOS-2026-006",
+      "related_document_ids": [],
+      "issued_on": "2026-07-16",
+      "status": "Approved",
+      "amount": "796.05",
+      "currency": "EUR",
+      "synthetic": true,
+      "contains_real_personal_data": false,
+      "model_generated": false
+    },
+    {
+      "filename": "scanner_output_204.pdf",
+      "sha256": "664a05db081337f621d9ff396a9372b193b49486f5d59654985ccd0b6ad69d31",
+      "page_count": 2,
+      "category": "delivery_note",
+      "document_id": "DN-2026-006",
+      "dossier_id": "DOS-2026-006",
+      "related_document_ids": [
+        "PO-2026-006"
+      ],
+      "issued_on": "2026-07-20",
+      "status": "Delivered",
+      "amount": "796.05",
+      "currency": "EUR",
+      "synthetic": true,
+      "contains_real_personal_data": false,
+      "model_generated": false
+    },
+    {
+      "filename": "file_copy_0003.pdf",
+      "sha256": "e4b221d715e229f0537de1895a8bc1d3130bedffdf9598ee243bdcc6af33f1ff",
+      "page_count": 2,
+      "category": "invoice",
+      "document_id": "INV-2026-006",
+      "dossier_id": "DOS-2026-006",
+      "related_document_ids": [
+        "PO-2026-006",
+        "DN-2026-006"
+      ],
+      "issued_on": "2026-07-21",
+      "status": "Approved for payment",
+      "amount": "796.05",
+      "currency": "EUR",
+      "synthetic": true,
+      "contains_real_personal_data": false,
+      "model_generated": false
+    },
+    {
+      "filename": "attachment_final_02.pdf",
+      "sha256": "9763a299658905041dcc0612ec2176928f210ad3f71b18565745016324f859cd",
+      "page_count": 2,
+      "category": "payment_confirmation",
+      "document_id": "PAY-2026-006",
+      "dossier_id": "DOS-2026-006",
+      "related_document_ids": [
+        "INV-2026-006",
+        "PO-2026-006"
+      ],
+      "issued_on": "2026-07-28",
+      "status": "Settled",
+      "amount": "796.05",
+      "currency": "EUR",
+      "synthetic": true,
+      "contains_real_personal_data": false,
+      "model_generated": false
+    },
+    {
+      "filename": "new_document_15.pdf",
+      "sha256": "e5116db59f3ab3a6cafe04e3e07faf619ac8a50f41c2ba3df187f09ece37a303",
+      "page_count": 2,
+      "category": "purchase_order",
+      "document_id": "PO-2026-007",
+      "dossier_id": "DOS-2026-007",
+      "related_document_ids": [],
+      "issued_on": "2026-07-21",
+      "status": "Awaiting approval",
+      "amount": "785.07",
+      "currency": "EUR",
+      "synthetic": true,
+      "contains_real_personal_data": false,
+      "model_generated": false
+    },
+    {
+      "filename": "scan_000256.pdf",
+      "sha256": "649c49ccc1c9bfd44b7c66e3468a0dfa96732985ff4f3e01eaf38f4841aaea86",
+      "page_count": 2,
+      "category": "purchase_order",
+      "document_id": "PO-2026-008",
+      "dossier_id": "DOS-2026-008",
+      "related_document_ids": [],
+      "issued_on": "2026-07-22",
+      "status": "Approved",
+      "amount": "967.46",
+      "currency": "EUR",
+      "synthetic": true,
+      "contains_real_personal_data": false,
+      "model_generated": false
+    },
+    {
+      "filename": "received_file_044.pdf",
+      "sha256": "33c1a315663875a9c5ace54e8b22463bbd6cd82b66b6d94e02c38fadf24597ab",
+      "page_count": 2,
+      "category": "invoice",
+      "document_id": "INV-2026-007",
+      "dossier_id": "DOS-2026-007",
+      "related_document_ids": [
+        "PO-2026-007"
+      ],
+      "issued_on": "2026-07-23",
+      "status": "Pending review",
+      "amount": "785.07",
+      "currency": "EUR",
+      "synthetic": true,
+      "contains_real_personal_data": false,
+      "model_generated": false
+    },
+    {
+      "filename": "untitled_document_09.pdf",
+      "sha256": "0554ed577aaff99898b8d38fcd67609a4596d06da39f12816da20365d4e8e632",
+      "page_count": 2,
+      "category": "invoice",
+      "document_id": "INV-2026-008",
+      "dossier_id": "DOS-2026-008",
+      "related_document_ids": [],
+      "issued_on": "2026-07-24",
+      "status": "Reference missing",
+      "amount": "967.46",
+      "currency": "EUR",
+      "synthetic": true,
+      "contains_real_personal_data": false,
+      "model_generated": false
+    },
+    {
+      "filename": "archive_item_031.pdf",
+      "sha256": "41b605e5241cb951f7d61b8203969a0218faf84ca9bcac8405663beba1db5689",
+      "page_count": 2,
+      "category": "payment_confirmation",
+      "document_id": "PAY-2026-007",
+      "dossier_id": "DOS-2026-007",
+      "related_document_ids": [
+        "INV-2026-007"
+      ],
+      "issued_on": "2026-07-25",
+      "status": "Settled",
+      "amount": "785.07",
+      "currency": "EUR",
+      "synthetic": true,
+      "contains_real_personal_data": false,
+      "model_generated": false
+    },
+    {
+      "filename": "document_from_email_006.pdf",
+      "sha256": "d3141113a9f6f9139dd44a45b65fa57a8fa0875b6bb18fd62c541ca0a18df584",
+      "page_count": 2,
+      "category": "delivery_note",
+      "document_id": "DN-2026-007",
+      "dossier_id": "DOS-2026-007",
+      "related_document_ids": [
+        "PO-2026-008"
+      ],
+      "issued_on": "2026-07-26",
+      "status": "Partially delivered",
+      "amount": "785.07",
+      "currency": "EUR",
+      "synthetic": true,
+      "contains_real_personal_data": false,
+      "model_generated": false
+    }
+  ]
+}
