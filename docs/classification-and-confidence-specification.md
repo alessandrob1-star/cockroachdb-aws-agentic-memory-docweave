@@ -24,8 +24,8 @@ relational-first memory for evidence, results, decisions, calibration,
 preferences, and governed rules.
 
 This document does not approve a physical database schema, model training, or
-cloud resource creation. Claude Sonnet 4.6 is the approved primary Bedrock
-model under
+cloud resource creation. The current temporary primary Bedrock model is
+recorded under
 [`ADR-0001`](architecture/decisions/0001-amazon-bedrock-primary-model.md).
 
 ## 2. Objectives

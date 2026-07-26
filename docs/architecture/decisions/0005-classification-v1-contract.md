@@ -13,11 +13,11 @@ application proposal merely because it is valid prose or JSON. The boundary
 must distinguish untrusted document content, untrusted model output,
 deterministic validation, and runtime provenance observed from the Bedrock API.
 
-Claude Sonnet 4.6 supports structured outputs through the Amazon Bedrock Runtime
-Converse API. Converse accepts a JSON Schema through
-`outputConfig.textFormat`. Bedrock validates the schema against its supported
-JSON Schema Draft 2020-12 subset and constrains the generated response, but the
-application must still validate business invariants and evidence independently.
+The contract supports model-specific constrained emission through Amazon
+Bedrock Runtime Converse. The current Nova 2 Lite integration forces a
+side-effect-free `emit_classification` tool whose input uses the versioned JSON
+Schema. The application still validates business invariants and evidence
+independently and never executes the emission tool.
 
 This decision does not approve a model invocation, Python Software Development
 Kit dependency, CockroachDB migration or write, prompt logging, cloud resource,
@@ -165,8 +165,7 @@ Acceptance requires:
 
 ## References
 
-- [Amazon Bedrock structured outputs](https://docs.aws.amazon.com/bedrock/latest/userguide/structured-output.html)
-- [Amazon Bedrock `OutputConfig` API](https://docs.aws.amazon.com/bedrock/latest/APIReference/API_runtime_OutputConfig.html)
-- [Claude Sonnet 4.6 model card](https://docs.aws.amazon.com/bedrock/latest/userguide/model-card-anthropic-claude-sonnet-4-6.html)
+- [Amazon Nova structured output](https://docs.aws.amazon.com/nova/latest/userguide/concept-chapter-servicename.html)
+- [Amazon Nova 2 Lite model card](https://docs.aws.amazon.com/bedrock/latest/userguide/model-card-amazon-nova-2-lite.html)
 - [ADR-0001: Amazon Bedrock Primary Model](0001-amazon-bedrock-primary-model.md)
 - [Classification and confidence specification](../../classification-and-confidence-specification.md)

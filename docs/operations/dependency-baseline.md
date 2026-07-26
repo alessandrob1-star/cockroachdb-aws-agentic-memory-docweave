@@ -24,6 +24,7 @@ yet the release Software Bill of Materials or final license-policy approval.
 | PySide6-Addons | 6.11.1 | Qt modules required transitively by PySide6 | LGPL-3.0-only OR GPL-2.0-only OR GPL-3.0-only |
 | PySide6-Essentials | 6.11.1 | Core Qt modules required transitively by PySide6 | LGPL-3.0-only OR GPL-2.0-only OR GPL-3.0-only |
 | shiboken6 | 6.11.1 | Python binding support required transitively by PySide6 | LGPL-3.0-only OR GPL-2.0-only OR GPL-3.0-only |
+| awscrt | 0.36.0 | AWS Common Runtime support required by the AWS login credential provider | Apache-2.0 |
 | boto3 | 1.43.56 | AWS Software Development Kit for Python and Bedrock client | Apache-2.0 |
 | botocore | 1.43.56 | AWS request, retry, credential, and service-model runtime | Apache-2.0 |
 | jmespath | 1.1.0 | boto3 response-query dependency | MIT |
@@ -57,4 +58,6 @@ Alembic requires an explicit runtime database URL for online work, and
 migrations do not run during normal application import or startup. The
 Bedrock module creates no client during import. Its explicit client factory
 uses the standard AWS credential provider chain and accepts no credential
-values. Automated tests inject a fake Converse transport and make no AWS call.
+values. `awscrt` enables the AWS login credential provider without copying
+credential values into project configuration. Automated tests inject a fake
+Converse transport and make no AWS call.

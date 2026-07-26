@@ -11,7 +11,7 @@ desktop application and the complete cloud application. It translates the
 approved product workflow into bounded agent responsibilities, deterministic
 controls, CockroachDB checkpoints, and human decisions.
 
-The architecture uses Claude Sonnet 4.6 through Amazon Bedrock as recorded in
+The architecture uses the versioned primary model through Amazon Bedrock as recorded in
 [`ADR-0001`](decisions/0001-amazon-bedrock-primary-model.md). It does not define
 the physical CockroachDB schema or create any Amazon Web Services resources.
 
@@ -41,7 +41,7 @@ Discovery and stable identity
 Safety inspection and extraction
         |
         v
-Structured Sonnet 4.6 analysis
+Structured Bedrock analysis
         |
         v
 Deterministic validation and evidence checks
@@ -124,9 +124,10 @@ stored when references and reproducible configuration are sufficient.
 
 ### 4.4 Structured model analysis
 
-The Classification Agent calls the central Bedrock gateway using the European
-Claude Sonnet 4.6 inference profile. The request uses a versioned JSON
-(JavaScript Object Notation) Schema and an explicit maximum output-token limit.
+The Classification Agent calls the central Bedrock gateway using the approved
+European inference profile. The request uses a versioned JSON (JavaScript
+Object Notation) Schema, a side-effect-free forced emission envelope, and an
+explicit maximum output-token limit.
 
 The requested proposal includes:
 
@@ -159,13 +160,14 @@ review queue. There is no canned classification fallback.
 count, and final routing decision.
 
 **Current implementation:** `classification.v1` provides the
-Bedrock-compatible structured-output schema, bounded request fields, typed
+Bedrock-compatible constrained-emission schema, bounded request fields, typed
 proposal, and fail-closed local decoder. The pinned boto3 gateway now supplies
 the approved profile, adaptive retry and timeout configuration, strict response
 handling, observed token and latency provenance, and optional externally
-configured cost estimation. Exact quotations are verified against the cited
-page. Live invocation, quality evidence, application composition, and the
-CockroachDB checkpoint remain pending.
+configured cost estimation. Exact quotations are reconstructed locally from
+selected evidence segments. One bounded live proposal passed validation;
+corpus-quality evidence, application composition, and the CockroachDB
+checkpoint remain pending.
 
 ### 4.6 Proposal enrichment
 

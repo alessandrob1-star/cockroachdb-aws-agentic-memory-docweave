@@ -177,8 +177,10 @@ The critical path is:
   corpus through a disposable Qt PDF worker.
 - Authorized-root, signature, source-digest, file, page, character, and timeout
   controls are implemented with explicit limited-processing states.
-- Bedrock invocation, structured classification, CockroachDB extraction
-  checkpoints, and live quality evidence remain pending. The
+- One bounded Nova 2 Lite classification passed real extraction, constrained
+  emission, deterministic evidence reconstruction, and fail-closed validation.
+  CockroachDB extraction checkpoints and corpus-level quality evidence remain
+  pending. The
   `classification.v1` contract and pinned boto3 gateway are implemented
   locally, including response validation, observed provenance fields, and
   externally configured cost estimation.
