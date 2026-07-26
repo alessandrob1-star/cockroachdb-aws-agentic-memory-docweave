@@ -27,6 +27,12 @@ The repository currently contains a tested Python package with:
 - symlink blocking and cross-platform unreadable-path hardening;
 - streaming SHA-256 content fingerprinting;
 - PDF signature inspection based on the `%PDF-` header;
+- isolated Qt PDF text extraction with page boundaries and extractor
+  provenance;
+- authorized-root, source-digest, file, page, character, and timeout controls
+  around each disposable extraction worker;
+- explicit malformed, encrypted, unsupported-security, changed-source,
+  text-free, and worker-failure extraction states;
 - deterministic intake records;
 - duplicate grouping for ready intake records with identical fingerprints;
 - safe copy and move operation planning;
@@ -73,10 +79,10 @@ The repository currently contains a tested Python package with:
 ## 3. Current local quality evidence
 
 The latest verified local quality gate on
-`codex/embedded-pdf-preview` reported:
+`codex/isolated-pdf-extraction` reported:
 
-- 261 tests passed;
-- 95 percent total package coverage;
+- 330 tests passed;
+- 93 percent total package coverage;
 - Ruff format check passed;
 - Ruff lint check passed;
 - MyPy strict check passed;
@@ -85,10 +91,12 @@ The latest verified local quality gate on
 - online migration execution was verified to fail closed when no database URL
   is explicitly supplied.
 
-The 259-test guarded-PDF-opening baseline passed GitHub Actions on pull request
-31 and after its merge to `main`. The 261-test embedded-preview increment
-remains local evidence until a separately authorized pull request passes
-GitHub Actions.
+The merged `main` baseline passed GitHub Actions through pull request 34. The
+330-test isolated-extraction increment remains local evidence until this
+separately authorized pull request passes GitHub Actions. The first full local
+run encountered the previously observed intermittent native Qt desktop-test
+termination under Python 3.14; an immediate complete rerun passed. GitHub
+Actions uses the supported Python 3.12 test target.
 
 The check command is:
 
@@ -105,7 +113,6 @@ DocWeave does not yet implement or claim:
 - AWS infrastructure or deployed DocWeave workloads;
 - Amazon Bedrock invocation inside the product;
 - a complete PySide6 desktop workflow or any cloud user interface;
-- PDF text extraction;
 - model-driven classification, naming, confidence, or relationship analysis;
 - live durable idempotency in the running application;
 - restore planning or restore execution;

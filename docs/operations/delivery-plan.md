@@ -109,6 +109,9 @@ The critical path is:
   [`local-batch-operation-design-note.md`](../architecture/local-batch-operation-design-note.md)
   define the recommended handoff into the next batch and audit implementation
   block.
+- The PDF extraction library and process boundary are decided in ADR-0004.
+  Real page-level Qt PDF extraction now runs in a bounded disposable process
+  without a new dependency or cloud access.
 
 ### M2 - CockroachDB memory foundation
 
@@ -164,6 +167,15 @@ The critical path is:
   provenance in CockroachDB.
 - Route malformed, encrypted, suspicious, or unsupported files to explicit
   limited states.
+
+**Current progress on 2026-07-26:**
+
+- Real page-level extraction succeeds across the initial 30-PDF synthetic
+  corpus through a disposable Qt PDF worker.
+- Authorized-root, signature, source-digest, file, page, character, and timeout
+  controls are implemented with explicit limited-processing states.
+- Bedrock invocation, structured classification, CockroachDB extraction
+  checkpoints, and model provenance remain pending.
 
 **Exit criteria:**
 
@@ -254,7 +266,7 @@ The critical path is:
 
 **Measurement date:** 2026-07-26
 
-The current evidence-weighted Schedule Performance Indicator is **38%**. This
+The current evidence-weighted Schedule Performance Indicator is **42%**. This
 is a planning estimate, not a product-completion or production-readiness claim.
 It is calculated from fixed milestone weights and conservative completion
 estimates based only on merged or locally verified evidence:
@@ -262,17 +274,18 @@ estimates based only on merged or locally verified evidence:
 | Milestone | Project weight | Evidence-complete estimate | Weighted contribution |
 | --- | ---: | ---: | ---: |
 | M0 - Baseline complete | 8% | 100% | 8.0% |
-| M1 - Decisions and scaffolding | 14% | 85% | 11.9% |
+| M1 - Decisions and scaffolding | 14% | 95% | 13.3% |
 | M2 - CockroachDB foundation | 18% | 70% | 12.6% |
-| M3 - Real analysis slice | 18% | 0% | 0.0% |
+| M3 - Real analysis slice | 18% | 15% | 2.7% |
 | M4 - Review and safe operations | 15% | 10% | 1.5% |
 | M5 - Product surfaces | 12% | 30% | 3.6% |
-| M6 - Evaluation and hardening | 9% | 0% | 0.0% |
+| M6 - Evaluation and hardening | 9% | 5% | 0.45% |
 | M7 - Submission readiness | 6% | 0% | 0.0% |
-| **Total** | **100%** |  | **37.6%, rounded to 38%** |
+| **Total** | **100%** |  | **42.15%, rounded to 42%** |
 
 The project is **on plan overall and ahead on the database foundation**. M1 is
-at the end of its planned window with some later-slice decisions still open.
+nearly complete now that the extraction decision is closed, with the Bedrock
+contract and cloud-compute decisions still open.
 The clean live migration validation and local transaction and repository
 contracts from M2 were completed before the M2 window opens, while runtime
 application persistence is not complete.
@@ -301,14 +314,13 @@ The repository package layout, local toolchain, and initial migration tooling
 are decided. The next vertical slices still require the following approved
 decisions before their respective implementation begins:
 
-1. PDF extraction library and process isolation boundary;
-2. embedding model, vector dimension, and distance metric;
-3. Bedrock structured-output schema version `classification.v1`;
-4. cloud compute, storage, queue, authentication, and network topology;
-5. desktop-to-cloud identity and role matrix;
-6. confidence scoring formula and review thresholds;
-7. raw model-response and extracted-text retention policy;
-8. runtime CockroachDB identities and least-privilege authorization model.
+1. embedding model, vector dimension, and distance metric;
+2. Bedrock structured-output schema version `classification.v1`;
+3. cloud compute, storage, queue, authentication, and network topology;
+4. desktop-to-cloud identity and role matrix;
+5. confidence scoring formula and review thresholds;
+6. raw model-response and extracted-text retention policy;
+7. runtime CockroachDB identities and least-privilege authorization model.
 
 ## 7. Next implementation slice
 
