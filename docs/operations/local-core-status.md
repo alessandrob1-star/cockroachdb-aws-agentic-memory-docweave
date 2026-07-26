@@ -55,6 +55,8 @@ The repository currently contains a tested Python package with:
   non-blocking phase progress, cooperative cancellation, deterministic intake
   metrics, validated in-memory workspace state, multiple selection, status, and
   document table presentation;
+- guarded user-initiated opening of one ready PDF through the operating-system
+  reader after current path, root, symlink, file-type, and signature checks;
 - fail-closed behavior that prevents mutation when intent persistence fails and
   preserves an in-progress state when result persistence fails;
 - bounded serializable transaction execution with SQLSTATE `40001` retry,
@@ -69,9 +71,9 @@ The repository currently contains a tested Python package with:
 ## 3. Current local quality evidence
 
 The latest verified local quality gate on
-`codex/progressive-desktop-scan` reported:
+`codex/open-pdf-from-desktop` reported:
 
-- 251 tests passed;
+- 259 tests passed;
 - 95 percent total package coverage;
 - Ruff format check passed;
 - Ruff lint check passed;
@@ -81,10 +83,9 @@ The latest verified local quality gate on
 - online migration execution was verified to fail closed when no database URL
   is explicitly supplied.
 
-The 238-test desktop-shell baseline passed GitHub Actions on pull request 29
-and after its merge to `main`. The 251-test progressive-scan increment remains
-local evidence until a separately authorized pull request passes GitHub
-Actions.
+The 251-test progressive-scan baseline passed GitHub Actions on pull request 30
+and after its merge to `main`. The 259-test guarded-PDF-opening increment
+remains local evidence until this pull request passes GitHub Actions.
 
 The check command is:
 

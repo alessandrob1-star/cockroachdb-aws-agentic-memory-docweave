@@ -35,8 +35,8 @@ workload, complete review interface, or intelligent document analysis is
 claimed yet. An initial read-only PySide6 desktop shell now exposes
 authorized-folder selection, non-blocking local discovery, deterministic intake
 counts, phase-aware progress, cooperative cancellation, explicit in-memory
-workspace state, multiple document selection, and a virtualized document
-table.
+workspace state, multiple document selection, safe user-initiated opening of
+ready PDFs in the system reader, and a virtualized document table.
 
 The current approved product direction includes:
 

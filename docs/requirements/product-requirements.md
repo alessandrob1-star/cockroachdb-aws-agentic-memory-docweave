@@ -3,7 +3,8 @@
 **Version:** 0.1
 **Baseline approved:** 2026-07-21
 **Implementation status:** In progress; progressive read-only desktop
-discovery, cancellation, and in-memory selection implemented
+discovery, cancellation, in-memory selection, and safe external PDF opening
+implemented
 **Product surfaces:** PySide6 desktop application and complete cloud application
 
 ## 1. Product vision

@@ -2,7 +2,7 @@ from pathlib import Path
 from threading import Event
 
 import pytest
-from PySide6.QtCore import QEventLoop, QItemSelectionModel, QTimer
+from PySide6.QtCore import QEventLoop, QItemSelectionModel, QTimer, QUrl
 from PySide6.QtWidgets import (
     QFileDialog,
     QLabel,
@@ -224,6 +224,79 @@ def test_window_tracks_multiple_document_selection_in_memory(
     )
     assert selection_status is not None
     assert selection_status.text() == "2 selected"
+    window.close()
+
+
+def test_window_opens_one_ready_pdf_through_injected_system_handler(
+    tmp_path: Path,
+    qt_application: object,
+) -> None:
+    path = tmp_path / "invoice.pdf"
+    path.write_bytes(b"%PDF-1.7\ninvoice")
+    opened: list[QUrl] = []
+
+    def accept_open(url: QUrl) -> bool:
+        opened.append(url)
+        return True
+
+    window = DocWeaveMainWindow(document_opener=accept_open)
+    window.set_authorized_root(tmp_path)
+    wait_for_scan(window)
+    table = window.findChild(QTableView, "documentTable")
+    open_button = window.findChild(QPushButton, "openPdfButton")
+    assert table is not None
+    table.selectRow(0)
+
+    window.open_selected_document()
+
+    assert opened == [QUrl.fromLocalFile(str(path.resolve()))]
+    status = window.findChild(QLabel, "status")
+    assert status is not None
+    assert "Open request sent" in status.text()
+    assert open_button is not None
+    assert open_button.isEnabled()
+    window.close()
+
+
+def test_window_blocks_changed_or_non_ready_pdf_and_reports_handler_failure(
+    tmp_path: Path,
+    qt_application: object,
+) -> None:
+    invalid = tmp_path / "invalid.pdf"
+    invalid.write_bytes(b"not a pdf")
+    ready = tmp_path / "ready.pdf"
+    ready.write_bytes(b"%PDF-1.7\nready")
+    window = DocWeaveMainWindow(document_opener=lambda url: False)
+    window.set_authorized_root(tmp_path)
+    wait_for_scan(window)
+    table = window.findChild(QTableView, "documentTable")
+    status = window.findChild(QLabel, "status")
+    assert table is not None
+    assert status is not None
+
+    window._handle_document_activated(table.model().index(0, 0))
+    assert "Only a document with Ready status" in status.text()
+
+    table.selectRow(1)
+    window.open_selected_document()
+    assert "did not accept" in status.text()
+
+    ready.write_bytes(b"changed after scan")
+    window.open_selected_document()
+    assert "invalid_signature" in status.text()
+    window.close()
+
+
+def test_window_requires_exactly_one_selected_pdf(
+    qt_application: object,
+) -> None:
+    window = DocWeaveMainWindow()
+
+    window.open_selected_document()
+
+    status = window.findChild(QLabel, "status")
+    assert status is not None
+    assert status.text() == "Select one ready PDF to open it safely."
     window.close()
 
 

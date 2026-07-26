@@ -19,7 +19,8 @@ The shell lets a user:
 5. inspect discovered, ready, and attention-required counts;
 6. view per-file relative path, deterministic intake state, byte size, and safe
    diagnostic category; and
-7. select multiple completed rows for later review without enabling an action.
+7. select multiple completed rows for later review; and
+8. explicitly open one ready PDF in the operating-system reader.
 
 It never renames, copies, moves, uploads, extracts text from, or sends a document
 to a model.
@@ -67,7 +68,22 @@ keys.
 This state is deliberately process-local. It is not a CockroachDB workspace,
 does not survive restart, and does not establish user or role authorization.
 
-## 5. Presentation and accessibility baseline
+## 5. External PDF reader boundary
+
+A double click or the `Open PDF` button can request opening exactly one
+completed `Ready` record. Immediately before the request, DocWeave verifies
+that the observed path still exists, is a regular `.pdf` file, is not a
+symbolic link, resolves inside the authorized root, and still has a valid PDF
+signature. A failed check blocks the request with a safe category.
+
+The operating system chooses the external reader. DocWeave does not execute a
+shell command, does not claim that the external application accepted or
+rendered the document beyond its returned request status, and does not yet
+provide an embedded PDF preview. Opening an untrusted document still inherits
+the security posture of the installed reader, so controlled synthetic
+documents are recommended during development.
+
+## 6. Presentation and accessibility baseline
 
 The document table uses a read-only `QAbstractTableModel` rather than one widget
 per cell. This is the correct base for later pagination or virtualization.
@@ -81,7 +97,7 @@ increment. Web Content Accessibility Guidelines 2.2 Level AA conformance is
 not yet claimed; keyboard, screen-reader, contrast, high-DPI, and
 reduced-motion evidence remain pending.
 
-## 6. Dependency and launch
+## 7. Dependency and launch
 
 PySide6 6.11.1 and its exact transitive Qt packages are pinned. The selected
 release supports the approved Python range and provides Windows wheels. Its
@@ -97,7 +113,7 @@ with:
 
 Packaged desktop delivery remains a separate architecture decision.
 
-## 7. Verification and non-claims
+## 8. Verification and non-claims
 
 Automated evidence covers:
 
@@ -108,6 +124,10 @@ Automated evidence covers:
 - background completion without freezing the event loop;
 - cooperative cancellation with partial-result discard;
 - validated in-memory workspace transitions and multiple row selection;
+- current-state, root-containment, file-type, symlink, and signature checks
+  before external PDF opening;
+- accepted and rejected external-reader request states without launching a real
+  reader in automated tests;
 - root-change and close protection during an active scan;
 - missing-root, invalid-result, and non-directory failure states; and
 - folder-picker authorization.
