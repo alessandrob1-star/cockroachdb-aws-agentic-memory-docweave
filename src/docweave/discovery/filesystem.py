@@ -1,15 +1,18 @@
 """Deterministic local filesystem discovery for authorized roots."""
 
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
 
+from docweave.core.cancellation import CancellationCheck, raise_if_cancelled
 from docweave.core.paths import (
     path_comparison_key,
     relative_posix_path,
     resolve_existing_path,
 )
+
+DiscoveryProgressCallback = Callable[[int], None]
 
 
 class DiscoveryStatus(StrEnum):
@@ -81,19 +84,23 @@ def discover_files(
     roots: Iterable[Path],
     *,
     config: DiscoveryConfig | None = None,
+    progress_callback: DiscoveryProgressCallback | None = None,
+    cancellation_check: CancellationCheck | None = None,
 ) -> DiscoveryResult:
-    """Discover files recursively within already-authorized local roots."""
+    """Discover files recursively with bounded progress and cancellation."""
     active_config = config or DiscoveryConfig()
     resolved_roots = tuple(resolve_existing_path(root) for root in roots)
     discovered: list[DiscoveredFile] = []
     limit_reached = False
 
     for root in resolved_roots:
+        raise_if_cancelled(cancellation_check)
         if not root.is_dir():
             msg = f"authorized root is not a directory: {root}"
             raise NotADirectoryError(msg)
 
         for path in _iter_files(root):
+            raise_if_cancelled(cancellation_check)
             if len(discovered) >= active_config.max_files:
                 limit_reached = True
                 break
@@ -102,13 +109,18 @@ def discover_files(
             if discovered_file.status is DiscoveryStatus.UNSUPPORTED:
                 if active_config.include_unsupported:
                     discovered.append(discovered_file)
+                if progress_callback is not None:
+                    progress_callback(len(discovered))
                 continue
 
             discovered.append(discovered_file)
+            if progress_callback is not None:
+                progress_callback(len(discovered))
 
         if limit_reached:
             break
 
+    raise_if_cancelled(cancellation_check)
     return DiscoveryResult(
         files=tuple(discovered),
         scanned_roots=resolved_roots,

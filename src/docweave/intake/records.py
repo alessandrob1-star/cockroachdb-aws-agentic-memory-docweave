@@ -1,10 +1,11 @@
 """Deterministic intake records for discovered local files."""
 
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
 
+from docweave.core.cancellation import CancellationCheck, raise_if_cancelled
 from docweave.core.fingerprints import ContentFingerprint, compute_sha256_fingerprint
 from docweave.discovery import DiscoveredFile, DiscoveryStatus
 from docweave.inspection import (
@@ -12,6 +13,8 @@ from docweave.inspection import (
     PdfSignatureStatus,
     inspect_pdf_signature,
 )
+
+IntakeProgressCallback = Callable[[int, int], None]
 
 
 class IntakeStatus(StrEnum):
@@ -101,10 +104,25 @@ class IntakeResult:
         return None
 
 
-def build_intake_records(files: Iterable[DiscoveredFile]) -> IntakeResult:
-    """Build deterministic intake records for discovered files."""
-    records = tuple(_build_intake_record(file) for file in files)
-    return IntakeResult(records=records)
+def build_intake_records(
+    files: Iterable[DiscoveredFile],
+    *,
+    progress_callback: IntakeProgressCallback | None = None,
+    cancellation_check: CancellationCheck | None = None,
+) -> IntakeResult:
+    """Build deterministic intake records with cooperative cancellation."""
+    source_files = tuple(files)
+    records: list[IntakeRecord] = []
+    total = len(source_files)
+    for file in source_files:
+        raise_if_cancelled(cancellation_check)
+        records.append(
+            _build_intake_record(file, cancellation_check=cancellation_check)
+        )
+        if progress_callback is not None:
+            progress_callback(len(records), total)
+    raise_if_cancelled(cancellation_check)
+    return IntakeResult(records=tuple(records))
 
 
 def _duplicate_groups(
@@ -118,7 +136,11 @@ def _duplicate_groups(
     return tuple(groups)
 
 
-def _build_intake_record(file: DiscoveredFile) -> IntakeRecord:
+def _build_intake_record(
+    file: DiscoveredFile,
+    *,
+    cancellation_check: CancellationCheck | None,
+) -> IntakeRecord:
     terminal_record = _discovery_terminal_record(file)
     if terminal_record is not None:
         return terminal_record
@@ -129,7 +151,10 @@ def _build_intake_record(file: DiscoveredFile) -> IntakeRecord:
         return signature_record
 
     try:
-        fingerprint = compute_sha256_fingerprint(file.absolute_path)
+        fingerprint = compute_sha256_fingerprint(
+            file.absolute_path,
+            cancellation_check=cancellation_check,
+        )
     except OSError as exc:
         return IntakeRecord(
             discovered_file=file,

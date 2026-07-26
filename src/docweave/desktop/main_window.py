@@ -2,7 +2,7 @@
 
 from pathlib import Path
 
-from PySide6.QtCore import QThread, Signal, Slot
+from PySide6.QtCore import QItemSelection, QThread, Signal, Slot
 from PySide6.QtGui import QCloseEvent, QFont
 from PySide6.QtWidgets import (
     QAbstractItemView,
@@ -12,6 +12,7 @@ from PySide6.QtWidgets import (
     QLabel,
     QLineEdit,
     QMainWindow,
+    QProgressBar,
     QPushButton,
     QSizePolicy,
     QTableView,
@@ -23,8 +24,15 @@ from docweave.desktop.models import DocumentTableModel
 from docweave.desktop.scan import (
     DesktopScanResult,
     ScanFunction,
+    ScanPhase,
+    ScanProgress,
     ScanWorker,
     scan_authorized_root,
+)
+from docweave.desktop.workspace import (
+    DesktopWorkspaceSession,
+    WorkspacePhase,
+    WorkspaceSnapshot,
 )
 
 _WINDOW_STYLESHEET = """
@@ -114,6 +122,22 @@ QLabel#status {
     color: #24466f;
     padding: 9px 12px;
 }
+QProgressBar {
+    background: #e7ebf0;
+    border: none;
+    border-radius: 4px;
+    color: #24466f;
+    min-height: 8px;
+    text-align: center;
+}
+QProgressBar::chunk {
+    background: #2a9d8f;
+    border-radius: 4px;
+}
+QLabel#selectionStatus {
+    color: #24466f;
+    font-weight: 600;
+}
 """
 
 
@@ -129,16 +153,21 @@ class DocWeaveMainWindow(QMainWindow):
     ) -> None:
         super().__init__()
         self._scan_function = scan_function
-        self._authorized_root: Path | None = None
         self._scan_thread: QThread | None = None
         self._scan_worker: ScanWorker | None = None
         self._table_model = DocumentTableModel()
+        self._workspace = DesktopWorkspaceSession()
         self._build_window()
 
     @property
     def authorized_root(self) -> Path | None:
         """Return the currently authorized local root."""
-        return self._authorized_root
+        return self._workspace.snapshot.authorized_root
+
+    @property
+    def workspace_snapshot(self) -> WorkspaceSnapshot:
+        """Return the current non-persistent desktop workspace state."""
+        return self._workspace.snapshot
 
     @property
     def scan_in_progress(self) -> bool:
@@ -152,7 +181,11 @@ class DocWeaveMainWindow(QMainWindow):
             raise NotADirectoryError("authorized root must be a directory")
         if self.scan_in_progress:
             raise RuntimeError("authorized root cannot change during a scan")
-        self._authorized_root = resolved
+        self._workspace.authorize(resolved)
+        self._table_model.clear()
+        self._table.clearSelection()
+        self._update_selection_status()
+        self._update_metrics(discovered=0, ready=0, attention=0)
         self._root_field.setText(str(resolved))
         self._scan_button.setEnabled(True)
         self._set_status(
@@ -162,30 +195,49 @@ class DocWeaveMainWindow(QMainWindow):
     @Slot()
     def start_scan(self) -> None:
         """Start one non-blocking scan of the explicitly authorized root."""
-        if self._authorized_root is None:
+        authorized_root = self.authorized_root
+        if authorized_root is None:
             self._set_status("Choose a folder before starting a scan.")
             return
         if self.scan_in_progress:
             return
 
         self._table_model.clear()
+        self._table.clearSelection()
+        self._workspace.start_scan()
         self._update_metrics(discovered=0, ready=0, attention=0)
         self._set_busy(True)
         self._set_status("Scanning in the background… You can keep using the window.")
 
         thread = QThread(self)
-        worker = ScanWorker(self._authorized_root, self._scan_function)
+        worker = ScanWorker(authorized_root, self._scan_function)
         worker.moveToThread(thread)
         thread.started.connect(worker.run)
+        worker.progressed.connect(self._handle_scan_progress)
         worker.completed.connect(self._handle_scan_completed)
+        worker.cancelled.connect(self._handle_scan_cancelled)
         worker.failed.connect(self._handle_scan_failed)
         worker.completed.connect(thread.quit)
+        worker.cancelled.connect(thread.quit)
         worker.failed.connect(thread.quit)
         thread.finished.connect(worker.deleteLater)
         thread.finished.connect(self._handle_thread_finished)
         self._scan_thread = thread
         self._scan_worker = worker
         thread.start()
+
+    @Slot()
+    def cancel_scan(self) -> None:
+        """Request cooperative cancellation without publishing partial state."""
+        if not self.scan_in_progress or self._scan_worker is None:
+            return
+        self._workspace.request_cancellation()
+        self._scan_worker.request_cancellation()
+        self._cancel_button.setEnabled(False)
+        self._set_status(
+            "Cancelling at the next safe file boundary… No partial result "
+            "will be published."
+        )
 
     def closeEvent(self, event: QCloseEvent) -> None:
         """Prevent unsafe thread destruction during an active scan."""
@@ -201,6 +253,11 @@ class DocWeaveMainWindow(QMainWindow):
     def _handle_scan_completed(self, raw_result: object) -> None:
         if not isinstance(raw_result, DesktopScanResult):
             self._handle_scan_failed("InvalidScanResult")
+            return
+        try:
+            self._workspace.complete(raw_result)
+        except (RuntimeError, ValueError) as error:
+            self._handle_scan_failed(error.__class__.__name__)
             return
         self._table_model.replace_records(raw_result.intake.records)
         self._update_metrics(
@@ -218,8 +275,56 @@ class DocWeaveMainWindow(QMainWindow):
             f"{suffix} No files were changed."
         )
 
+    @Slot(object)
+    def _handle_scan_progress(self, raw_progress: object) -> None:
+        if not isinstance(raw_progress, ScanProgress):
+            self.cancel_scan()
+            self._set_status(
+                "Scan progress was invalid and cancellation was requested safely."
+            )
+            return
+        try:
+            self._workspace.record_progress(raw_progress)
+        except (RuntimeError, ValueError):
+            self.cancel_scan()
+            self._set_status(
+                "Scan progress was inconsistent and cancellation was requested safely."
+            )
+            return
+        if raw_progress.phase is ScanPhase.DISCOVERY:
+            self._progress_bar.setRange(0, 0)
+            self._discovered_value.setText(str(raw_progress.completed))
+            self._set_status(
+                f"Discovering files… {raw_progress.completed} observed. "
+                "No files are being changed."
+            )
+            return
+        total = raw_progress.total or 0
+        self._progress_bar.setRange(0, total)
+        self._progress_bar.setValue(raw_progress.completed)
+        self._discovered_value.setText(str(total))
+        self._set_status(
+            "Inspecting PDF signatures and fingerprints… "
+            f"{raw_progress.completed} of {total}. No files are being changed."
+        )
+
+    @Slot()
+    def _handle_scan_cancelled(self) -> None:
+        self._workspace.cancel()
+        self._table_model.clear()
+        self._update_metrics(discovered=0, ready=0, attention=0)
+        self._set_status(
+            "Scan cancelled safely. Partial results were discarded and no files "
+            "were changed."
+        )
+
     @Slot(str)
     def _handle_scan_failed(self, error_category: str) -> None:
+        if self.workspace_snapshot.phase in {
+            WorkspacePhase.SCANNING,
+            WorkspacePhase.CANCELLING,
+        }:
+            self._workspace.fail(error_category)
         self._set_status(
             f"Scan failed safely ({error_category}). No files were changed."
         )
@@ -229,6 +334,7 @@ class DocWeaveMainWindow(QMainWindow):
         self._scan_thread = None
         self._scan_worker = None
         self._set_busy(False)
+        self._progress_bar.setVisible(False)
         self.scan_finished.emit()
 
     @Slot()
@@ -323,10 +429,22 @@ class DocWeaveMainWindow(QMainWindow):
         self._scan_button.setObjectName("primaryButton")
         self._scan_button.setEnabled(False)
         self._scan_button.clicked.connect(self.start_scan)
+        self._cancel_button = QPushButton("Cancel scan")
+        self._cancel_button.setObjectName("secondaryButton")
+        self._cancel_button.setVisible(False)
+        self._cancel_button.clicked.connect(self.cancel_scan)
         controls.addWidget(self._root_field, stretch=1)
         controls.addWidget(self._choose_button)
         controls.addWidget(self._scan_button)
+        controls.addWidget(self._cancel_button)
         layout.addLayout(controls)
+
+        self._progress_bar = QProgressBar()
+        self._progress_bar.setObjectName("scanProgress")
+        self._progress_bar.setVisible(False)
+        self._progress_bar.setTextVisible(False)
+        self._progress_bar.setAccessibleName("Document scan progress")
+        layout.addWidget(self._progress_bar)
 
         self._status_label = QLabel(
             "Choose a folder to begin. No files will be changed."
@@ -374,34 +492,49 @@ class DocWeaveMainWindow(QMainWindow):
             "Content analysis is not active yet."
         )
         subtitle.setObjectName("muted")
-        layout.addWidget(title)
+        title_row = QHBoxLayout()
+        title_row.addWidget(title)
+        title_row.addStretch()
+        self._selection_status = QLabel("0 selected")
+        self._selection_status.setObjectName("selectionStatus")
+        self._selection_status.setAccessibleName("Selected document count")
+        title_row.addWidget(self._selection_status)
+        layout.addLayout(title_row)
         layout.addWidget(subtitle)
 
-        table = QTableView()
-        table.setObjectName("documentTable")
-        table.setModel(self._table_model)
-        table.setAlternatingRowColors(True)
-        table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
-        table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
-        table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
-        table.setSortingEnabled(False)
-        table.setWordWrap(False)
-        table.setAccessibleName("Discovered documents")
-        table.verticalHeader().setVisible(False)
-        table.verticalHeader().setDefaultSectionSize(34)
-        table.horizontalHeader().setStretchLastSection(True)
-        table.setColumnWidth(0, 190)
-        table.setColumnWidth(1, 340)
-        table.setColumnWidth(2, 140)
-        table.setColumnWidth(3, 100)
-        table.setFont(QFont("Segoe UI", 9))
-        layout.addWidget(table, stretch=1)
+        self._table = QTableView()
+        self._table.setObjectName("documentTable")
+        self._table.setModel(self._table_model)
+        self._table.setAlternatingRowColors(True)
+        self._table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
+        self._table.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection)
+        self._table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+        self._table.setSortingEnabled(False)
+        self._table.setWordWrap(False)
+        self._table.setAccessibleName("Discovered documents")
+        self._table.verticalHeader().setVisible(False)
+        self._table.verticalHeader().setDefaultSectionSize(34)
+        self._table.horizontalHeader().setStretchLastSection(True)
+        self._table.setColumnWidth(0, 190)
+        self._table.setColumnWidth(1, 340)
+        self._table.setColumnWidth(2, 140)
+        self._table.setColumnWidth(3, 100)
+        self._table.setFont(QFont("Segoe UI", 9))
+        self._table.selectionModel().selectionChanged.connect(
+            self._handle_selection_changed
+        )
+        layout.addWidget(self._table, stretch=1)
         return card
 
     def _set_busy(self, busy: bool) -> None:
-        self._scan_button.setEnabled(not busy and self._authorized_root is not None)
+        self._scan_button.setEnabled(not busy and self.authorized_root is not None)
         self._choose_button.setEnabled(not busy)
         self._root_field.setEnabled(not busy)
+        self._cancel_button.setVisible(busy)
+        self._cancel_button.setEnabled(busy)
+        self._progress_bar.setVisible(busy)
+        if busy:
+            self._progress_bar.setRange(0, 0)
 
     def _set_status(self, message: str) -> None:
         self._status_label.setText(message)
@@ -417,3 +550,23 @@ class DocWeaveMainWindow(QMainWindow):
         self._discovered_value.setText(str(discovered))
         self._ready_value.setText(str(ready))
         self._attention_value.setText(str(attention))
+
+    @Slot(QItemSelection, QItemSelection)
+    def _handle_selection_changed(
+        self,
+        selected: QItemSelection,
+        deselected: QItemSelection,
+    ) -> None:
+        del selected, deselected
+        selected_rows = self._table.selectionModel().selectedRows()
+        keys = frozenset(
+            key
+            for index in selected_rows
+            if (key := self._table_model.comparison_key_at(index.row())) is not None
+        )
+        self._workspace.select_documents(keys)
+        self._update_selection_status()
+
+    def _update_selection_status(self) -> None:
+        count = len(self.workspace_snapshot.selected_document_keys)
+        self._selection_status.setText(f"{count} selected")

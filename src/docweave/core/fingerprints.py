@@ -4,6 +4,8 @@ from dataclasses import dataclass
 from hashlib import sha256
 from pathlib import Path
 
+from docweave.core.cancellation import CancellationCheck, raise_if_cancelled
+
 DEFAULT_READ_CHUNK_SIZE = 1024 * 1024
 SHA256_DIGEST_SIZE = 32
 
@@ -25,8 +27,9 @@ def compute_sha256_fingerprint(
     path: Path,
     *,
     chunk_size: int = DEFAULT_READ_CHUNK_SIZE,
+    cancellation_check: CancellationCheck | None = None,
 ) -> ContentFingerprint:
-    """Compute a SHA-256 fingerprint by streaming file bytes."""
+    """Compute a SHA-256 fingerprint with cooperative chunk cancellation."""
     if chunk_size < 1:
         msg = "chunk_size must be at least 1"
         raise ValueError(msg)
@@ -35,7 +38,11 @@ def compute_sha256_fingerprint(
     byte_size = 0
 
     with path.open("rb") as file:
-        while chunk := file.read(chunk_size):
+        while True:
+            raise_if_cancelled(cancellation_check)
+            chunk = file.read(chunk_size)
+            if not chunk:
+                break
             byte_size += len(chunk)
             digest.update(chunk)
 

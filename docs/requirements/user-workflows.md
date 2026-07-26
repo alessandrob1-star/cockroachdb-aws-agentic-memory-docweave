@@ -2,8 +2,8 @@
 
 **Version:** 0.1
 **Baseline approved:** 2026-07-21
-**Implementation status:** In progress; initial desktop folder authorization
-and discovery presentation implemented
+**Implementation status:** In progress; desktop folder authorization,
+progressive discovery status, cancellation, and in-memory selection implemented
 
 ## 1. Interaction model
 

@@ -3,6 +3,7 @@
 from docweave.discovery.filesystem import (
     DiscoveredFile,
     DiscoveryConfig,
+    DiscoveryProgressCallback,
     DiscoveryResult,
     DiscoveryStatus,
     discover_files,
@@ -11,6 +12,7 @@ from docweave.discovery.filesystem import (
 __all__ = [
     "DiscoveredFile",
     "DiscoveryConfig",
+    "DiscoveryProgressCallback",
     "DiscoveryResult",
     "DiscoveryStatus",
     "discover_files",

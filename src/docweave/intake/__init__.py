@@ -2,6 +2,7 @@
 
 from docweave.intake.records import (
     DuplicateGroup,
+    IntakeProgressCallback,
     IntakeRecord,
     IntakeResult,
     IntakeStatus,
@@ -10,6 +11,7 @@ from docweave.intake.records import (
 
 __all__ = [
     "DuplicateGroup",
+    "IntakeProgressCallback",
     "IntakeRecord",
     "IntakeResult",
     "IntakeStatus",

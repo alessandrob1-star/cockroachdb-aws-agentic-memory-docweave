@@ -3,6 +3,7 @@ from pathlib import Path
 
 import pytest
 
+from docweave.core.cancellation import CancellationRequestedError
 from docweave.core.fingerprints import (
     SHA256_DIGEST_SIZE,
     compute_sha256_fingerprint,
@@ -47,6 +48,18 @@ def test_propagates_file_read_errors(tmp_path: Path) -> None:
 
     with pytest.raises(FileNotFoundError):
         compute_sha256_fingerprint(missing)
+
+
+def test_fingerprint_stops_at_cooperative_chunk_boundary(tmp_path: Path) -> None:
+    path = tmp_path / "document.pdf"
+    path.write_bytes(b"x" * 64)
+
+    with pytest.raises(CancellationRequestedError):
+        compute_sha256_fingerprint(
+            path,
+            chunk_size=8,
+            cancellation_check=lambda: True,
+        )
 
 
 @pytest.mark.parametrize(

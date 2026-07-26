@@ -1,7 +1,7 @@
 # Desktop Discovery Shell
 
 **Project:** DocWeave
-**Status:** Initial read-only PySide6 surface implemented locally
+**Status:** Progressive read-only PySide6 surface implemented locally
 **Date:** 2026-07-26
 
 ## 1. Purpose
@@ -14,9 +14,12 @@ The shell lets a user:
 
 1. authorize one existing local directory;
 2. start recursive discovery without blocking the user-interface thread;
-3. inspect discovered, ready, and attention-required counts; and
-4. view per-file relative path, deterministic intake state, byte size, and safe
-   diagnostic category.
+3. observe separate discovery and deterministic-intake progress;
+4. cancel at cooperative file or fingerprint-chunk boundaries;
+5. inspect discovered, ready, and attention-required counts;
+6. view per-file relative path, deterministic intake state, byte size, and safe
+   diagnostic category; and
+7. select multiple completed rows for later review without enabling an action.
 
 It never renames, copies, moves, uploads, extracts text from, or sends a document
 to a model.
@@ -34,34 +37,51 @@ role authorization system.
 ## 3. Responsiveness and lifecycle
 
 Discovery and deterministic intake execute through a worker object on a
-dedicated Qt thread. The main thread receives either one immutable result
-snapshot or a minimized exception category.
+dedicated Qt thread. The main thread receives typed, throttled progress and
+then exactly one complete immutable result, cancellation signal, or minimized
+exception category.
 
 While scanning:
 
 - a duplicate start request is ignored;
 - root changes are rejected;
-- the scan button and root field are disabled; and
+- the scan button and root field are disabled;
+- a cancellation control requests a cooperative stop; and
 - window closure is deferred to avoid destroying an active thread.
 
-The initial shell has no cancellation control because the current synchronous
-discovery core has no safe cooperative-cancellation contract. Cancellation,
-progressive row delivery, and durable checkpoints remain required before the
+Cancellation is checked between discovered files, between intake records, and
+between one-mebibyte fingerprint chunks. Partial results are discarded rather
+than presented as complete. Directory enumeration can still take time before
+the next cooperative boundary, so immediate hard cancellation is not claimed.
+Progressive row delivery and durable checkpoints remain required before the
 10,000-file user-interface acceptance scenario is claimed.
 
-## 4. Presentation and accessibility baseline
+## 4. In-memory workspace state
+
+The desktop session records one immutable snapshot with the authorized root,
+lifecycle phase, latest progress, complete result, selected document keys, and
+sanitized error category. Transition checks reject decreasing progress,
+mismatched result roots, selection before completion, and unknown document
+keys.
+
+This state is deliberately process-local. It is not a CockroachDB workspace,
+does not survive restart, and does not establish user or role authorization.
+
+## 5. Presentation and accessibility baseline
 
 The document table uses a read-only `QAbstractTableModel` rather than one widget
 per cell. This is the correct base for later pagination or virtualization.
-Controls, status messages, metrics, and the table have accessible names. Status
-and safety meaning are expressed in text rather than color alone.
+Controls, status messages, progress, selection count, metrics, and the table
+have accessible names. Status and safety meaning are expressed in text rather
+than color alone.
 
-Windows rendering was inspected with both an empty workspace and a controlled
-three-file result. Web Content Accessibility Guidelines 2.2 Level AA
-conformance is not yet claimed; keyboard, screen-reader, contrast, high-DPI,
-and reduced-motion evidence remain pending.
+Windows rendering was inspected with an empty workspace and earlier with a
+controlled result. Product-owner visual acceptance remains required for this
+increment. Web Content Accessibility Guidelines 2.2 Level AA conformance is
+not yet claimed; keyboard, screen-reader, contrast, high-DPI, and
+reduced-motion evidence remain pending.
 
-## 5. Dependency and launch
+## 6. Dependency and launch
 
 PySide6 6.11.1 and its exact transitive Qt packages are pinned. The selected
 release supports the approved Python range and provides Windows wheels. Its
@@ -77,20 +97,22 @@ with:
 
 Packaged desktop delivery remains a separate architecture decision.
 
-## 6. Verification and non-claims
+## 7. Verification and non-claims
 
 Automated evidence covers:
 
 - application bootstrap and metadata;
 - virtualized table content and size formatting;
 - authorized-root scanning and nested relative paths;
-- worker success and minimized failure output;
+- worker progress, success, cancellation, and minimized failure output;
 - background completion without freezing the event loop;
+- cooperative cancellation with partial-result discard;
+- validated in-memory workspace transitions and multiple row selection;
 - root-change and close protection during an active scan;
 - missing-root, invalid-result, and non-directory failure states; and
 - folder-picker authorization.
 
-This implementation does not claim progressive results, repeated-scan
-comparison, persistence across restart, PDF preview, content extraction,
-classification, review, operation approval, restore, cloud parity, packaging,
-or production readiness.
+This implementation does not claim progressive row delivery, repeated-scan
+comparison, durable checkpoints, persistence across restart, PDF preview,
+content extraction, classification, review, operation approval, restore,
+cloud parity, packaging, or production readiness.

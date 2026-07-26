@@ -34,7 +34,9 @@ persistence is not yet claimed. No runtime database integration, restore, AWS
 workload, complete review interface, or intelligent document analysis is
 claimed yet. An initial read-only PySide6 desktop shell now exposes
 authorized-folder selection, non-blocking local discovery, deterministic intake
-counts, explicit status, and a virtualized document table.
+counts, phase-aware progress, cooperative cancellation, explicit in-memory
+workspace state, multiple document selection, and a virtualized document
+table.
 
 The current approved product direction includes:
 
@@ -112,8 +114,8 @@ Launch the initial read-only desktop discovery shell:
 .\.venv\Scripts\docweave-desktop.exe
 ```
 
-The shell does not yet connect to CockroachDB or Amazon Bedrock and does not
-modify files.
+The shell does not yet connect to CockroachDB or Amazon Bedrock, does not
+persist its session, and does not modify files.
 
 ## License
 

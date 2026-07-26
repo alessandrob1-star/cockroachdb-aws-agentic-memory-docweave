@@ -2,6 +2,7 @@ from pathlib import Path
 
 import pytest
 
+from docweave.core.cancellation import CancellationRequestedError
 from docweave.discovery import DiscoveryConfig, DiscoveryStatus, discover_files
 
 
@@ -56,6 +57,21 @@ def test_enforces_max_file_limit(tmp_path: Path) -> None:
 
     assert result.limit_reached is True
     assert len(result.files) == 2
+
+
+def test_reports_progress_and_honors_cancellation(tmp_path: Path) -> None:
+    write_file(tmp_path / "a.pdf")
+    write_file(tmp_path / "b.pdf")
+    progress: list[int] = []
+
+    with pytest.raises(CancellationRequestedError):
+        discover_files(
+            [tmp_path],
+            progress_callback=progress.append,
+            cancellation_check=lambda: bool(progress),
+        )
+
+    assert progress == [1]
 
 
 def test_rejects_non_directory_root(tmp_path: Path) -> None:
