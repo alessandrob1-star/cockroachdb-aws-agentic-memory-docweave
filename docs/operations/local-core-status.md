@@ -33,6 +33,12 @@ The repository currently contains a tested Python package with:
   around each disposable extraction worker;
 - explicit malformed, encrypted, unsupported-security, changed-source,
   text-free, and worker-failure extraction states;
+- bounded `classification.v1` Converse request fields with document text
+  explicitly separated as untrusted data;
+- a closed structured-output schema tied to the approved taxonomy baseline;
+- typed non-authoritative classification proposals with exact page-evidence
+  validation, abstention, alternatives, contradictions, and ordinal raw
+  signals;
 - deterministic intake records;
 - duplicate grouping for ready intake records with identical fingerprints;
 - safe copy and move operation planning;
@@ -79,9 +85,9 @@ The repository currently contains a tested Python package with:
 ## 3. Current local quality evidence
 
 The latest verified local quality gate on
-`codex/isolated-pdf-extraction` reported:
+`codex/classification-v1-contract` reported:
 
-- 330 tests passed;
+- 361 tests passed;
 - 93 percent total package coverage;
 - Ruff format check passed;
 - Ruff lint check passed;
@@ -91,12 +97,10 @@ The latest verified local quality gate on
 - online migration execution was verified to fail closed when no database URL
   is explicitly supplied.
 
-The merged `main` baseline passed GitHub Actions through pull request 34. The
-330-test isolated-extraction increment remains local evidence until this
-separately authorized pull request passes GitHub Actions. The first full local
-run encountered the previously observed intermittent native Qt desktop-test
-termination under Python 3.14; an immediate complete rerun passed. GitHub
-Actions uses the supported Python 3.12 test target.
+The merged `main` baseline passed GitHub Actions through pull request 35. The
+361-test structured-classification increment remains local evidence until this
+separately authorized pull request passes GitHub Actions. GitHub Actions uses
+the supported Python 3.12 test target.
 
 The check command is:
 
@@ -113,7 +117,8 @@ DocWeave does not yet implement or claim:
 - AWS infrastructure or deployed DocWeave workloads;
 - Amazon Bedrock invocation inside the product;
 - a complete PySide6 desktop workflow or any cloud user interface;
-- model-driven classification, naming, confidence, or relationship analysis;
+- observed model-driven classification, naming, confidence, or relationship
+  analysis;
 - live durable idempotency in the running application;
 - restore planning or restore execution;
 - durable Activity History;

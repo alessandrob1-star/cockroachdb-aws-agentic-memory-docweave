@@ -112,6 +112,9 @@ The critical path is:
 - The PDF extraction library and process boundary are decided in ADR-0004.
   Real page-level Qt PDF extraction now runs in a bounded disposable process
   without a new dependency or cloud access.
+- The initial Bedrock structured-output boundary is decided in ADR-0005.
+  `classification.v1` request, schema, and fail-closed decoder contracts are
+  locally implemented without invoking a model.
 
 ### M2 - CockroachDB memory foundation
 
@@ -175,7 +178,9 @@ The critical path is:
 - Authorized-root, signature, source-digest, file, page, character, and timeout
   controls are implemented with explicit limited-processing states.
 - Bedrock invocation, structured classification, CockroachDB extraction
-  checkpoints, and model provenance remain pending.
+  checkpoints, and observed runtime provenance remain pending. The
+  `classification.v1` request, schema, and evidence validator are implemented
+  locally.
 
 **Exit criteria:**
 
@@ -266,7 +271,7 @@ The critical path is:
 
 **Measurement date:** 2026-07-26
 
-The current evidence-weighted Schedule Performance Indicator is **42%**. This
+The current evidence-weighted Schedule Performance Indicator is **44%**. This
 is a planning estimate, not a product-completion or production-readiness claim.
 It is calculated from fixed milestone weights and conservative completion
 estimates based only on merged or locally verified evidence:
@@ -274,18 +279,19 @@ estimates based only on merged or locally verified evidence:
 | Milestone | Project weight | Evidence-complete estimate | Weighted contribution |
 | --- | ---: | ---: | ---: |
 | M0 - Baseline complete | 8% | 100% | 8.0% |
-| M1 - Decisions and scaffolding | 14% | 95% | 13.3% |
+| M1 - Decisions and scaffolding | 14% | 97% | 13.58% |
 | M2 - CockroachDB foundation | 18% | 70% | 12.6% |
-| M3 - Real analysis slice | 18% | 15% | 2.7% |
+| M3 - Real analysis slice | 18% | 25% | 4.5% |
 | M4 - Review and safe operations | 15% | 10% | 1.5% |
 | M5 - Product surfaces | 12% | 30% | 3.6% |
 | M6 - Evaluation and hardening | 9% | 5% | 0.45% |
 | M7 - Submission readiness | 6% | 0% | 0.0% |
-| **Total** | **100%** |  | **42.15%, rounded to 42%** |
+| **Total** | **100%** |  | **44.23%, rounded to 44%** |
 
 The project is **on plan overall and ahead on the database foundation**. M1 is
-nearly complete now that the extraction decision is closed, with the Bedrock
-contract and cloud-compute decisions still open.
+nearly complete now that the extraction and Bedrock contract decisions are
+closed. The initial cloud-compute decision remains open. This does not claim
+that the cloud application or live Bedrock gateway exists.
 The clean live migration validation and local transaction and repository
 contracts from M2 were completed before the M2 window opens, while runtime
 application persistence is not complete.
@@ -315,12 +321,11 @@ are decided. The next vertical slices still require the following approved
 decisions before their respective implementation begins:
 
 1. embedding model, vector dimension, and distance metric;
-2. Bedrock structured-output schema version `classification.v1`;
-3. cloud compute, storage, queue, authentication, and network topology;
-4. desktop-to-cloud identity and role matrix;
-5. confidence scoring formula and review thresholds;
-6. raw model-response and extracted-text retention policy;
-7. runtime CockroachDB identities and least-privilege authorization model.
+2. cloud compute, storage, queue, authentication, and network topology;
+3. desktop-to-cloud identity and role matrix;
+4. confidence scoring formula and review thresholds;
+5. raw model-response and extracted-text retention policy;
+6. runtime CockroachDB identities and least-privilege authorization model.
 
 ## 7. Next implementation slice
 

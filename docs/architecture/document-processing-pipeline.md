@@ -158,6 +158,13 @@ review queue. There is no canned classification fallback.
 **Persistent checkpoint:** validation ruleset version, results, errors, retry
 count, and final routing decision.
 
+**Current implementation:** `classification.v1` now provides the
+Bedrock-compatible structured-output schema, bounded request fields, typed
+proposal, and fail-closed local decoder. Exact quotations are verified against
+the cited extracted page. The gateway, live invocation, retry execution,
+runtime provenance, cost observation, and CockroachDB checkpoint remain
+pending.
+
 ### 4.6 Proposal enrichment
 
 After a valid classification proposal exists:
@@ -266,13 +273,12 @@ Observed cost is stored after processing so estimates can be improved.
 The following remain separate approval points:
 
 1. embedding model, vector dimension, and distance metric;
-2. structured-output schema and prompt contract;
-3. raw confidence formula and calibration method;
-4. numerical review thresholds and bounded retry count;
-5. cloud storage, queue, compute, and application topology;
-6. desktop-to-cloud identity and authorization design;
-7. retention of extracted text and raw model responses; and
-8. whether and when a secondary model is evaluated.
+2. raw confidence formula and calibration method;
+3. numerical review thresholds and bounded retry count;
+4. cloud storage, queue, compute, and application topology;
+5. desktop-to-cloud identity and authorization design;
+6. retention of extracted text and raw model responses; and
+7. whether and when a secondary model is evaluated.
 
 The physical CockroachDB schema, indexes, and transaction boundaries are
 approved by

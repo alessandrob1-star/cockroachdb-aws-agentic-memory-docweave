@@ -6,7 +6,7 @@
 
 **Baseline approved:** 2026-07-22
 
-**Implementation status:** Not started
+**Implementation status:** In progress
 
 **Document status:** Approved product design; physical schema approved separately; implementation pending
 
@@ -135,6 +135,14 @@ Bedrock model gateway. At minimum, a proposal contains:
 
 Free-form model text shall not become authoritative application state without
 schema validation.
+
+**Current implementation:** ADR-0005 defines `classification.v1`, constructs
+bounded side-effect-free Converse request fields, and decodes the closed
+structured response into a non-authoritative typed proposal. Deterministic
+validation confirms taxonomy and contract versions, page existence, exact
+evidence quotations, cross-references, alternatives, abstention, and
+application-side budgets. No Bedrock invocation, model-quality result,
+confidence calculation, or persistence is claimed.
 
 ### 5.3 Independent review
 
@@ -457,16 +465,15 @@ This specification is satisfied only when evidence demonstrates that:
 
 The following decisions remain open:
 
-1. prompt and structured-output contract;
-2. extraction libraries and the OCR boundary;
-3. raw confidence scoring formula;
-4. calibration algorithm and minimum sample requirements;
-5. numerical confidence-band thresholds;
-6. second-analysis triggers and cost limits;
-7. preference-promotion thresholds and approval matrix;
-8. Grounding Rule Studio MVP inclusion or post-MVP scheduling;
-9. rule expression format and precedence engine; and
-10. retention policy for raw model responses and learning evidence.
+1. Optical Character Recognition boundary;
+2. raw confidence scoring formula;
+3. calibration algorithm and minimum sample requirements;
+4. numerical confidence-band thresholds;
+5. second-analysis triggers and cost limits;
+6. preference-promotion thresholds and approval matrix;
+7. Grounding Rule Studio MVP inclusion or post-MVP scheduling;
+8. rule expression format and precedence engine; and
+9. retention policy for raw model responses and learning evidence.
 
 Each decision requires an explained proposal and explicit user approval before
 implementation.
