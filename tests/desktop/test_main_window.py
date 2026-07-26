@@ -2,14 +2,16 @@ from pathlib import Path
 from threading import Event
 
 import pytest
-from PySide6.QtCore import QEventLoop, QItemSelectionModel, QTimer, QUrl
+from PySide6.QtCore import QEventLoop, QItemSelectionModel, QTimer
 from PySide6.QtWidgets import (
+    QDialog,
     QFileDialog,
     QLabel,
     QLineEdit,
     QProgressBar,
     QPushButton,
     QTableView,
+    QWidget,
 )
 
 from docweave.core.cancellation import CancellationCheck, CancellationRequestedError
@@ -227,19 +229,20 @@ def test_window_tracks_multiple_document_selection_in_memory(
     window.close()
 
 
-def test_window_opens_one_ready_pdf_through_injected_system_handler(
+def test_window_opens_one_ready_pdf_through_injected_preview(
     tmp_path: Path,
     qt_application: object,
 ) -> None:
     path = tmp_path / "invoice.pdf"
     path.write_bytes(b"%PDF-1.7\ninvoice")
-    opened: list[QUrl] = []
+    previews: list[tuple[Path, QDialog]] = []
 
-    def accept_open(url: QUrl) -> bool:
-        opened.append(url)
-        return True
+    def create_preview(path: Path, parent: QWidget) -> QDialog:
+        dialog = QDialog(parent)
+        previews.append((path, dialog))
+        return dialog
 
-    window = DocWeaveMainWindow(document_opener=accept_open)
+    window = DocWeaveMainWindow(preview_factory=create_preview)
     window.set_authorized_root(tmp_path)
     wait_for_scan(window)
     table = window.findChild(QTableView, "documentTable")
@@ -249,16 +252,17 @@ def test_window_opens_one_ready_pdf_through_injected_system_handler(
 
     window.open_selected_document()
 
-    assert opened == [QUrl.fromLocalFile(str(path.resolve()))]
+    assert len(previews) == 1
+    assert previews[0][0] == path.resolve()
     status = window.findChild(QLabel, "status")
     assert status is not None
-    assert "Open request sent" in status.text()
+    assert "preview opened inside DocWeave" in status.text()
     assert open_button is not None
     assert open_button.isEnabled()
     window.close()
 
 
-def test_window_blocks_changed_or_non_ready_pdf_and_reports_handler_failure(
+def test_window_blocks_changed_or_non_ready_pdf_and_reports_preview_failure(
     tmp_path: Path,
     qt_application: object,
 ) -> None:
@@ -266,7 +270,12 @@ def test_window_blocks_changed_or_non_ready_pdf_and_reports_handler_failure(
     invalid.write_bytes(b"not a pdf")
     ready = tmp_path / "ready.pdf"
     ready.write_bytes(b"%PDF-1.7\nready")
-    window = DocWeaveMainWindow(document_opener=lambda url: False)
+
+    def fail_preview(path: Path, parent: QWidget) -> QDialog:
+        del path, parent
+        raise RuntimeError("private details")
+
+    window = DocWeaveMainWindow(preview_factory=fail_preview)
     window.set_authorized_root(tmp_path)
     wait_for_scan(window)
     table = window.findChild(QTableView, "documentTable")
@@ -279,7 +288,7 @@ def test_window_blocks_changed_or_non_ready_pdf_and_reports_handler_failure(
 
     table.selectRow(1)
     window.open_selected_document()
-    assert "did not accept" in status.text()
+    assert "RuntimeError" in status.text()
 
     ready.write_bytes(b"changed after scan")
     window.open_selected_document()
@@ -296,7 +305,7 @@ def test_window_requires_exactly_one_selected_pdf(
 
     status = window.findChild(QLabel, "status")
     assert status is not None
-    assert status.text() == "Select one ready PDF to open it safely."
+    assert status.text() == "Select one ready PDF to preview it safely."
     window.close()
 
 

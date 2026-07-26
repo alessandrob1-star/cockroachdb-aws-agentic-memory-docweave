@@ -7,6 +7,7 @@ from docweave.desktop.opening import (
     PdfOpenValidationError,
     validate_pdf_for_open,
 )
+from docweave.desktop.preview import PdfPreviewDialog, create_pdf_preview
 from docweave.desktop.scan import (
     DesktopScanResult,
     ScanPhase,
@@ -20,11 +21,13 @@ __all__ = [
     "DocWeaveMainWindow",
     "PdfOpenFailure",
     "PdfOpenValidationError",
+    "PdfPreviewDialog",
     "ScanPhase",
     "ScanProgress",
     "WorkspacePhase",
     "WorkspaceSnapshot",
     "create_application",
+    "create_pdf_preview",
     "main",
     "scan_authorized_root",
     "validate_pdf_for_open",

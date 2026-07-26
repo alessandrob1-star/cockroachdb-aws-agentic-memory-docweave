@@ -3,10 +3,11 @@
 from collections.abc import Callable
 from pathlib import Path
 
-from PySide6.QtCore import QItemSelection, QModelIndex, QThread, QUrl, Signal, Slot
-from PySide6.QtGui import QCloseEvent, QDesktopServices, QFont
+from PySide6.QtCore import QItemSelection, QModelIndex, QThread, Signal, Slot
+from PySide6.QtGui import QCloseEvent, QFont
 from PySide6.QtWidgets import (
     QAbstractItemView,
+    QDialog,
     QFileDialog,
     QFrame,
     QHBoxLayout,
@@ -23,6 +24,7 @@ from PySide6.QtWidgets import (
 
 from docweave.desktop.models import DocumentTableModel
 from docweave.desktop.opening import PdfOpenValidationError, validate_pdf_for_open
+from docweave.desktop.preview import create_pdf_preview
 from docweave.desktop.scan import (
     DesktopScanResult,
     ScanFunction,
@@ -37,7 +39,7 @@ from docweave.desktop.workspace import (
     WorkspaceSnapshot,
 )
 
-DocumentOpener = Callable[[QUrl], bool]
+PreviewFactory = Callable[[Path, QWidget], QDialog]
 
 _WINDOW_STYLESHEET = """
 QMainWindow, QWidget#central {
@@ -155,11 +157,12 @@ class DocWeaveMainWindow(QMainWindow):
         self,
         *,
         scan_function: ScanFunction = scan_authorized_root,
-        document_opener: DocumentOpener = QDesktopServices.openUrl,
+        preview_factory: PreviewFactory = create_pdf_preview,
     ) -> None:
         super().__init__()
         self._scan_function = scan_function
-        self._document_opener = document_opener
+        self._preview_factory = preview_factory
+        self._preview_dialogs: set[QDialog] = set()
         self._scan_thread: QThread | None = None
         self._scan_worker: ScanWorker | None = None
         self._table_model = DocumentTableModel()
@@ -506,11 +509,11 @@ class DocWeaveMainWindow(QMainWindow):
         self._selection_status.setObjectName("selectionStatus")
         self._selection_status.setAccessibleName("Selected document count")
         title_row.addWidget(self._selection_status)
-        self._open_button = QPushButton("Open PDF")
+        self._open_button = QPushButton("Preview PDF")
         self._open_button.setObjectName("openPdfButton")
         self._open_button.setEnabled(False)
         self._open_button.setAccessibleDescription(
-            "Open the selected ready PDF in the system reader"
+            "Preview the selected ready PDF inside DocWeave"
         )
         self._open_button.clicked.connect(self.open_selected_document)
         title_row.addWidget(self._open_button)
@@ -594,10 +597,10 @@ class DocWeaveMainWindow(QMainWindow):
 
     @Slot()
     def open_selected_document(self) -> None:
-        """Open exactly one selected ready PDF after current-state validation."""
+        """Preview one selected ready PDF after current-state validation."""
         selected_rows = self._table.selectionModel().selectedRows()
         if len(selected_rows) != 1:
-            self._set_status("Select one ready PDF to open it safely.")
+            self._set_status("Select one ready PDF to preview it safely.")
             return
         self._open_document_row(selected_rows[0].row())
 
@@ -607,28 +610,36 @@ class DocWeaveMainWindow(QMainWindow):
 
     def _open_document_row(self, row: int) -> None:
         if not self._table_model.is_openable_at(row):
-            self._set_status("Only a document with Ready status can be opened safely.")
+            self._set_status(
+                "Only a document with Ready status can be previewed safely."
+            )
             return
         path = self._table_model.absolute_path_at(row)
         root = self.authorized_root
         if path is None or root is None:
-            self._set_status("The document is no longer available to open safely.")
+            self._set_status("The document is no longer available to preview safely.")
             return
         try:
             validated_path = validate_pdf_for_open(path, root)
         except PdfOpenValidationError as error:
             self._set_status(
-                "PDF open request was blocked safely "
+                "PDF preview was blocked safely "
                 f"({error.category.value}). No files were changed."
             )
             return
-        accepted = self._document_opener(QUrl.fromLocalFile(str(validated_path)))
-        if accepted:
+        try:
+            dialog = self._preview_factory(validated_path, self)
+        except Exception as error:
             self._set_status(
-                "Open request sent to the system PDF reader. No files were changed."
+                "PDF preview failed safely "
+                f"({error.__class__.__name__}). No files were changed."
             )
             return
-        self._set_status(
-            "The system PDF reader did not accept the open request. "
-            "No files were changed."
+        self._preview_dialogs.add(dialog)
+        dialog.finished.connect(
+            lambda unused_result, active_dialog=dialog: self._preview_dialogs.discard(
+                active_dialog
+            )
         )
+        dialog.show()
+        self._set_status("PDF preview opened inside DocWeave. No files were changed.")
