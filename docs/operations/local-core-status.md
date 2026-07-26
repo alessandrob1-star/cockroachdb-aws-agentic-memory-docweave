@@ -39,6 +39,11 @@ The repository currently contains a tested Python package with:
 - typed non-authoritative classification proposals with exact page-evidence
   validation, abstention, alternatives, contradictions, and ordinal raw
   signals;
+- a pinned boto3 Bedrock Runtime gateway with an injected Converse client,
+  approved European profile, adaptive retries, explicit timeouts, strict stop
+  reasons, sanitized errors, and observed token and latency provenance;
+- optional token-cost estimation that requires externally supplied current
+  prices rather than hardcoded rates;
 - deterministic intake records;
 - duplicate grouping for ready intake records with identical fingerprints;
 - safe copy and move operation planning;
@@ -85,9 +90,9 @@ The repository currently contains a tested Python package with:
 ## 3. Current local quality evidence
 
 The latest verified local quality gate on
-`codex/classification-v1-contract` reported:
+`codex/bedrock-classification-gateway` reported:
 
-- 361 tests passed;
+- 398 tests passed;
 - 93 percent total package coverage;
 - Ruff format check passed;
 - Ruff lint check passed;
@@ -97,8 +102,11 @@ The latest verified local quality gate on
 - online migration execution was verified to fail closed when no database URL
   is explicitly supplied.
 
-The merged `main` baseline passed GitHub Actions through pull request 35. The
-361-test structured-classification increment remains local evidence until this
+The first complete local run ended during an existing native Qt desktop test
+on local Python 3.14.5. Subsequent complete reruns passed, most recently with
+all 398 tests and
+quality gates. The merged `main` baseline passed GitHub Actions through pull
+request 36. The Bedrock gateway increment remains local evidence until this
 separately authorized pull request passes GitHub Actions. GitHub Actions uses
 the supported Python 3.12 test target.
 

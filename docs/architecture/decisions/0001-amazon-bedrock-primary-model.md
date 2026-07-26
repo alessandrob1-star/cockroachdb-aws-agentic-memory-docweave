@@ -3,7 +3,7 @@
 **Status:** Accepted
 **Decision date:** 2026-07-22
 **Decision owner:** Project owner
-**Implementation status:** Not started
+**Implementation status:** In progress; gateway implemented, live invocation pending
 
 ## Context
 
@@ -116,6 +116,12 @@ evaluation candidate rather than a hidden fallback.
 6. Demonstrate that invalid or incomplete model output cannot become canonical
    CockroachDB state.
 7. Record the exact model and inference-profile identifiers with every result.
+
+Items 1 through 3 now have local evidence: the European inference profile was
+reported active on 2026-07-26 without invocation, `classification.v1` is
+implemented, and ADR-0006 provides the pinned gateway and provenance boundary.
+Items 4 through 7 still require a separately approved live synthetic
+evaluation and durable persistence evidence.
 
 ## Out of scope
 

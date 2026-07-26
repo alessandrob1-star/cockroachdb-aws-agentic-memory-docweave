@@ -178,9 +178,10 @@ The critical path is:
 - Authorized-root, signature, source-digest, file, page, character, and timeout
   controls are implemented with explicit limited-processing states.
 - Bedrock invocation, structured classification, CockroachDB extraction
-  checkpoints, and observed runtime provenance remain pending. The
-  `classification.v1` request, schema, and evidence validator are implemented
-  locally.
+  checkpoints, and live quality evidence remain pending. The
+  `classification.v1` contract and pinned boto3 gateway are implemented
+  locally, including response validation, observed provenance fields, and
+  externally configured cost estimation.
 
 **Exit criteria:**
 
@@ -271,7 +272,7 @@ The critical path is:
 
 **Measurement date:** 2026-07-26
 
-The current evidence-weighted Schedule Performance Indicator is **44%**. This
+The current evidence-weighted Schedule Performance Indicator is **46%**. This
 is a planning estimate, not a product-completion or production-readiness claim.
 It is calculated from fixed milestone weights and conservative completion
 estimates based only on merged or locally verified evidence:
@@ -281,21 +282,21 @@ estimates based only on merged or locally verified evidence:
 | M0 - Baseline complete | 8% | 100% | 8.0% |
 | M1 - Decisions and scaffolding | 14% | 97% | 13.58% |
 | M2 - CockroachDB foundation | 18% | 70% | 12.6% |
-| M3 - Real analysis slice | 18% | 25% | 4.5% |
+| M3 - Real analysis slice | 18% | 35% | 6.3% |
 | M4 - Review and safe operations | 15% | 10% | 1.5% |
 | M5 - Product surfaces | 12% | 30% | 3.6% |
 | M6 - Evaluation and hardening | 9% | 5% | 0.45% |
 | M7 - Submission readiness | 6% | 0% | 0.0% |
-| **Total** | **100%** |  | **44.23%, rounded to 44%** |
+| **Total** | **100%** |  | **46.03%, rounded to 46%** |
 
 The project is **on plan overall and ahead on the database foundation**. M1 is
 nearly complete now that the extraction and Bedrock contract decisions are
 closed. The initial cloud-compute decision remains open. This does not claim
-that the cloud application or live Bedrock gateway exists.
+that the cloud application or live Bedrock invocation exists.
 The clean live migration validation and local transaction and repository
 contracts from M2 were completed before the M2 window opens, while runtime
 application persistence is not complete.
-No schedule credit is taken for the unimplemented Bedrock analysis, complete
+No schedule credit is taken for unobserved Bedrock model quality, complete
 PySide6 workflow, cloud product, AWS deployment, evaluation corpus, or
 submission package. Limited credit is taken for the locally verified read-only
 desktop discovery, cancellation, session-state, selection, and guarded

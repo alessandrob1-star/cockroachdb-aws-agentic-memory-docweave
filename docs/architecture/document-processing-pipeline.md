@@ -158,12 +158,14 @@ review queue. There is no canned classification fallback.
 **Persistent checkpoint:** validation ruleset version, results, errors, retry
 count, and final routing decision.
 
-**Current implementation:** `classification.v1` now provides the
+**Current implementation:** `classification.v1` provides the
 Bedrock-compatible structured-output schema, bounded request fields, typed
-proposal, and fail-closed local decoder. Exact quotations are verified against
-the cited extracted page. The gateway, live invocation, retry execution,
-runtime provenance, cost observation, and CockroachDB checkpoint remain
-pending.
+proposal, and fail-closed local decoder. The pinned boto3 gateway now supplies
+the approved profile, adaptive retry and timeout configuration, strict response
+handling, observed token and latency provenance, and optional externally
+configured cost estimation. Exact quotations are verified against the cited
+page. Live invocation, quality evidence, application composition, and the
+CockroachDB checkpoint remain pending.
 
 ### 4.6 Proposal enrichment
 

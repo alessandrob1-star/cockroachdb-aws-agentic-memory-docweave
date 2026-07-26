@@ -1,5 +1,22 @@
 """Structured analysis contracts for genuine model-driven proposals."""
 
+from docweave.analysis.bedrock_gateway import (
+    APPROVED_BEDROCK_MODEL_ID,
+    APPROVED_BEDROCK_REGION,
+    BEDROCK_CONNECT_TIMEOUT_SECONDS,
+    BEDROCK_READ_TIMEOUT_SECONDS,
+    BEDROCK_TOTAL_MAX_ATTEMPTS,
+    BedrockClassificationGateway,
+    BedrockClassificationRun,
+    BedrockGatewayConfig,
+    BedrockGatewayError,
+    BedrockGatewayErrorCode,
+    BedrockRunProvenance,
+    BedrockTokenPricing,
+    BedrockUsage,
+    ConverseClient,
+    create_bedrock_runtime_client,
+)
 from docweave.analysis.contracts import (
     CLASSIFICATION_CONTRACT_VERSION,
     AlternativeClass,
@@ -31,6 +48,11 @@ from docweave.analysis.validation import (
 )
 
 __all__ = [
+    "APPROVED_BEDROCK_MODEL_ID",
+    "APPROVED_BEDROCK_REGION",
+    "BEDROCK_CONNECT_TIMEOUT_SECONDS",
+    "BEDROCK_READ_TIMEOUT_SECONDS",
+    "BEDROCK_TOTAL_MAX_ATTEMPTS",
     "CLASSIFICATION_CONTRACT_VERSION",
     "CLASSIFICATION_MAXIMUM_OUTPUT_TOKENS",
     "MAXIMUM_CLASSIFICATION_INPUT_CHARACTERS",
@@ -38,6 +60,14 @@ __all__ = [
     "MAXIMUM_RESPONSE_BYTES",
     "TAXONOMY_VERSION",
     "AlternativeClass",
+    "BedrockClassificationGateway",
+    "BedrockClassificationRun",
+    "BedrockGatewayConfig",
+    "BedrockGatewayError",
+    "BedrockGatewayErrorCode",
+    "BedrockRunProvenance",
+    "BedrockTokenPricing",
+    "BedrockUsage",
     "CandidateMetadata",
     "ClassificationInputCode",
     "ClassificationInputError",
@@ -45,6 +75,7 @@ __all__ = [
     "ClassificationValidationCode",
     "ClassificationValidationError",
     "Contradiction",
+    "ConverseClient",
     "EvidenceReference",
     "RawClassificationSignals",
     "SignalStrength",
@@ -52,5 +83,6 @@ __all__ = [
     "classification_v1_converse_fields",
     "classification_v1_json_schema",
     "classification_v1_output_config",
+    "create_bedrock_runtime_client",
     "decode_classification_v1",
 ]

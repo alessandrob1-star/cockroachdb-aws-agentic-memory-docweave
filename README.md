@@ -49,12 +49,15 @@ changed, and text-free documents receive explicit states. This is parser
 failure isolation, not a malware scanner or operating-system sandbox. Extracted
 text is not yet sent to Bedrock or persisted in CockroachDB.
 
-The `classification.v1` boundary now builds bounded, side-effect-free Converse
-request fields and validates structured classification proposals against exact
-page quotations, the approved taxonomy version, closed object shapes, and
-cross-reference rules. It does not import an AWS client or invoke a model.
-Consequently, real classification quality and Bedrock integration are still
-not claimed.
+The `classification.v1` boundary now builds bounded Converse request fields and
+validates structured classification proposals against exact page quotations,
+the approved taxonomy version, closed object shapes, and cross-reference
+rules. A pinned boto3 Bedrock Runtime gateway can submit that contract through
+an injected client and record observed tokens, latency, retries, stop reason,
+request identity, and an optional externally priced cost estimate. It is not
+wired into application startup and no model invocation has been performed.
+Consequently, real classification quality and live Bedrock integration are
+still not claimed.
 
 An initial, explicitly labelled corpus of 30 synthetic two-page PDFs is
 available in `pdf_sintetici` for desktop discovery, preview, guarded-link, and
@@ -97,6 +100,7 @@ Approved architecture:
 - [CockroachDB migration-tooling decision](docs/architecture/decisions/0003-cockroachdb-migration-tooling.md)
 - [Isolated PDF text-extraction decision](docs/architecture/decisions/0004-isolated-pdf-text-extraction.md)
 - [Classification v1 structured-contract decision](docs/architecture/decisions/0005-classification-v1-contract.md)
+- [Bedrock classification-gateway decision](docs/architecture/decisions/0006-bedrock-classification-gateway.md)
 - [Document-processing pipeline](docs/architecture/document-processing-pipeline.md)
 - [CockroachDB physical-schema specification](docs/architecture/cockroachdb-physical-schema.md)
 - [CockroachDB Entity Relationship model](docs/architecture/cockroachdb-entity-relationship.md)

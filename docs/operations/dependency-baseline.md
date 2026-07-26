@@ -2,14 +2,14 @@
 
 **Project:** DocWeave
 **Last updated:** 2026-07-26
-**Status:** Pinned persistence and desktop inventory; release review pending
+**Status:** Pinned persistence, desktop, and Bedrock inventory; release review pending
 
 ## 1. Purpose
 
 This inventory records direct dependencies introduced for the CockroachDB
-persistence foundation and PySide6 desktop surface. It supports reproducible
-installation and third-party license review. It is not yet the release Software
-Bill of Materials or final license-policy approval.
+persistence foundation, PySide6 desktop surface, and Amazon Bedrock gateway. It
+supports reproducible installation and third-party license review. It is not
+yet the release Software Bill of Materials or final license-policy approval.
 
 ## 2. Direct migration and persistence dependencies
 
@@ -24,6 +24,13 @@ Bill of Materials or final license-policy approval.
 | PySide6-Addons | 6.11.1 | Qt modules required transitively by PySide6 | LGPL-3.0-only OR GPL-2.0-only OR GPL-3.0-only |
 | PySide6-Essentials | 6.11.1 | Core Qt modules required transitively by PySide6 | LGPL-3.0-only OR GPL-2.0-only OR GPL-3.0-only |
 | shiboken6 | 6.11.1 | Python binding support required transitively by PySide6 | LGPL-3.0-only OR GPL-2.0-only OR GPL-3.0-only |
+| boto3 | 1.43.56 | AWS Software Development Kit for Python and Bedrock client | Apache-2.0 |
+| botocore | 1.43.56 | AWS request, retry, credential, and service-model runtime | Apache-2.0 |
+| jmespath | 1.1.0 | boto3 response-query dependency | MIT |
+| s3transfer | 0.19.2 | boto3 transitive transfer dependency | Apache-2.0 |
+| python-dateutil | 2.9.0.post0 | botocore date and time dependency | Apache-2.0 OR BSD-3-Clause |
+| six | 1.17.0 | python-dateutil compatibility dependency | MIT |
+| urllib3 | 2.7.0 | botocore HTTP transport dependency | MIT |
 
 License values were read from installed package metadata after installation.
 The PySide6 license expression and Python compatibility were also checked
@@ -46,6 +53,8 @@ release-gate work.
 
 ## 4. Security boundary
 
-No dependency receives credentials automatically. Alembic requires an explicit
-runtime database URL for online work, and migrations do not run during normal
-application import or startup.
+Alembic requires an explicit runtime database URL for online work, and
+migrations do not run during normal application import or startup. The
+Bedrock module creates no client during import. Its explicit client factory
+uses the standard AWS credential provider chain and accepts no credential
+values. Automated tests inject a fake Converse transport and make no AWS call.
