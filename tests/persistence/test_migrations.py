@@ -10,6 +10,7 @@ REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
 ALEMBIC_CONFIG_PATH = REPOSITORY_ROOT / "alembic.ini"
 DATABASE_URL_ENVIRONMENT_VARIABLE = "DOCWEAVE_DATABASE_URL"
 INITIAL_REVISION = "0001_operational_foundation"
+CLASSIFICATION_REVISION = "0002_classification_memory"
 
 
 def alembic_config() -> Config:
@@ -30,18 +31,18 @@ def render_downgrade_sql() -> str:
     output = StringIO()
     config = alembic_config()
     config.output_buffer = output
-    command.downgrade(config, f"{INITIAL_REVISION}:base", sql=True)
+    command.downgrade(config, "head:base", sql=True)
     return output.getvalue()
 
 
 def test_migration_history_has_one_expected_head() -> None:
     script = ScriptDirectory.from_config(alembic_config())
 
-    assert script.get_heads() == [INITIAL_REVISION]
+    assert script.get_heads() == [CLASSIFICATION_REVISION]
     assert script.get_base() == INITIAL_REVISION
 
 
-def test_offline_upgrade_creates_only_approved_foundation_tables() -> None:
+def test_offline_upgrade_creates_approved_non_vector_memory_tables() -> None:
     sql = render_upgrade_sql()
 
     expected_tables = {
@@ -51,6 +52,14 @@ def test_offline_upgrade_creates_only_approved_foundation_tables() -> None:
         "operation_batches",
         "file_operations",
         "audit_events",
+        "documents",
+        "document_versions",
+        "taxonomy_versions",
+        "taxonomy_classes",
+        "agent_runs",
+        "proposals",
+        "classification_proposals",
+        "proposal_evidence",
     }
     for table_name in expected_tables:
         assert f"CREATE TABLE docweave.{table_name}" in sql
@@ -58,8 +67,22 @@ def test_offline_upgrade_creates_only_approved_foundation_tables() -> None:
     assert "CREATE SCHEMA IF NOT EXISTS docweave" in sql
     assert "VECTOR" not in sql
     assert "document_chunks" not in sql
-    assert "agent_runs" not in sql
+    assert "document_classifications" not in sql
+    assert "review_decisions" not in sql
     assert "CREATE ROLE" not in sql
+
+
+def test_classification_memory_separates_proposals_from_canonical_state() -> None:
+    sql = render_upgrade_sql()
+
+    assert "uq_agent_runs_idempotency" in sql
+    assert "request_sha256" in sql
+    assert "fk_proposals_agent_run_workspace" in sql
+    assert "fk_classification_proposals_class" in sql
+    assert "fk_proposal_evidence_proposal_workspace" in sql
+    assert "proposal_status" in sql
+    assert "'needs_review'" in sql
+    assert "outcome JSONB NOT NULL" in sql
 
 
 def test_offline_upgrade_enforces_workspace_and_idempotency_boundaries() -> None:
@@ -104,6 +127,14 @@ def test_offline_upgrade_contains_append_only_audit_storage_shape() -> None:
 def test_offline_downgrade_drops_tables_in_dependency_order() -> None:
     sql = render_downgrade_sql()
     expected_order = [
+        "DROP TABLE docweave.proposal_evidence",
+        "DROP TABLE docweave.classification_proposals",
+        "DROP TABLE docweave.proposals",
+        "DROP TABLE docweave.agent_runs",
+        "DROP TABLE docweave.taxonomy_classes",
+        "DROP TABLE docweave.taxonomy_versions",
+        "DROP TABLE docweave.document_versions",
+        "DROP TABLE docweave.documents",
         "DROP TABLE docweave.audit_events",
         "DROP TABLE docweave.file_operations",
         "DROP TABLE docweave.operation_batches",

@@ -1,5 +1,13 @@
 """Durable persistence boundaries for DocWeave."""
 
+from docweave.persistence.classification_repository import (
+    ClassificationEvidenceWrite,
+    ClassificationPersistenceIdentity,
+    ClassificationScores,
+    CockroachClassificationRepository,
+    PersistClassificationProposal,
+    map_bedrock_classification_run,
+)
 from docweave.persistence.contracts import (
     AuditAppend,
     BatchItemSnapshot,
@@ -49,6 +57,10 @@ __all__ = [
     "ActiveExecutionLeaseError",
     "AuditAppend",
     "BatchItemSnapshot",
+    "ClassificationEvidenceWrite",
+    "ClassificationPersistenceIdentity",
+    "ClassificationScores",
+    "CockroachClassificationRepository",
     "CockroachOperationRepository",
     "CockroachTransactionRunner",
     "CreateBatch",
@@ -60,6 +72,7 @@ __all__ = [
     "OperationExecutionIdentity",
     "OperationPersistenceRepository",
     "OperationResultMapping",
+    "PersistClassificationProposal",
     "PersistedOperationExecution",
     "PersistenceConflictError",
     "PersistenceDisposition",
@@ -75,6 +88,7 @@ __all__ = [
     "TransactionRun",
     "build_durable_operation_runtime",
     "map_audit_event",
+    "map_bedrock_classification_run",
     "map_create_batch",
     "map_execution_intent",
     "map_operation_result",
