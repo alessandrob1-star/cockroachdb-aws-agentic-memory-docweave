@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from pathlib import Path
 from typing import cast
 
 from PySide6.QtCore import (
@@ -12,7 +13,7 @@ from PySide6.QtCore import (
     Qt,
 )
 
-from docweave.intake import IntakeRecord
+from docweave.intake import IntakeRecord, IntakeStatus
 
 _INVALID_INDEX = QModelIndex()
 _SIZE_COLUMN = 3
@@ -24,22 +25,26 @@ class DocumentTableRow:
     """Minimized presentation data for one locally inspected file."""
 
     name: str
+    absolute_path: Path
     relative_path: str
     comparison_key: str
     status: str
     byte_size: int | None
     reason: str | None
+    openable: bool
 
     @classmethod
     def from_intake_record(cls, record: IntakeRecord) -> DocumentTableRow:
         """Map deterministic intake evidence without exposing file contents."""
         return cls(
             name=record.absolute_path.name,
+            absolute_path=record.absolute_path,
             relative_path=record.relative_path,
             comparison_key=record.discovered_file.comparison_key,
             status=record.status.value,
             byte_size=record.discovered_file.byte_size,
             reason=record.reason,
+            openable=record.status is IntakeStatus.READY,
         )
 
 
@@ -128,6 +133,16 @@ class DocumentTableModel(QAbstractTableModel):
         if not 0 <= row < len(self._rows):
             return None
         return self._rows[row].comparison_key
+
+    def absolute_path_at(self, row: int) -> Path | None:
+        """Return the observed local path for a validated user action."""
+        if not 0 <= row < len(self._rows):
+            return None
+        return self._rows[row].absolute_path
+
+    def is_openable_at(self, row: int) -> bool:
+        """Return whether the completed intake state permits opening."""
+        return 0 <= row < len(self._rows) and self._rows[row].openable
 
 
 def _status_label(status: str) -> str:

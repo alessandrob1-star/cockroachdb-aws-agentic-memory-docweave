@@ -1,9 +1,10 @@
 """Primary DocWeave desktop discovery window."""
 
+from collections.abc import Callable
 from pathlib import Path
 
-from PySide6.QtCore import QItemSelection, QThread, Signal, Slot
-from PySide6.QtGui import QCloseEvent, QFont
+from PySide6.QtCore import QItemSelection, QModelIndex, QThread, QUrl, Signal, Slot
+from PySide6.QtGui import QCloseEvent, QDesktopServices, QFont
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QFileDialog,
@@ -21,6 +22,7 @@ from PySide6.QtWidgets import (
 )
 
 from docweave.desktop.models import DocumentTableModel
+from docweave.desktop.opening import PdfOpenValidationError, validate_pdf_for_open
 from docweave.desktop.scan import (
     DesktopScanResult,
     ScanFunction,
@@ -34,6 +36,8 @@ from docweave.desktop.workspace import (
     WorkspacePhase,
     WorkspaceSnapshot,
 )
+
+DocumentOpener = Callable[[QUrl], bool]
 
 _WINDOW_STYLESHEET = """
 QMainWindow, QWidget#central {
@@ -83,7 +87,7 @@ QPushButton {
     font-weight: 600;
     padding: 9px 15px;
 }
-QPushButton#secondaryButton {
+QPushButton#secondaryButton, QPushButton#openPdfButton {
     background: #ffffff;
     border: 1px solid #8da0ba;
     color: #243b5a;
@@ -93,7 +97,8 @@ QPushButton#primaryButton {
     border: 1px solid #e76f51;
     color: #ffffff;
 }
-QPushButton#primaryButton:disabled, QPushButton#secondaryButton:disabled {
+QPushButton#primaryButton:disabled, QPushButton#secondaryButton:disabled,
+QPushButton#openPdfButton:disabled {
     background: #d8dee8;
     border-color: #d8dee8;
     color: #758195;
@@ -150,9 +155,11 @@ class DocWeaveMainWindow(QMainWindow):
         self,
         *,
         scan_function: ScanFunction = scan_authorized_root,
+        document_opener: DocumentOpener = QDesktopServices.openUrl,
     ) -> None:
         super().__init__()
         self._scan_function = scan_function
+        self._document_opener = document_opener
         self._scan_thread: QThread | None = None
         self._scan_worker: ScanWorker | None = None
         self._table_model = DocumentTableModel()
@@ -499,6 +506,14 @@ class DocWeaveMainWindow(QMainWindow):
         self._selection_status.setObjectName("selectionStatus")
         self._selection_status.setAccessibleName("Selected document count")
         title_row.addWidget(self._selection_status)
+        self._open_button = QPushButton("Open PDF")
+        self._open_button.setObjectName("openPdfButton")
+        self._open_button.setEnabled(False)
+        self._open_button.setAccessibleDescription(
+            "Open the selected ready PDF in the system reader"
+        )
+        self._open_button.clicked.connect(self.open_selected_document)
+        title_row.addWidget(self._open_button)
         layout.addLayout(title_row)
         layout.addWidget(subtitle)
 
@@ -523,6 +538,7 @@ class DocWeaveMainWindow(QMainWindow):
         self._table.selectionModel().selectionChanged.connect(
             self._handle_selection_changed
         )
+        self._table.doubleClicked.connect(self._handle_document_activated)
         layout.addWidget(self._table, stretch=1)
         return card
 
@@ -570,3 +586,49 @@ class DocWeaveMainWindow(QMainWindow):
     def _update_selection_status(self) -> None:
         count = len(self.workspace_snapshot.selected_document_keys)
         self._selection_status.setText(f"{count} selected")
+        selected_rows = self._table.selectionModel().selectedRows()
+        self._open_button.setEnabled(
+            len(selected_rows) == 1
+            and self._table_model.is_openable_at(selected_rows[0].row())
+        )
+
+    @Slot()
+    def open_selected_document(self) -> None:
+        """Open exactly one selected ready PDF after current-state validation."""
+        selected_rows = self._table.selectionModel().selectedRows()
+        if len(selected_rows) != 1:
+            self._set_status("Select one ready PDF to open it safely.")
+            return
+        self._open_document_row(selected_rows[0].row())
+
+    @Slot(QModelIndex)
+    def _handle_document_activated(self, index: QModelIndex) -> None:
+        self._open_document_row(index.row())
+
+    def _open_document_row(self, row: int) -> None:
+        if not self._table_model.is_openable_at(row):
+            self._set_status("Only a document with Ready status can be opened safely.")
+            return
+        path = self._table_model.absolute_path_at(row)
+        root = self.authorized_root
+        if path is None or root is None:
+            self._set_status("The document is no longer available to open safely.")
+            return
+        try:
+            validated_path = validate_pdf_for_open(path, root)
+        except PdfOpenValidationError as error:
+            self._set_status(
+                "PDF open request was blocked safely "
+                f"({error.category.value}). No files were changed."
+            )
+            return
+        accepted = self._document_opener(QUrl.fromLocalFile(str(validated_path)))
+        if accepted:
+            self._set_status(
+                "Open request sent to the system PDF reader. No files were changed."
+            )
+            return
+        self._set_status(
+            "The system PDF reader did not accept the open request. "
+            "No files were changed."
+        )

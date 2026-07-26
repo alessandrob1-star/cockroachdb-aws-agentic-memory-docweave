@@ -66,6 +66,11 @@ def test_virtualized_model_presents_intake_evidence(
     assert model.data(model.createIndex(0, 99)) is None
     assert model.comparison_key_at(large_row) == "large.pdf"
     assert model.comparison_key_at(-1) is None
+    assert model.absolute_path_at(large_row) == tmp_path / "large.pdf"
+    assert model.absolute_path_at(-1) is None
+    assert model.is_openable_at(large_row)
+    assert not model.is_openable_at(paths_and_rows["invalid.pdf"])
+    assert not model.is_openable_at(-1)
     assert (
         model.headerData(
             0,

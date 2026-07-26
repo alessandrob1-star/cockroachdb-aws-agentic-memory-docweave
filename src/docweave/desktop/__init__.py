@@ -2,6 +2,11 @@
 
 from docweave.desktop.application import create_application, main
 from docweave.desktop.main_window import DocWeaveMainWindow
+from docweave.desktop.opening import (
+    PdfOpenFailure,
+    PdfOpenValidationError,
+    validate_pdf_for_open,
+)
 from docweave.desktop.scan import (
     DesktopScanResult,
     ScanPhase,
@@ -13,6 +18,8 @@ from docweave.desktop.workspace import WorkspacePhase, WorkspaceSnapshot
 __all__ = [
     "DesktopScanResult",
     "DocWeaveMainWindow",
+    "PdfOpenFailure",
+    "PdfOpenValidationError",
     "ScanPhase",
     "ScanProgress",
     "WorkspacePhase",
@@ -20,4 +27,5 @@ __all__ = [
     "create_application",
     "main",
     "scan_authorized_root",
+    "validate_pdf_for_open",
 ]
