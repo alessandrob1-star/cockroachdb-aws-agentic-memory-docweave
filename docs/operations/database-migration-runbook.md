@@ -2,7 +2,7 @@
 
 **Project:** DocWeave
 **Status:** Initial revision validated live; online Alembic runner pending
-**Last updated:** 2026-07-24
+**Last updated:** 2026-07-26
 
 ## 1. Purpose
 
@@ -124,7 +124,7 @@ The repository does not yet prove:
 - a production or runtime-connected DocWeave schema;
 - persistent application memory;
 - runtime database roles or Row-Level Security;
-- serializable transaction retries;
+- serializable retry behavior under live CockroachDB contention;
 - live operation reconciliation;
 - Distributed Vector Indexing; or
 - competition-qualifying CockroachDB integration.
@@ -133,3 +133,7 @@ The repository does prove that the exact offline-rendered SQL for revision
 `0001_operational_foundation` was accepted and introspected in a clean,
 isolated CockroachDB Cloud validation database. See
 [`cockroachdb-live-validation.md`](cockroachdb-live-validation.md).
+
+The repository also contains a locally tested serializable transaction runner
+and CockroachDB operation repository contract. These are offline application
+evidence only and have not executed through Psycopg against the live target.
