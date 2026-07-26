@@ -39,20 +39,18 @@ human-review and promotion workflow.
 ## Confidence boundary
 
 The Bedrock classification contract intentionally emits ordinal signals rather
-than fabricated probabilities. Persistence therefore requires a caller-supplied
-`ClassificationScores` value and explicit `method_version`. The adapter never
-converts ordinal model words into numeric confidence on its own.
-
-The confidence method and calibration process remain pending. Until approved,
-the runtime requires an injected score provider and has no fallback. The
-desktop must not manufacture scores merely to write a proposal.
+than fabricated probabilities. ADR-0007 defines `confidence.raw.v0_1` as the
+deterministic pre-evaluation default and records its exact method version. The
+runtime accepts an explicitly injected later provider, but never a silent or
+model-authored numerical fallback. Calibration and thresholds remain pending.
 
 ## Runtime sequence
 
 The side-effect-free runtime builder composes one transaction runner, the
 document and taxonomy repository, and the classification repository around
-caller-supplied engine, Bedrock gateway, and score provider dependencies.
-Construction opens no connection and invokes no model.
+caller-supplied engine and Bedrock gateway dependencies. The default score
+provider is `confidence.raw.v0_1`; a replacement must be explicit and
+versioned. Construction opens no connection and invokes no model.
 
 One explicit classification request then:
 
@@ -62,7 +60,7 @@ One explicit classification request then:
 3. registers or exactly replays the logical document and verified version;
 4. installs or verifies the complete approved taxonomy with human authority;
 5. invokes Bedrock outside every database transaction;
-6. obtains versioned scores from the mandatory injected provider; and
+6. obtains versioned uncalibrated scores from the configured provider; and
 7. atomically persists the run, proposal subtype, and evidence.
 
 Document registration is durable even if later model analysis fails. That
@@ -70,7 +68,7 @@ record is verified intake state, not a fabricated classification success.
 
 ## Current limitations
 
-- No application runtime composes this repository with extraction and Bedrock.
+- The composed runtime is not wired into desktop startup or a configured engine.
 - No file-instance registration is implemented.
 - No review, canonical promotion, workflow checkpoint, or classification audit
   event is implemented in this revision.

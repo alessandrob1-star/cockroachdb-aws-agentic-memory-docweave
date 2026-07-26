@@ -31,6 +31,9 @@ from docweave.persistence.classification_repository import (
     CockroachClassificationRepository,
     map_bedrock_classification_run,
 )
+from docweave.persistence.confidence_provider import (
+    provide_uncalibrated_confidence_v0,
+)
 from docweave.persistence.contracts import PersistenceDisposition
 from docweave.persistence.memory_foundation_repository import (
     CockroachMemoryFoundationRepository,
@@ -135,7 +138,7 @@ class ClassificationRuntime:
     gateway: ClassificationGateway
     foundation_repository: CockroachMemoryFoundationRepository
     classification_repository: CockroachClassificationRepository
-    score_provider: ScoreProvider
+    score_provider: ScoreProvider = provide_uncalibrated_confidence_v0
     extractor: Extractor = extract_pdf_text
     clock: Clock = lambda: datetime.now(UTC)
 
@@ -210,13 +213,14 @@ def build_classification_runtime(
     engine: Engine,
     *,
     gateway: ClassificationGateway,
-    score_provider: ScoreProvider,
+    score_provider: ScoreProvider = provide_uncalibrated_confidence_v0,
     options: ClassificationRuntimeOptions | None = None,
 ) -> ClassificationRuntime:
     """Compose the pipeline without connecting or invoking Bedrock.
 
-    Credential resolution, actor authorization, identity allocation, and
-    selection of the confidence method remain caller responsibilities.
+    Credential resolution, actor authorization, identity allocation, and any
+    explicit replacement of the versioned default score provider remain caller
+    responsibilities.
     """
     runtime_options = options or ClassificationRuntimeOptions()
     transaction_runner = CockroachTransactionRunner(

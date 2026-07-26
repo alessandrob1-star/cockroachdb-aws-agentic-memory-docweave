@@ -17,6 +17,9 @@ from docweave.persistence.classification_runtime import (
     PersistedClassificationRun,
     build_classification_runtime,
 )
+from docweave.persistence.confidence_provider import (
+    provide_uncalibrated_confidence_v0,
+)
 from docweave.persistence.contracts import (
     AuditAppend,
     BatchItemSnapshot,
@@ -116,4 +119,5 @@ __all__ = [
     "map_create_batch",
     "map_execution_intent",
     "map_operation_result",
+    "provide_uncalibrated_confidence_v0",
 ]

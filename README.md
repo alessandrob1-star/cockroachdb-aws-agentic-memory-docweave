@@ -67,17 +67,26 @@ non-authoritative classification proposal, minimized evidence excerpts, and
 runtime provenance. Model and document values remain bound SQL parameters, and
 the schema deliberately omits canonical classifications and review decisions
 until the human-review workflow is implemented. Runtime wiring, document
-registration, taxonomy seeding, and the approved numeric confidence method
-remain pending.
+registration, taxonomy initialization, and an uncalibrated scoring boundary are
+implemented locally; configured application and live database wiring remain
+pending.
 
 The local shared core now also defines an explicit classification runtime that
 keeps extraction, database transactions, and Bedrock invocation in separate
 failure boundaries. It can register a verified PDF document version, install
 or verify the approved workspace taxonomy with recorded human authority, invoke
-the real validated Bedrock gateway, obtain scores from a required injected
-confidence provider, and persist the proposal. Runtime construction performs
-no database or model input/output. No default confidence provider, configured
-database engine, desktop wiring, or live end-to-end execution is claimed.
+the real validated Bedrock gateway, obtain scores from the versioned
+pre-evaluation method or an explicitly injected later provider, and persist the
+proposal. Runtime construction performs no database or model input/output. No
+configured database engine, desktop wiring, or live end-to-end execution is
+claimed.
+
+`confidence.raw.v0_1` now provides a deterministic pre-evaluation default for
+review ordering. It uses validated ordinal model signals, extraction coverage,
+evidence support, alternatives, contradictions, and missing expected evidence.
+It never uses filenames or model-authored percentages, leaves calibrated
+confidence null, and defines no automatic threshold. Corpus evaluation may
+replace it with a later version without rewriting historical proposals.
 
 An initial, explicitly labelled corpus of 30 synthetic two-page PDFs is
 available in `pdf_sintetici` for desktop discovery, preview, guarded-link, and
@@ -121,6 +130,7 @@ Approved architecture:
 - [Isolated PDF text-extraction decision](docs/architecture/decisions/0004-isolated-pdf-text-extraction.md)
 - [Classification v1 structured-contract decision](docs/architecture/decisions/0005-classification-v1-contract.md)
 - [Bedrock classification-gateway decision](docs/architecture/decisions/0006-bedrock-classification-gateway.md)
+- [Uncalibrated confidence v0.1 decision](docs/architecture/decisions/0007-uncalibrated-confidence-v0.md)
 - [Document-processing pipeline](docs/architecture/document-processing-pipeline.md)
 - [CockroachDB physical-schema specification](docs/architecture/cockroachdb-physical-schema.md)
 - [CockroachDB Entity Relationship model](docs/architecture/cockroachdb-entity-relationship.md)
