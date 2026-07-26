@@ -45,6 +45,10 @@ The repository currently contains a tested Python package with:
   and audit mappings;
 - optional durable lifecycle recording around filesystem execution, with
   intent-before-mutation and result-after-mutation ordering;
+- workspace-scoped loading of durable terminal results and execution claims
+  through the repository boundary;
+- restart-aware terminal replay, active-lease rejection, and expired-lease
+  reconciliation without duplicate filesystem execution;
 - fail-closed behavior that prevents mutation when intent persistence fails and
   preserves an in-progress state when result persistence fails;
 - bounded serializable transaction execution with SQLSTATE `40001` retry,
@@ -59,9 +63,9 @@ The repository currently contains a tested Python package with:
 ## 3. Current local quality evidence
 
 The latest verified local quality gate on
-`codex/cockroachdb-persistence-boundary` reported:
+`codex/durable-restart-state-loading` reported:
 
-- 195 tests passed;
+- 221 tests passed;
 - 94 percent total package coverage;
 - Ruff format check passed;
 - Ruff lint check passed;
@@ -73,9 +77,8 @@ The latest verified local quality gate on
 
 The 144-test migration baseline passed GitHub Actions on pull request 22 and
 after its merge to `main`. The Node.js 24 workflow update passed on pull request
-23 and after its merge to `main`. The 195-test durable orchestration increment
-is local evidence until a separately authorized pull request passes GitHub
-Actions.
+23 and after its merge to `main`. The 221-test restart-state increment is local
+evidence until a separately authorized pull request passes GitHub Actions.
 
 The check command is:
 
@@ -94,16 +97,16 @@ DocWeave does not yet implement or claim:
 - PySide6 desktop or cloud user interface;
 - PDF text extraction;
 - model-driven classification, naming, confidence, or relationship analysis;
-- durable idempotency in the running application;
+- live durable idempotency in the running application;
 - restore planning or restore execution;
 - durable Activity History;
 - release security scanning beyond the current Python quality gate.
 
 The batch executor remains a local primitive, but its optional lifecycle
-recorder now connects execution ordering to the durable adapter contract. No
-live runtime engine constructs that recorder, and restart bootstrap does not
-yet reload database state. The project therefore does not claim persistent
-application behavior.
+recorder and restart-aware ledger now connect execution ordering and state
+loading to the durable adapter contract. No live runtime engine constructs
+these components or loads a CockroachDB row. The project therefore does not
+claim persistent application behavior.
 
 ## 5. Contract review findings
 
@@ -119,9 +122,9 @@ must be closed before production-grade batch execution:
 
 | Gap | Impact | Required next control |
 | --- | --- | --- |
-| Runtime recorder is not constructed from durable state | Restart does not yet reload terminal or in-progress operations | Add workspace-scoped state reads and restart bootstrap |
+| Runtime components are not constructed against a live engine | The tested restart path is not yet an application integration | Add approved engine, recorder, ledger, and bootstrap wiring |
 | Audit adapter has no live runtime evidence | Activity History cannot yet survive restart | Run approved integration and restart tests against CockroachDB |
-| Lease state is not reloaded after restart | A new process cannot yet discover an interrupted durable claim | Load workspace-scoped claims and reconcile expired leases |
+| Lease renewal and execution fencing are not implemented | A worker that outlives its lease is not yet safe for concurrent production execution | Add renewal or fencing before enabling multiple workers |
 | No restore contract | Move and copy outcomes are not yet reversible through tested restore semantics | Add restore planning after batch result and audit semantics |
 | No workspace/user authorization model | Approval uses user identifiers but no role policy yet | Add authorization contract before user interface or cloud execution |
 
@@ -142,9 +145,10 @@ contention, or recovery.
 
 ## 7. Readiness for CockroachDB, AWS, and UI
 
-The next CockroachDB application step is workspace-scoped loading of durable
-terminal and in-progress execution state, followed by restart reconciliation.
-Live execution remains behind separate approval and a current cost preflight.
+The next CockroachDB application step is approved runtime engine construction
+and a controlled restart integration test using the implemented
+workspace-scoped loader. Live execution remains behind separate approval and a
+current cost preflight.
 
 The PySide6 desktop preview interface is no longer blocked by a missing batch
 model. Its first implementation should still wait for an approved surface

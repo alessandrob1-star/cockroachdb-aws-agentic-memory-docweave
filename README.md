@@ -22,12 +22,14 @@ persistence adapter now defines atomic batch, execution-intent, terminal-result,
 and hash-chained audit writes with bounded serializable retry behavior. An
 optional lifecycle recorder now orders durable intent before filesystem
 mutation and durable results after mutation, failing closed at both
-boundaries. The first non-vector CockroachDB migration is validated offline and
-against a clean, isolated live validation database. No runtime engine connects
-the recorder to that schema, and restart state loading is pending, so durable
-application persistence is not yet claimed. No runtime database integration,
-restore, AWS workload, user interface, or intelligent document analysis is
-claimed yet.
+boundaries. A restart-aware ledger can now load one workspace-scoped terminal
+result or execution claim, replay completed work, reject active leases, and
+route expired claims through filesystem reconciliation. The first non-vector
+CockroachDB migration is validated offline and against a clean, isolated live
+validation database. No runtime engine connects these boundaries to that
+schema, so durable application persistence is not yet claimed. No runtime
+database integration, restore, AWS workload, user interface, or intelligent
+document analysis is claimed yet.
 
 The current approved product direction includes:
 

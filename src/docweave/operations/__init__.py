@@ -53,6 +53,7 @@ from docweave.operations.planning import (
     plan_file_operation,
 )
 from docweave.operations.results import (
+    ExecutionLedger,
     InMemoryExecutionLedger,
     OperationResultRecord,
     ResultDisposition,
@@ -77,6 +78,7 @@ __all__ = [
     "BatchItemState",
     "BatchState",
     "BatchSummary",
+    "ExecutionLedger",
     "ExecutionReason",
     "ExecutionResult",
     "ExecutionStatus",

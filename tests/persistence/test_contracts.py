@@ -1,3 +1,4 @@
+from collections.abc import Callable
 from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 from uuid import UUID
@@ -17,6 +18,8 @@ from docweave.persistence import (
     AuditAppend,
     BatchItemSnapshot,
     CreateBatch,
+    OperationExecutionIdentity,
+    PersistedOperationExecution,
     RecordExecutionIntent,
     RecordOperationResult,
 )
@@ -239,3 +242,98 @@ def test_verification_failure_requires_matching_event_type() -> None:
             error_category="verification_failed",
             audit_event=audit_event(AuditEventType.ITEM_EXECUTION_FAILED),
         )
+
+
+def persisted_success() -> PersistedOperationExecution:
+    return PersistedOperationExecution(
+        identity=OperationExecutionIdentity(
+            workspace_id=WORKSPACE_ID,
+            operation_batch_id=BATCH_ID,
+            file_operation_id=OPERATION_ID,
+        ),
+        state=BatchItemState.SUCCEEDED,
+        idempotency_key="execute-item-001",
+        execution_id="batch-001:item-001",
+        approval_id="approval-001",
+        lease_expires_at_utc=None,
+        intent_recorded_at_utc=NOW,
+        started_at_utc=NOW,
+        completed_at_utc=NOW + timedelta(seconds=1),
+        result_disposition=ResultDisposition.EXECUTED,
+        expected_source_sha256=DIGEST,
+        actual_sha256=DIGEST,
+        actual_size=42,
+        source_exists_after=True,
+        destination_exists_after=True,
+        safe_error_summary=ExecutionReason.SUCCEEDED.value,
+        error_category=None,
+    )
+
+
+def test_accepts_complete_persisted_terminal_execution() -> None:
+    execution = persisted_success()
+
+    assert execution.completed_at_utc == NOW + timedelta(seconds=1)
+    assert execution.actual_sha256 == DIGEST
+
+
+def test_executing_persisted_state_requires_complete_claim() -> None:
+    with pytest.raises(ValueError, match="claim evidence"):
+        replace(
+            persisted_success(),
+            state=BatchItemState.EXECUTING,
+            lease_expires_at_utc=None,
+            completed_at_utc=None,
+            result_disposition=None,
+            actual_sha256=None,
+            actual_size=None,
+            source_exists_after=None,
+            destination_exists_after=None,
+            safe_error_summary=None,
+        )
+
+
+def _without_execution_key(
+    execution: PersistedOperationExecution,
+) -> PersistedOperationExecution:
+    return replace(execution, idempotency_key=None)
+
+
+def _with_negative_size(
+    execution: PersistedOperationExecution,
+) -> PersistedOperationExecution:
+    return replace(execution, actual_size=-1)
+
+
+def _without_actual_digest(
+    execution: PersistedOperationExecution,
+) -> PersistedOperationExecution:
+    return replace(execution, actual_sha256=None)
+
+
+def _without_destination(
+    execution: PersistedOperationExecution,
+) -> PersistedOperationExecution:
+    return replace(execution, destination_exists_after=False)
+
+
+@pytest.mark.parametrize(
+    ("mutate", "message"),
+    [
+        (_without_execution_key, "result evidence"),
+        (_with_negative_size, "must not be negative"),
+        (_without_actual_digest, "destination evidence"),
+        (_without_destination, "destination evidence"),
+    ],
+)
+def test_rejects_incomplete_persisted_terminal_evidence(
+    mutate: Callable[[PersistedOperationExecution], PersistedOperationExecution],
+    message: str,
+) -> None:
+    with pytest.raises(ValueError, match=message):
+        mutate(persisted_success())
+
+
+def test_rejects_invalid_persisted_digest_length() -> None:
+    with pytest.raises(ValueError, match="32-byte"):
+        replace(persisted_success(), expected_source_sha256=b"short")

@@ -1,7 +1,8 @@
 # CockroachDB Operation Persistence Boundary
 
 **Project:** DocWeave
-**Status:** Local adapter and contract tests implemented; live runtime pending
+**Status:** Local adapter, restart loading, and contract tests implemented;
+live runtime pending
 **Date:** 2026-07-26
 
 ## 1. Purpose
@@ -102,7 +103,34 @@ pass through the durable recorder. The default recorder remains optional so
 existing local-only tests and development do not silently imply database
 persistence.
 
-## 6. Workspace isolation
+## 6. Restart state loading
+
+The restart-aware execution ledger loads at most one operation row for each
+derived execution key. The read includes `workspace_id`, `operation_batch_id`,
+and `file_operation_id`; an unknown key cannot trigger an arbitrary database
+lookup. Loaded claim identity, approval identity, source digest, state, and
+result evidence are validated before use.
+
+The executor treats loaded state as follows:
+
+1. a validated terminal result is returned as an idempotent replay without
+   invoking the filesystem executor;
+2. an executing claim whose lease is still active raises a bounded
+   `ActiveExecutionLeaseError` before filesystem inspection or mutation;
+3. an executing claim whose lease has expired enters the existing filesystem
+   reconciliation path; and
+4. absent or non-executing state continues through current-source validation
+   and normal durable intent recording.
+
+The first result and in-progress checks share the same scoped read. Invalid,
+incomplete, or mismatched persisted content fails closed instead of being
+coerced into a successful result.
+
+Lease expiry permits reconciliation but is not a claim that long-running
+execution fencing or lease renewal is implemented. Those controls remain
+required before concurrent production workers are enabled.
+
+## 7. Workspace isolation
 
 Every batch, operation, and audit lookup or mutation includes `workspace_id`.
 Operation identity queries also include the owning batch and operation
@@ -112,7 +140,7 @@ batch events may reference only operations contained in that batch.
 These query contracts provide defense in depth but do not replace the pending
 runtime role and Row-Level Security design.
 
-## 7. Current verification
+## 8. Current verification
 
 Local tests cover:
 
@@ -130,23 +158,27 @@ Local tests cover:
 - intent-persistence failure prevents filesystem mutation;
 - result-persistence failure preserves an in-progress reconciliation state;
 - successful mutation follows the exact intent, filesystem, result order; and
-- missing post-mutation destination evidence fails closed.
+- missing post-mutation destination evidence fails closed;
+- terminal durable results replay without invoking filesystem execution;
+- active durable leases block a second process before mutation;
+- expired durable leases reconcile verified postconditions;
+- persisted identity or evidence mismatches fail closed; and
+- result and in-progress checks reuse one workspace-scoped read.
 
 The tests use controlled local doubles and SQLite only for transaction rollback
 semantics. They do not claim that the application adapter has executed against
 CockroachDB.
 
-## 8. Remaining work and non-claims
+## 9. Remaining work and non-claims
 
 The following remain pending:
 
 - runtime engine construction and approved secret delivery;
-- runtime construction of the lifecycle recorder around the application
-  workflow;
-- loading durable terminal and in-progress execution state after restart;
+- runtime construction of the lifecycle recorder and restart-aware ledger
+  around the application workflow;
 - live Psycopg execution and contention tests against an approved target;
 - runtime identities, authorization, and Row-Level Security;
-- restart and lease-expiry reconciliation against CockroachDB;
+- restart, lease expiry, renewal, and fencing evidence against CockroachDB;
 - restore persistence and execution;
 - production telemetry and Activity History queries; and
 - any claim of persistent application memory or competition integration.

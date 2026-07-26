@@ -24,6 +24,7 @@ from docweave.persistence import (
     BatchItemSnapshot,
     CockroachOperationRepository,
     CreateBatch,
+    OperationExecutionIdentity,
     PersistenceConflictError,
     PersistenceDisposition,
     PersistenceNotFoundError,
@@ -518,3 +519,82 @@ def test_verification_failure_marks_reconciliation_required() -> None:
     )
     assert result_parameters["reconciliation_state"] == "required"
     assert result_parameters["verification_failed_increment"] == 1
+
+
+def execution_identity() -> OperationExecutionIdentity:
+    return OperationExecutionIdentity(
+        workspace_id=WORKSPACE_ID,
+        operation_batch_id=BATCH_ID,
+        file_operation_id=OPERATION_ID,
+    )
+
+
+def persisted_execution_row(**overrides: object) -> dict[str, object]:
+    row: dict[str, object] = {
+        "state": "succeeded",
+        "idempotency_key": "execute-item-001",
+        "execution_id": "execution-001",
+        "approval_id": "approval-001",
+        "lease_expires_at": None,
+        "intent_recorded_at": NOW,
+        "started_at": NOW,
+        "completed_at": NOW + timedelta(seconds=2),
+        "result_disposition": "executed",
+        "expected_source_sha256": DIGEST,
+        "actual_sha256": DIGEST,
+        "actual_size": 42,
+        "source_exists_after": True,
+        "destination_exists_after": True,
+        "safe_error_summary": "succeeded",
+        "error_category": None,
+    }
+    row.update(overrides)
+    return row
+
+
+def test_loads_workspace_scoped_operation_execution_state() -> None:
+    adapter, transaction_runner = repository(
+        [FakeResult(mapping=persisted_execution_row())]
+    )
+
+    loaded = adapter.load_operation_execution(execution_identity())
+
+    assert loaded is not None
+    assert loaded.state is BatchItemState.SUCCEEDED
+    assert loaded.result_disposition is ResultDisposition.EXECUTED
+    assert loaded.actual_sha256 == DIGEST
+    query, raw_parameters = transaction_runner.connection.calls[0]
+    parameters = cast(Mapping[str, object], raw_parameters)
+    assert "workspace_id = :workspace_id" in query
+    assert "operation_batch_id = :operation_batch_id" in query
+    assert "file_operation_id = :file_operation_id" in query
+    assert parameters == {
+        "workspace_id": WORKSPACE_ID,
+        "operation_batch_id": BATCH_ID,
+        "file_operation_id": OPERATION_ID,
+    }
+
+
+def test_missing_operation_execution_returns_none() -> None:
+    adapter, transaction_runner = repository([FakeResult(mapping=None)])
+
+    assert adapter.load_operation_execution(execution_identity()) is None
+    assert transaction_runner.run_count == 1
+
+
+def test_invalid_persisted_operation_state_fails_closed() -> None:
+    adapter, _ = repository(
+        [FakeResult(mapping=persisted_execution_row(state="unknown"))]
+    )
+
+    with pytest.raises(PersistenceConflictError, match="state is invalid"):
+        adapter.load_operation_execution(execution_identity())
+
+
+def test_incomplete_persisted_success_fails_closed() -> None:
+    adapter, _ = repository(
+        [FakeResult(mapping=persisted_execution_row(actual_sha256=None))]
+    )
+
+    with pytest.raises(PersistenceConflictError, match="state is invalid"):
+        adapter.load_operation_execution(execution_identity())
