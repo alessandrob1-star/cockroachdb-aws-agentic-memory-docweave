@@ -1,9 +1,10 @@
 # ADR-0001: Amazon Bedrock Primary Model
 
 **Status:** Accepted
-**Decision date:** 2026-07-22
+**Decision date:** 2026-07-22; revised 2026-07-26
 **Decision owner:** Project owner
-**Implementation status:** In progress; gateway implemented, live invocation pending
+**Implementation status:** In progress; temporary model validated on one
+bounded integration target
 
 ## Context
 
@@ -20,18 +21,19 @@ model invocation.
 
 ## Decision
 
-DocWeave will use **Anthropic Claude Sonnet 4.6** as its primary MVP model
-through Amazon Bedrock.
+DocWeave will temporarily use **Amazon Nova 2 Lite** as its primary MVP model
+through Amazon Bedrock. This is a reversible pre-development selection, not a
+claim that Nova 2 Lite is the final production model.
 
 | Setting | Approved value |
 | --- | --- |
-| Provider | Anthropic |
-| Model | Claude Sonnet 4.6 |
-| Base model identifier | `anthropic.claude-sonnet-4-6` |
-| Geographic inference profile | `eu.anthropic.claude-sonnet-4-6` |
+| Provider | Amazon |
+| Model | Nova 2 Lite |
+| Base model identifier | `amazon.nova-2-lite-v1:0` |
+| Geographic inference profile | `eu.amazon.nova-2-lite-v1:0` |
 | AWS source region | `eu-central-1` |
 | Runtime interface | Amazon Bedrock Runtime Converse API |
-| Output contract | Bedrock structured output constrained by a versioned JSON Schema |
+| Output contract | Forced side-effect-free tool input constrained by a versioned JSON Schema |
 | Commercial mode | On-demand inference |
 
 The European geographic inference profile is selected so Bedrock may route
@@ -43,24 +45,48 @@ Every request will set an explicit maximum output-token value. Limits will be
 defined per agent contract rather than allowing a model maximum to become the
 application default.
 
-## Why this model
+## Why this temporary model
 
-Claude Sonnet 4.6 provides the balance required for the MVP:
+Nova 2 Lite provides the strongest currently usable AWS-native baseline found
+for the Free account plan:
 
-- strong document reasoning and agent planning;
+- reasoning support for document processing and business automation;
 - text and image input support;
-- a large context window for substantial documents and grounded context;
+- a one-million-token context window for substantial documents and grounded
+  context;
 - response streaming for interactive user experiences;
 - prompt caching support for reusable taxonomy and policy context; and
-- native structured outputs through Bedrock Runtime, reducing malformed
-  classification records and avoidable retries.
+- constrained tool input through Bedrock Runtime, reducing malformed
+  classification records without exposing an action-capable tool.
 
-Structured output is especially important because DocWeave must persist typed
+The project owner first revised the initial Sonnet 4.6 selection to Opus 4.6
+after a bounded Sonnet slice produced no accepted classification. A bounded
+Opus request reached the model, but later requests could not proceed because
+the required commercial agreement was not active under the current account
+plan. The owner explicitly prohibited upgrading the account plan at this
+stage. Nova 2 Lite was therefore selected as a disclosed temporary model after
+AWS reported its agreement, authorization, entitlement, European profile, and
+regional availability as active. It is not a silent fallback.
+
+Structured model output is especially important because DocWeave must persist typed
 classification, evidence, confidence signals, alternatives, and provenance.
 Free-form text is not an acceptable authoritative interface between an LLM and
 CockroachDB.
 
 ## Alternatives considered
+
+### Claude Sonnet 4.6
+
+Sonnet 4.6 remains a lower-cost alternative. The first bounded live slice
+produced no accepted result, so it is not the primary model. It may be
+re-evaluated later only through an explicit benchmark.
+
+### Claude Opus 4.6
+
+Opus 4.6 remains the preferred quality candidate for a later controlled
+benchmark. It is not currently usable because its commercial model agreement
+is unavailable under the approved account plan. DocWeave will not activate a
+paid account plan or silently route to a global profile to obtain access.
 
 ### Claude Sonnet 5
 
@@ -79,10 +105,10 @@ classification path.
 
 ### Amazon Nova 2 Lite
 
-Nova 2 Lite is a cost-efficient multimodal document-processing model. It was
-not selected as the primary because the approved design prioritizes reasoning
-quality and a reliable structured classification contract. It remains an
-evaluation candidate rather than a hidden fallback.
+Nova 2 Lite is the temporary selected model. AWS recommends it as the migration
+target from Nova Pro 1 for reasoning and document-processing workloads. Its
+quality still requires DocWeave-specific evaluation and must not be inferred
+from vendor claims.
 
 ## Consequences
 
@@ -92,13 +118,12 @@ evaluation candidate rather than a hidden fallback.
 - The Converse API provides a consistent Bedrock integration boundary.
 - European geographic routing improves capacity without choosing global data
   routing.
-- Structured output supports deterministic validation before persistence.
+- Constrained tool input supports deterministic validation before persistence.
 
 ### Costs and limitations
 
 - Usage is billed by input and output tokens.
-- Anthropic may require completion of its one-time model-use questionnaire
-  before the first invocation.
+- The temporary model may not match Claude Opus quality on DocWeave tasks.
 - Large document contexts can increase cost and latency, so extraction,
   chunking, caching, and token budgets still require explicit design.
 - Model output remains untrusted until schema, evidence, policy, and
@@ -117,11 +142,12 @@ evaluation candidate rather than a hidden fallback.
    CockroachDB state.
 7. Record the exact model and inference-profile identifiers with every result.
 
-Items 1 through 3 now have local evidence: the European inference profile was
-reported active on 2026-07-26 without invocation, `classification.v1` is
-implemented, and ADR-0006 provides the pinned gateway and provenance boundary.
-Items 4 through 7 still require a separately approved live synthetic
-evaluation and durable persistence evidence.
+Items 1 through 3 now have local evidence: the Nova 2 Lite European inference
+profile and account access were reported available on 2026-07-26 without
+invocation, `classification.v1` is implemented, and ADR-0006 provides the
+pinned gateway and provenance boundary. Items 4 through 7 still require a
+separately approved live synthetic evaluation and durable persistence
+evidence.
 
 ## Out of scope
 

@@ -17,6 +17,7 @@ from docweave.analysis.contracts import (
     RawClassificationSignals,
     SignalStrength,
 )
+from docweave.analysis.evidence import build_evidence_segments
 from docweave.analysis.taxonomy import TAXONOMY_VERSION, TaxonomyClass
 from docweave.extraction import ExtractedPage
 
@@ -206,24 +207,27 @@ def _decode_evidence(
     pages: tuple[ExtractedPage, ...],
 ) -> tuple[EvidenceReference, ...]:
     items = _object_list(value, _MAXIMUM_EVIDENCE)
-    page_text = {page.page_index: page.text for page in pages}
+    try:
+        segments = {
+            segment.segment_id: segment for segment in build_evidence_segments(pages)
+        }
+    except ValueError as error:
+        raise ClassificationValidationError(
+            ClassificationValidationCode.EVIDENCE_INVALID
+        ) from error
     evidence: list[EvidenceReference] = []
     seen_ids: set[str] = set()
     for item in items:
-        _exact_keys(item, {"evidence_id", "page_index", "quote", "supports"})
+        _exact_keys(item, {"evidence_id", "segment_id", "supports"})
         evidence_id = _bounded_string(item["evidence_id"])
-        page_index = item["page_index"]
-        quote = _nonblank_string(
-            item["quote"],
-            maximum_characters=_MAXIMUM_QUOTE_CHARACTERS,
-        )
+        segment_id = _bounded_string(item["segment_id"])
+        segment = segments.get(segment_id)
         supports = _string_list(item["supports"], maximum_items=4)
         if (
             _EVIDENCE_ID.fullmatch(evidence_id) is None
             or evidence_id in seen_ids
-            or type(page_index) is not int
-            or page_index not in page_text
-            or quote not in page_text[page_index]
+            or segment is None
+            or len(segment.text) > _MAXIMUM_QUOTE_CHARACTERS
             or not supports
             or not set(supports).issubset(_SUPPORTED_EVIDENCE_ROLES)
         ):
@@ -234,8 +238,8 @@ def _decode_evidence(
         evidence.append(
             EvidenceReference(
                 evidence_id=evidence_id,
-                page_index=page_index,
-                quote=quote,
+                page_index=segment.page_index,
+                quote=segment.text,
                 supports=supports,
             )
         )

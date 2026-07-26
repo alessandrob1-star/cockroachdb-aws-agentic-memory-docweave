@@ -36,8 +36,10 @@ from docweave.analysis.request import (
     classification_v1_converse_fields,
 )
 from docweave.analysis.schema import (
+    CLASSIFICATION_TOOL_NAME,
     classification_v1_json_schema,
     classification_v1_output_config,
+    classification_v1_tool_config,
 )
 from docweave.analysis.taxonomy import TAXONOMY_VERSION, TaxonomyClass
 from docweave.analysis.validation import (
@@ -55,6 +57,7 @@ __all__ = [
     "BEDROCK_TOTAL_MAX_ATTEMPTS",
     "CLASSIFICATION_CONTRACT_VERSION",
     "CLASSIFICATION_MAXIMUM_OUTPUT_TOKENS",
+    "CLASSIFICATION_TOOL_NAME",
     "MAXIMUM_CLASSIFICATION_INPUT_CHARACTERS",
     "MAXIMUM_CLASSIFICATION_INPUT_PAGES",
     "MAXIMUM_RESPONSE_BYTES",
@@ -83,6 +86,7 @@ __all__ = [
     "classification_v1_converse_fields",
     "classification_v1_json_schema",
     "classification_v1_output_config",
+    "classification_v1_tool_config",
     "create_bedrock_runtime_client",
     "decode_classification_v1",
 ]

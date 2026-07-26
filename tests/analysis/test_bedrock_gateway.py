@@ -25,6 +25,7 @@ from docweave.analysis import (
     BedrockGatewayErrorCode,
     BedrockTokenPricing,
     BedrockUsage,
+    ClassificationValidationCode,
     TaxonomyClass,
     create_bedrock_runtime_client,
 )
@@ -39,7 +40,7 @@ PAGES = (
 )
 
 
-def _proposal_json(*, quote: str = "INVOICE INV-17") -> str:
+def _proposal_json(*, segment_id: str = "p0_s1") -> str:
     return json.dumps(
         {
             "contract_version": "classification.v1",
@@ -51,8 +52,7 @@ def _proposal_json(*, quote: str = "INVOICE INV-17") -> str:
             "evidence": [
                 {
                     "evidence_id": "ev_1",
-                    "page_index": 0,
-                    "quote": quote,
+                    "segment_id": segment_id,
                     "supports": ["classification"],
                 }
             ],
@@ -73,14 +73,23 @@ def _proposal_json(*, quote: str = "INVOICE INV-17") -> str:
 def _response(
     *,
     text: str | None = None,
-    stop_reason: str = "end_turn",
+    stop_reason: str = "tool_use",
 ) -> dict[str, Any]:
+    tool_input = json.loads(text or _proposal_json())
     return {
         "stopReason": stop_reason,
         "output": {
             "message": {
                 "role": "assistant",
-                "content": [{"text": text or _proposal_json()}],
+                "content": [
+                    {
+                        "toolUse": {
+                            "toolUseId": "tool-123",
+                            "name": "emit_classification",
+                            "input": tool_input,
+                        }
+                    }
+                ],
             }
         },
         "usage": {
@@ -151,7 +160,9 @@ def test_client_factory_uses_approved_region_retries_and_timeouts() -> None:
     "kwargs",
     [
         {"region_name": "us-east-1"},
-        {"model_id": "global.anthropic.claude-sonnet-4-6"},
+        {"model_id": "eu.anthropic.claude-sonnet-4-6"},
+        {"model_id": "global.anthropic.claude-opus-4-6-v1"},
+        {"model_id": "global.amazon.nova-2-lite-v1:0"},
         {"connect_timeout_seconds": 0},
         {"read_timeout_seconds": 0},
         {"total_max_attempts": 0},
@@ -184,11 +195,13 @@ def test_gateway_returns_validated_proposal_and_observed_provenance() -> None:
     request = client.calls[0]
     assert request["modelId"] == APPROVED_BEDROCK_MODEL_ID
     assert request["inferenceConfig"]["maxTokens"] == 4_096
-    assert request["outputConfig"]["textFormat"]["type"] == "json_schema"
-    assert "toolConfig" not in request
+    assert "outputConfig" not in request
+    assert request["toolConfig"]["toolChoice"] == {
+        "tool": {"name": "emit_classification"}
+    }
     assert result.provenance.region_name == APPROVED_BEDROCK_REGION
     assert result.provenance.model_id == APPROVED_BEDROCK_MODEL_ID
-    assert result.provenance.stop_reason == "end_turn"
+    assert result.provenance.stop_reason == "tool_use"
     assert result.provenance.usage == BedrockUsage(500, 200, 700)
     assert result.provenance.service_latency_ms == 321
     assert result.provenance.observed_duration_ms == 123
@@ -228,7 +241,7 @@ def test_pricing_rejects_negative_values_and_estimates_uncached_usage() -> None:
         ("guardrail_intervened", BedrockGatewayErrorCode.GUARDRAIL_INTERVENED),
         ("content_filtered", BedrockGatewayErrorCode.CONTENT_FILTERED),
         ("malformed_model_output", BedrockGatewayErrorCode.INVALID_MODEL_OUTPUT),
-        ("tool_use", BedrockGatewayErrorCode.UNEXPECTED_STOP_REASON),
+        ("end_turn", BedrockGatewayErrorCode.UNEXPECTED_STOP_REASON),
     ],
 )
 def test_gateway_rejects_nonterminal_or_filtered_stop_reasons(
@@ -249,7 +262,6 @@ def test_gateway_rejects_nonterminal_or_filtered_stop_reasons(
     "response",
     [
         {},
-        {"stopReason": "end_turn"},
         {
             **_response(),
             "output": {
@@ -285,13 +297,17 @@ def test_gateway_rejects_malformed_response_shapes(
 
 
 def test_gateway_rejects_model_output_with_fabricated_evidence() -> None:
-    response = _response(text=_proposal_json(quote="Fabricated invoice evidence"))
+    response = _response(text=_proposal_json(segment_id="p0_s999"))
     gateway = BedrockClassificationGateway(FakeConverseClient(response=response))
 
     with pytest.raises(BedrockGatewayError) as captured:
         gateway.classify(PAGES)
 
     assert captured.value.code is BedrockGatewayErrorCode.INVALID_MODEL_OUTPUT
+    assert (
+        captured.value.validation_code is ClassificationValidationCode.EVIDENCE_INVALID
+    )
+    assert captured.value.service_error_code is None
     assert "Fabricated" not in str(captured.value)
 
 
@@ -342,6 +358,11 @@ def test_gateway_maps_aws_errors_without_exposing_messages(
         gateway.classify(PAGES)
 
     assert captured.value.code is expected
+    if aws_code == "UnknownException":
+        assert captured.value.service_error_code is None
+    else:
+        assert captured.value.service_error_code == aws_code
+    assert captured.value.validation_code is None
     assert "private" not in str(captured.value)
     assert len(captured.value.args) == 1
 

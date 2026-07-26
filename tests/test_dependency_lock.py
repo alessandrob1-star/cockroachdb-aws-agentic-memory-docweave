@@ -5,6 +5,7 @@ from pathlib import Path
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
 
 EXPECTED_RUNTIME_REQUIREMENTS = {
+    "awscrt==0.36.0",
     "boto3==1.43.56",
     "psycopg[binary]==3.3.4",
     "PySide6==6.11.1",
@@ -13,6 +14,7 @@ EXPECTED_RUNTIME_REQUIREMENTS = {
 }
 EXPECTED_INSTALLED_VERSIONS = {
     "alembic": "1.18.5",
+    "awscrt": "0.36.0",
     "boto3": "1.43.56",
     "botocore": "1.43.56",
     "jmespath": "1.1.0",
@@ -63,6 +65,7 @@ def test_resolved_lock_contains_every_direct_dependency() -> None:
     assert "alembic==1.18.5" in locked_requirements
     assert "boto3==1.43.56" in locked_requirements
     assert "botocore==1.43.56" in locked_requirements
+    assert "awscrt==0.36.0" in locked_requirements
     assert all("==" in requirement for requirement in locked_requirements)
 
 

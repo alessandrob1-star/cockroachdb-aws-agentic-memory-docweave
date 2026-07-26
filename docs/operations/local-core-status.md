@@ -35,7 +35,7 @@ The repository currently contains a tested Python package with:
   text-free, and worker-failure extraction states;
 - bounded `classification.v1` Converse request fields with document text
   explicitly separated as untrusted data;
-- a closed structured-output schema tied to the approved taxonomy baseline;
+- a closed forced-emission schema tied to the approved taxonomy baseline;
 - typed non-authoritative classification proposals with exact page-evidence
   validation, abstention, alternatives, contradictions, and ordinal raw
   signals;
@@ -90,9 +90,9 @@ The repository currently contains a tested Python package with:
 ## 3. Current local quality evidence
 
 The latest verified local quality gate on
-`codex/bedrock-classification-gateway` reported:
+`codex/bedrock-live-evaluation` reported:
 
-- 398 tests passed;
+- 401 tests passed;
 - 93 percent total package coverage;
 - Ruff format check passed;
 - Ruff lint check passed;
@@ -104,7 +104,7 @@ The latest verified local quality gate on
 
 The first complete local run ended during an existing native Qt desktop test
 on local Python 3.14.5. Subsequent complete reruns passed, most recently with
-all 398 tests and
+all 401 tests and
 quality gates. The merged `main` baseline passed GitHub Actions through pull
 request 36. The Bedrock gateway increment remains local evidence until this
 separately authorized pull request passes GitHub Actions. GitHub Actions uses
@@ -123,9 +123,9 @@ DocWeave does not yet implement or claim:
 - an application connection to CockroachDB or a production schema;
 - persistent operational, semantic, episodic, preference, or audit memory;
 - AWS infrastructure or deployed DocWeave workloads;
-- Amazon Bedrock invocation inside the product;
+- Amazon Bedrock invocation inside the product bootstrap;
 - a complete PySide6 desktop workflow or any cloud user interface;
-- observed model-driven classification, naming, confidence, or relationship
+- corpus-level model quality, naming, calibrated confidence, or relationship
   analysis;
 - live durable idempotency in the running application;
 - restore planning or restore execution;

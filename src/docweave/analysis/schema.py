@@ -16,6 +16,7 @@ _EVIDENCE_SUPPORTS = [
     "language",
     "contradiction",
 ]
+_EVIDENCE_IDS = [f"ev_{index}" for index in range(1, 51)]
 
 _CLASSIFICATION_V1_JSON_SCHEMA: dict[str, Any] = {
     "type": "object",
@@ -30,23 +31,34 @@ _CLASSIFICATION_V1_JSON_SCHEMA: dict[str, Any] = {
         "rationale": {"type": "string"},
         "rationale_evidence_ids": {
             "type": "array",
-            "items": {"type": "string"},
+            "description": (
+                "One or more ev_N identifiers declared in evidence. Never use "
+                "segment identifiers here."
+            ),
+            "items": {"type": "string", "enum": _EVIDENCE_IDS},
+            "minItems": 1,
         },
         "evidence": {
             "type": "array",
             "items": {
                 "type": "object",
                 "properties": {
-                    "evidence_id": {"type": "string"},
-                    "page_index": {"type": "integer"},
-                    "quote": {"type": "string"},
+                    "evidence_id": {
+                        "type": "string",
+                        "enum": _EVIDENCE_IDS,
+                        "description": ("Sequential identifier ev_1, ev_2, and so on."),
+                    },
+                    "segment_id": {
+                        "type": "string",
+                        "description": "Exact supplied evidence segment identifier.",
+                    },
                     "supports": {
                         "type": "array",
                         "items": {"type": "string", "enum": _EVIDENCE_SUPPORTS},
                         "minItems": 1,
                     },
                 },
-                "required": ["evidence_id", "page_index", "quote", "supports"],
+                "required": ["evidence_id", "segment_id", "supports"],
                 "additionalProperties": False,
             },
         },
@@ -59,7 +71,10 @@ _CLASSIFICATION_V1_JSON_SCHEMA: dict[str, Any] = {
                     "value": {"type": "string"},
                     "evidence_ids": {
                         "type": "array",
-                        "items": {"type": "string"},
+                        "description": (
+                            "ev_N identifiers declared in evidence, never segment IDs."
+                        ),
+                        "items": {"type": "string", "enum": _EVIDENCE_IDS},
                     },
                 },
                 "required": ["name", "value", "evidence_ids"],
@@ -75,7 +90,10 @@ _CLASSIFICATION_V1_JSON_SCHEMA: dict[str, Any] = {
                     "reason": {"type": "string"},
                     "evidence_ids": {
                         "type": "array",
-                        "items": {"type": "string"},
+                        "description": (
+                            "ev_N identifiers declared in evidence, never segment IDs."
+                        ),
+                        "items": {"type": "string", "enum": _EVIDENCE_IDS},
                     },
                 },
                 "required": ["class_code", "reason", "evidence_ids"],
@@ -90,7 +108,11 @@ _CLASSIFICATION_V1_JSON_SCHEMA: dict[str, Any] = {
                     "description": {"type": "string"},
                     "evidence_ids": {
                         "type": "array",
-                        "items": {"type": "string"},
+                        "description": (
+                            "ev_N identifiers declared in evidence, never segment IDs."
+                        ),
+                        "items": {"type": "string", "enum": _EVIDENCE_IDS},
+                        "minItems": 1,
                     },
                 },
                 "required": ["description", "evidence_ids"],
@@ -154,6 +176,7 @@ _CLASSIFICATION_V1_SCHEMA_JSON = json.dumps(
     separators=(",", ":"),
     sort_keys=True,
 )
+CLASSIFICATION_TOOL_NAME = "emit_classification"
 
 
 def classification_v1_json_schema() -> dict[str, Any]:
@@ -177,4 +200,23 @@ def classification_v1_output_config() -> dict[str, Any]:
                 }
             },
         }
+    }
+
+
+def classification_v1_tool_config() -> dict[str, Any]:
+    """Build a forced, side-effect-free classification emission tool."""
+    return {
+        "tools": [
+            {
+                "toolSpec": {
+                    "name": CLASSIFICATION_TOOL_NAME,
+                    "description": (
+                        "Emit one evidence-backed DocWeave classification proposal. "
+                        "This tool performs no action."
+                    ),
+                    "inputSchema": {"json": classification_v1_json_schema()},
+                }
+            }
+        ],
+        "toolChoice": {"tool": {"name": CLASSIFICATION_TOOL_NAME}},
     }

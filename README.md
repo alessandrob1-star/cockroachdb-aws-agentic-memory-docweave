@@ -49,15 +49,17 @@ changed, and text-free documents receive explicit states. This is parser
 failure isolation, not a malware scanner or operating-system sandbox. Extracted
 text is not yet sent to Bedrock or persisted in CockroachDB.
 
-The `classification.v1` boundary now builds bounded Converse request fields and
-validates structured classification proposals against exact page quotations,
+The `classification.v1` boundary now builds bounded Converse request fields,
+uses a forced side-effect-free emission envelope, and validates classification
+proposals against deterministic evidence segments and exact local quotations,
 the approved taxonomy version, closed object shapes, and cross-reference
 rules. A pinned boto3 Bedrock Runtime gateway can submit that contract through
 an injected client and record observed tokens, latency, retries, stop reason,
 request identity, and an optional externally priced cost estimate. It is not
-wired into application startup and no model invocation has been performed.
-Consequently, real classification quality and live Bedrock integration are
-still not claimed.
+wired into application startup. A bounded Nova 2 Lite run on one synthetic PDF
+completed real extraction, model invocation, evidence reconstruction, and
+validation. This proves the integration slice, not classification quality or
+production readiness.
 
 An initial, explicitly labelled corpus of 30 synthetic two-page PDFs is
 available in `pdf_sintetici` for desktop discovery, preview, guarded-link, and
@@ -108,6 +110,7 @@ Approved architecture:
 - [Desktop discovery shell](docs/architecture/desktop-discovery-shell.md)
 - [Verified AWS and CockroachDB environment baseline](docs/operations/environment-baseline.md)
 - [CockroachDB live validation evidence](docs/operations/cockroachdb-live-validation.md)
+- [Bedrock live classification validation](docs/operations/bedrock-live-validation.md)
 - [Delivery plan](docs/operations/delivery-plan.md)
 
 ## Repository policy

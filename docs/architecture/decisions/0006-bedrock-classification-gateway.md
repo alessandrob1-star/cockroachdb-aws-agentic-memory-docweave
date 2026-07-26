@@ -3,13 +3,13 @@
 **Status:** Accepted
 **Decision date:** 2026-07-26
 **Decision owner:** Project owner
-**Implementation status:** Implemented locally; live invocation pending approval
+**Implementation status:** Implemented locally; one bounded live proposal validated
 
 ## Context
 
 The approved `classification.v1` contract needs a production-shaped Amazon
-Bedrock Runtime boundary. The boundary must call the European Claude Sonnet 4.6
-inference profile, preserve observed service provenance, use bounded retries
+Bedrock Runtime boundary. The boundary must call the temporary European Amazon
+Nova 2 Lite inference profile, preserve observed service provenance, use bounded retries
 and timeouts, reject incomplete responses, and avoid turning volatile pricing
 or credentials into source-code constants.
 
@@ -28,16 +28,24 @@ The gateway is fixed to:
 | Setting | Value |
 | --- | --- |
 | Source region | `eu-central-1` |
-| Inference profile | `eu.anthropic.claude-sonnet-4-6` |
+| Inference profile | `eu.amazon.nova-2-lite-v1:0` |
 | Connection timeout | 5 seconds |
 | Read timeout | 90 seconds |
 | Retry mode | Adaptive |
 | Total attempts | 5, including the initial attempt |
 | Connection pool | 10 |
 
-The gateway reuses the explicit 4,096 output-token maximum and structured
-output configuration from `classification.v1`. It supplies no tools and
-performs no file or database action.
+The gateway reuses the explicit 4,096 output-token maximum from
+`classification.v1`. Nova 2 Lite does not support Bedrock `outputConfig`
+structured outputs, so the request forces one `emit_classification` tool whose
+input is constrained by the same versioned JSON Schema. The tool is only an
+output envelope: DocWeave never executes it, and it has no file, network,
+database, or cloud capability.
+
+Nova extended thinking remains disabled for this contract. High effort cannot
+retain the explicit output-token ceiling required by the cost and quota
+boundary, and reasoning tokens are billed as output tokens. A later reasoning
+configuration requires a separate bounded evaluation and approval.
 
 The boto3 session uses the standard credential provider chain. No access key,
 secret key, session token, account identifier, endpoint, or credential value
@@ -47,13 +55,15 @@ explicitly by future runtime composition.
 
 ## Response and provenance
 
-Only `end_turn` is accepted as a successful completion reason. Truncation,
+Only `tool_use` with exactly one `emit_classification` block is accepted as a
+successful completion reason. Truncation,
 guardrail intervention, content filtering, malformed output, tool use, and
 unknown stop reasons fail closed.
 
-The response must contain exactly one assistant text block plus valid token,
-latency, request, and retry metadata. The text is decoded through the existing
-`classification.v1` evidence validator.
+The response must contain exactly one assistant tool-use block plus valid
+token, latency, request, and retry metadata. Its input is decoded through the
+existing `classification.v1` evidence validator. Any other tool name or
+response shape fails closed and no tool is executed.
 
 The gateway records:
 
@@ -94,7 +104,7 @@ It does not expose AWS error messages, document content, model text, account
 details, or request payloads in the public exception. botocore performs the
 bounded retry policy; DocWeave does not add a second hidden retry loop.
 
-There is no canned classification, alternate model, fabricated success, or
+There is no canned classification, action-capable tool, alternate model, fabricated success, or
 silent fallback when Bedrock is unavailable.
 
 ## Alternatives considered
@@ -135,7 +145,7 @@ be supplied from a reviewed, dated configuration before a paid batch.
 ### Costs and limitations
 
 - boto3 and six transitive packages enter the pinned dependency inventory;
-- no live classification or quality evidence exists until an approved call;
+- one accepted live proposal is integration evidence, not corpus-quality evidence;
 - raw response retention remains unresolved and no raw response is retained;
 - the initial estimator does not price prompt-cache reads or writes; and
 - application bootstrap, CockroachDB checkpointing, and user-interface wiring

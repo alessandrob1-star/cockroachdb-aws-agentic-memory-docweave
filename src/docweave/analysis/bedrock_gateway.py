@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from collections.abc import Callable
 from dataclasses import dataclass
 from decimal import Decimal
@@ -27,15 +28,17 @@ from docweave.analysis.contracts import (
     ClassificationProposal,
 )
 from docweave.analysis.request import classification_v1_converse_fields
+from docweave.analysis.schema import CLASSIFICATION_TOOL_NAME
 from docweave.analysis.taxonomy import TAXONOMY_VERSION
 from docweave.analysis.validation import (
+    ClassificationValidationCode,
     ClassificationValidationError,
     decode_classification_v1,
 )
 from docweave.extraction import ExtractedPage
 
 APPROVED_BEDROCK_REGION = "eu-central-1"
-APPROVED_BEDROCK_MODEL_ID = "eu.anthropic.claude-sonnet-4-6"
+APPROVED_BEDROCK_MODEL_ID = "eu.amazon.nova-2-lite-v1:0"
 BEDROCK_CONNECT_TIMEOUT_SECONDS = 5
 BEDROCK_READ_TIMEOUT_SECONDS = 90
 BEDROCK_TOTAL_MAX_ATTEMPTS = 5
@@ -157,9 +160,17 @@ class BedrockGatewayErrorCode(StrEnum):
 class BedrockGatewayError(RuntimeError):
     """Sanitized gateway failure that retains no document or AWS message."""
 
-    def __init__(self, code: BedrockGatewayErrorCode) -> None:
+    def __init__(
+        self,
+        code: BedrockGatewayErrorCode,
+        *,
+        validation_code: ClassificationValidationCode | None = None,
+        service_error_code: str | None = None,
+    ) -> None:
         super().__init__(code.value)
         self.code = code
+        self.validation_code = validation_code
+        self.service_error_code = service_error_code
 
 
 def create_bedrock_runtime_client(
@@ -254,7 +265,8 @@ class BedrockClassificationGateway:
             )
         except ClassificationValidationError as error:
             raise BedrockGatewayError(
-                BedrockGatewayErrorCode.INVALID_MODEL_OUTPUT
+                BedrockGatewayErrorCode.INVALID_MODEL_OUTPUT,
+                validation_code=error.code,
             ) from error
 
         usage = _decode_usage(response.get("usage"))
@@ -291,7 +303,7 @@ def _validate_stop_reason(stop_reason: str) -> None:
         "model_context_window_exceeded": BedrockGatewayErrorCode.RESPONSE_TRUNCATED,
         "malformed_model_output": BedrockGatewayErrorCode.INVALID_MODEL_OUTPUT,
     }
-    if stop_reason == "end_turn":
+    if stop_reason == "tool_use":
         return
     raise BedrockGatewayError(
         error_codes.get(
@@ -313,12 +325,30 @@ def _response_text(response: dict[str, Any]) -> str:
         if not isinstance(content, list) or len(content) != 1:
             raise TypeError
         block = content[0]
-        if not isinstance(block, dict) or set(block) != {"text"}:
+        if not isinstance(block, dict) or set(block) != {"toolUse"}:
             raise TypeError
-        text = block["text"]
-        if not isinstance(text, str):
+        tool_use = block["toolUse"]
+        if not isinstance(tool_use, dict) or set(tool_use) != {
+            "toolUseId",
+            "name",
+            "input",
+        }:
             raise TypeError
-        return text
+        tool_use_id = tool_use["toolUseId"]
+        name = tool_use["name"]
+        tool_input = tool_use["input"]
+        if (
+            not isinstance(tool_use_id, str)
+            or not tool_use_id
+            or name != CLASSIFICATION_TOOL_NAME
+            or not isinstance(tool_input, dict)
+        ):
+            raise TypeError
+        return json.dumps(
+            tool_input,
+            ensure_ascii=False,
+            separators=(",", ":"),
+        )
     except (KeyError, TypeError) as error:
         raise BedrockGatewayError(BedrockGatewayErrorCode.RESPONSE_INVALID) from error
 
@@ -403,6 +433,10 @@ def _mapped_client_error(error: ClientError) -> BedrockGatewayError:
     }
     if not isinstance(error_code, str):
         return BedrockGatewayError(BedrockGatewayErrorCode.UNEXPECTED_AWS_ERROR)
+    mapped_code = mapped.get(error_code)
+    if mapped_code is None:
+        return BedrockGatewayError(BedrockGatewayErrorCode.UNEXPECTED_AWS_ERROR)
     return BedrockGatewayError(
-        mapped.get(error_code, BedrockGatewayErrorCode.UNEXPECTED_AWS_ERROR)
+        mapped_code,
+        service_error_code=error_code,
     )
