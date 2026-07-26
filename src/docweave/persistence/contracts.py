@@ -252,15 +252,19 @@ class RecordOperationResult:
             or not self.destination_exists_after
         ):
             raise ValueError("successful result requires verified destination evidence")
-        expected_event_types = {
-            BatchItemState.BLOCKED: AuditEventType.ITEM_BLOCKED,
-            BatchItemState.SUCCEEDED: AuditEventType.ITEM_EXECUTION_SUCCEEDED,
-            BatchItemState.FAILED: AuditEventType.ITEM_EXECUTION_FAILED,
-            BatchItemState.VERIFICATION_FAILED: (
-                AuditEventType.ITEM_VERIFICATION_FAILED
-            ),
-        }
-        if self.audit_event.event_type is not expected_event_types[self.terminal_state]:
+        expected_event_type = (
+            AuditEventType.ITEM_EXECUTION_RECONCILED
+            if self.disposition is ResultDisposition.RECONCILED
+            else {
+                BatchItemState.BLOCKED: AuditEventType.ITEM_BLOCKED,
+                BatchItemState.SUCCEEDED: AuditEventType.ITEM_EXECUTION_SUCCEEDED,
+                BatchItemState.FAILED: AuditEventType.ITEM_EXECUTION_FAILED,
+                BatchItemState.VERIFICATION_FAILED: (
+                    AuditEventType.ITEM_VERIFICATION_FAILED
+                ),
+            }[self.terminal_state]
+        )
+        if self.audit_event.event_type is not expected_event_type:
             raise ValueError("terminal result requires matching audit event")
         _require_matching_event(
             self.audit_event,
@@ -288,6 +292,11 @@ class OperationPersistenceRepository(Protocol):
     def record_operation_result(
         self,
         command: RecordOperationResult,
+    ) -> PersistenceDisposition: ...
+
+    def append_audit_events(
+        self,
+        events: tuple[AuditAppend, ...],
     ) -> PersistenceDisposition: ...
 
 

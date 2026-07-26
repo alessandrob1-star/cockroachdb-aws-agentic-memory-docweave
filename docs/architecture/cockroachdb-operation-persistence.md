@@ -15,6 +15,7 @@ The implementation is in:
 
 - `src/docweave/persistence/contracts.py`;
 - `src/docweave/persistence/mappers.py`;
+- `src/docweave/persistence/orchestration.py`;
 - `src/docweave/persistence/transactions.py`; and
 - `src/docweave/persistence/operation_repository.py`.
 
@@ -78,7 +79,30 @@ repository derives both. This is tamper-evident chaining, not an assertion that
 the current database identity, privileges, retention, backup, or external
 verification make the history tamper-proof.
 
-## 5. Workspace isolation
+## 5. Filesystem execution ordering
+
+The local batch executor accepts an optional durable lifecycle recorder. When
+configured, the order is:
+
+1. create and persist the execution-intent event;
+2. update the local in-progress ledger;
+3. perform the approved filesystem mutation;
+4. observe the destination evidence;
+5. persist the terminal result and matching audit event;
+6. update the local terminal ledger and audit trail.
+
+If intent persistence fails, filesystem mutation does not start. If filesystem
+mutation succeeds but result persistence fails, the in-progress intent remains
+available for reconciliation and no terminal success is emitted locally.
+Successful results require an observed destination byte size in addition to
+the verified digest.
+
+Replay, no-effect reconciliation, and aggregate batch-completion events also
+pass through the durable recorder. The default recorder remains optional so
+existing local-only tests and development do not silently imply database
+persistence.
+
+## 6. Workspace isolation
 
 Every batch, operation, and audit lookup or mutation includes `workspace_id`.
 Operation identity queries also include the owning batch and operation
@@ -88,7 +112,7 @@ batch events may reference only operations contained in that batch.
 These query contracts provide defense in depth but do not replace the pending
 runtime role and Row-Level Security design.
 
-## 6. Current verification
+## 7. Current verification
 
 Local tests cover:
 
@@ -103,18 +127,23 @@ Local tests cover:
 - result-count updates without duplicate increments;
 - reconciliation-required verification failures; and
 - deterministic append-only digest chaining.
+- intent-persistence failure prevents filesystem mutation;
+- result-persistence failure preserves an in-progress reconciliation state;
+- successful mutation follows the exact intent, filesystem, result order; and
+- missing post-mutation destination evidence fails closed.
 
 The tests use controlled local doubles and SQLite only for transaction rollback
 semantics. They do not claim that the application adapter has executed against
 CockroachDB.
 
-## 7. Remaining work and non-claims
+## 8. Remaining work and non-claims
 
 The following remain pending:
 
 - runtime engine construction and approved secret delivery;
-- integration of the implemented domain mappers and durable adapter with the
-  filesystem execution orchestrator;
+- runtime construction of the lifecycle recorder around the application
+  workflow;
+- loading durable terminal and in-progress execution state after restart;
 - live Psycopg execution and contention tests against an approved target;
 - runtime identities, authorization, and Row-Level Security;
 - restart and lease-expiry reconciliation against CockroachDB;

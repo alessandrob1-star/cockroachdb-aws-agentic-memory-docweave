@@ -284,6 +284,35 @@ def test_batch_idempotency_conflict_never_overwrites() -> None:
         adapter.create_batch(batch_command())
 
 
+def test_appends_non_result_audit_event_in_one_transaction() -> None:
+    adapter, transaction_runner = repository(
+        [
+            FakeResult(scalar=WORKSPACE_ID),
+            FakeResult(mapping=None),
+            FakeResult(),
+        ]
+    )
+    mapped_event = audit_event(
+        AuditEventType.ITEM_EXECUTION_REPLAYED,
+    )
+
+    disposition = adapter.append_audit_events((mapped_event,))
+
+    assert disposition is PersistenceDisposition.APPLIED
+    assert transaction_runner.run_count == 1
+    assert len(transaction_runner.connection.calls) == 3
+    transaction_runner.connection.assert_consumed()
+
+
+def test_rejects_empty_audit_append() -> None:
+    adapter, transaction_runner = repository([])
+
+    with pytest.raises(ValueError, match="events must not be empty"):
+        adapter.append_audit_events(())
+
+    assert transaction_runner.run_count == 0
+
+
 def test_batch_creation_fails_closed_when_audit_workspace_is_missing() -> None:
     adapter, _ = repository(
         [

@@ -19,12 +19,15 @@ planning, approval, single-operation execution, bounded local batch execution,
 per-item results, in-memory idempotency, interrupted-operation reconciliation,
 and append-only local audit event contracts. A typed CockroachDB operation
 persistence adapter now defines atomic batch, execution-intent, terminal-result,
-and hash-chained audit writes with bounded serializable retry behavior. The
-first non-vector CockroachDB migration is validated offline and against a
-clean, isolated live validation database. The adapter is not connected to that
-schema or to the local execution orchestrator, so durable application
-persistence is not yet claimed. No runtime database integration, restore, AWS
-workload, user interface, or intelligent document analysis is claimed yet.
+and hash-chained audit writes with bounded serializable retry behavior. An
+optional lifecycle recorder now orders durable intent before filesystem
+mutation and durable results after mutation, failing closed at both
+boundaries. The first non-vector CockroachDB migration is validated offline and
+against a clean, isolated live validation database. No runtime engine connects
+the recorder to that schema, and restart state loading is pending, so durable
+application persistence is not yet claimed. No runtime database integration,
+restore, AWS workload, user interface, or intelligent document analysis is
+claimed yet.
 
 The current approved product direction includes:
 
