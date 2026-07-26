@@ -20,7 +20,7 @@ The shell lets a user:
 6. view per-file relative path, deterministic intake state, byte size, and safe
    diagnostic category; and
 7. select multiple completed rows for later review; and
-8. explicitly open one ready PDF in the operating-system reader.
+8. explicitly preview one ready PDF in a read-only DocWeave window.
 
 It never renames, copies, moves, uploads, extracts text from, or sends a document
 to a model.
@@ -68,20 +68,20 @@ keys.
 This state is deliberately process-local. It is not a CockroachDB workspace,
 does not survive restart, and does not establish user or role authorization.
 
-## 5. External PDF reader boundary
+## 5. Embedded PDF preview boundary
 
-A double click or the `Open PDF` button can request opening exactly one
+A double click or the `Preview PDF` button can request previewing exactly one
 completed `Ready` record. Immediately before the request, DocWeave verifies
 that the observed path still exists, is a regular `.pdf` file, is not a
 symbolic link, resolves inside the authorized root, and still has a valid PDF
 signature. A failed check blocks the request with a safe category.
 
-The operating system chooses the external reader. DocWeave does not execute a
-shell command, does not claim that the external application accepted or
-rendered the document beyond its returned request status, and does not yet
-provide an embedded PDF preview. Opening an untrusted document still inherits
-the security posture of the installed reader, so controlled synthetic
-documents are recommended during development.
+The preview uses Qt PDF's `QPdfDocument` and `QPdfView` from the already pinned
+PySide6 distribution. It presents all pages in a continuously scrollable
+multi-page view with bounded zoom-in, zoom-out, and fit-to-width controls.
+The preview exposes no editing, annotation, printing, exporting, or shell
+execution. Invalid, password-protected, or unsupported documents remain in an
+explicit safe error state.
 
 ## 6. Presentation and accessibility baseline
 
@@ -92,10 +92,11 @@ have accessible names. Status and safety meaning are expressed in text rather
 than color alone.
 
 Windows rendering was inspected with an empty workspace and earlier with a
-controlled result. Product-owner visual acceptance remains required for this
-increment. Web Content Accessibility Guidelines 2.2 Level AA conformance is
-not yet claimed; keyboard, screen-reader, contrast, high-DPI, and
-reduced-motion evidence remain pending.
+controlled result. The product owner accepted the embedded preview's speed,
+scrolling, and basic behavior on 2026-07-26; visual polish, including larger
+zoom controls, remains planned. Web Content Accessibility Guidelines 2.2 Level
+AA conformance is not yet claimed; keyboard, screen-reader, contrast, high-DPI,
+and reduced-motion evidence remain pending.
 
 ## 7. Dependency and launch
 
@@ -125,14 +126,14 @@ Automated evidence covers:
 - cooperative cancellation with partial-result discard;
 - validated in-memory workspace transitions and multiple row selection;
 - current-state, root-containment, file-type, symlink, and signature checks
-  before external PDF opening;
-- accepted and rejected external-reader request states without launching a real
-  reader in automated tests;
+  before embedded PDF preview;
+- real Qt PDF loading, multipage mode, zoom controls, and malformed-document
+  states using controlled test files;
 - root-change and close protection during an active scan;
 - missing-root, invalid-result, and non-directory failure states; and
 - folder-picker authorization.
 
 This implementation does not claim progressive row delivery, repeated-scan
-comparison, durable checkpoints, persistence across restart, PDF preview,
-content extraction, classification, review, operation approval, restore,
-cloud parity, packaging, or production readiness.
+comparison, durable checkpoints, persistence across restart, extracted-text
+review, annotation, classification, operation approval, restore, cloud parity,
+packaging, or production readiness.

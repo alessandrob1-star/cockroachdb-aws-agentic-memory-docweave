@@ -254,7 +254,7 @@ The critical path is:
 
 **Measurement date:** 2026-07-26
 
-The current evidence-weighted Schedule Performance Indicator is **37%**. This
+The current evidence-weighted Schedule Performance Indicator is **38%**. This
 is a planning estimate, not a product-completion or production-readiness claim.
 It is calculated from fixed milestone weights and conservative completion
 estimates based only on merged or locally verified evidence:
@@ -266,10 +266,10 @@ estimates based only on merged or locally verified evidence:
 | M2 - CockroachDB foundation | 18% | 70% | 12.6% |
 | M3 - Real analysis slice | 18% | 0% | 0.0% |
 | M4 - Review and safe operations | 15% | 10% | 1.5% |
-| M5 - Product surfaces | 12% | 25% | 3.0% |
+| M5 - Product surfaces | 12% | 30% | 3.6% |
 | M6 - Evaluation and hardening | 9% | 0% | 0.0% |
 | M7 - Submission readiness | 6% | 0% | 0.0% |
-| **Total** | **100%** |  | **37.0%, rounded to 37%** |
+| **Total** | **100%** |  | **37.6%, rounded to 38%** |
 
 The project is **on plan overall and ahead on the database foundation**. M1 is
 at the end of its planned window with some later-slice decisions still open.
@@ -280,7 +280,7 @@ No schedule credit is taken for the unimplemented Bedrock analysis, complete
 PySide6 workflow, cloud product, AWS deployment, evaluation corpus, or
 submission package. Limited credit is taken for the locally verified read-only
 desktop discovery, cancellation, session-state, selection, and guarded
-system-reader opening workflow.
+embedded PDF preview workflow.
 
 The principal schedule risk is now the vertical integration path: application
 transactions and persistence, genuine Bedrock analysis, human review, safe

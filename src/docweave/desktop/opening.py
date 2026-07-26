@@ -1,4 +1,4 @@
-"""Fail-closed validation before opening a local PDF externally."""
+"""Fail-closed validation before previewing a local PDF."""
 
 from dataclasses import dataclass
 from enum import StrEnum
@@ -8,7 +8,7 @@ from docweave.inspection import inspect_pdf_signature
 
 
 class PdfOpenFailure(StrEnum):
-    """Safe categories for a rejected local open request."""
+    """Safe categories for a rejected local preview request."""
 
     INVALID_SIGNATURE = "invalid_signature"
     NOT_A_FILE = "not_a_file"
@@ -20,13 +20,13 @@ class PdfOpenFailure(StrEnum):
 
 @dataclass(frozen=True, slots=True)
 class PdfOpenValidationError(RuntimeError):
-    """Reject an unsafe open request without including a private path."""
+    """Reject an unsafe preview request without including a private path."""
 
     category: PdfOpenFailure
 
 
 def validate_pdf_for_open(path: Path, authorized_root: Path) -> Path:
-    """Return a current safe path or reject the external open request."""
+    """Return a current safe path or reject the internal preview request."""
     try:
         if path.is_symlink():
             raise PdfOpenValidationError(PdfOpenFailure.SYMBOLIC_LINK)
