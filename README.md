@@ -31,7 +31,10 @@ connection. The first non-vector CockroachDB migration is validated offline and
 against a clean, isolated live validation database. No configured runtime
 engine connects these boundaries to that schema, so durable application
 persistence is not yet claimed. No runtime database integration, restore, AWS
-workload, user interface, or intelligent document analysis is claimed yet.
+workload, complete review interface, or intelligent document analysis is
+claimed yet. An initial read-only PySide6 desktop shell now exposes
+authorized-folder selection, non-blocking local discovery, deterministic intake
+counts, explicit status, and a virtualized document table.
 
 The current approved product direction includes:
 
@@ -69,6 +72,7 @@ Approved architecture:
 - [CockroachDB physical-schema specification](docs/architecture/cockroachdb-physical-schema.md)
 - [CockroachDB Entity Relationship model](docs/architecture/cockroachdb-entity-relationship.md)
 - [CockroachDB operation persistence boundary](docs/architecture/cockroachdb-operation-persistence.md)
+- [Desktop discovery shell](docs/architecture/desktop-discovery-shell.md)
 - [Verified AWS and CockroachDB environment baseline](docs/operations/environment-baseline.md)
 - [CockroachDB live validation evidence](docs/operations/cockroachdb-live-validation.md)
 - [Delivery plan](docs/operations/delivery-plan.md)
@@ -101,6 +105,15 @@ python -m venv .venv
 .\.venv\Scripts\python -m pip install -e . --no-deps
 .\scripts\check.ps1
 ```
+
+Launch the initial read-only desktop discovery shell:
+
+```powershell
+.\.venv\Scripts\docweave-desktop.exe
+```
+
+The shell does not yet connect to CockroachDB or Amazon Bedrock and does not
+modify files.
 
 ## License
 

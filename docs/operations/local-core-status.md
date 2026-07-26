@@ -51,6 +51,9 @@ The repository currently contains a tested Python package with:
   reconciliation without duplicate filesystem execution;
 - side-effect-free composition of one coherent transaction runner, repository,
   restart ledger, lifecycle recorder, and execution hook set;
+- an initial read-only PySide6 desktop shell for authorized-folder selection,
+  non-blocking discovery, deterministic intake metrics, status, and document
+  table presentation;
 - fail-closed behavior that prevents mutation when intent persistence fails and
   preserves an in-progress state when result persistence fails;
 - bounded serializable transaction execution with SQLSTATE `40001` retry,
@@ -65,10 +68,10 @@ The repository currently contains a tested Python package with:
 ## 3. Current local quality evidence
 
 The latest verified local quality gate on
-`codex/durable-runtime-composition` reported:
+`codex/desktop-discovery-shell` reported:
 
-- 224 tests passed;
-- 94 percent total package coverage;
+- 238 tests passed;
+- 95 percent total package coverage;
 - Ruff format check passed;
 - Ruff lint check passed;
 - MyPy strict check passed;
@@ -79,9 +82,8 @@ The latest verified local quality gate on
 
 The 144-test migration baseline passed GitHub Actions on pull request 22 and
 after its merge to `main`. The Node.js 24 workflow update passed on pull request
-23 and after its merge to `main`. The 224-test runtime-composition increment is
-local evidence until a separately authorized pull request passes GitHub
-Actions.
+23 and after its merge to `main`. The 238-test desktop-shell increment is local
+evidence until a separately authorized pull request passes GitHub Actions.
 
 The check command is:
 
@@ -97,7 +99,7 @@ DocWeave does not yet implement or claim:
 - persistent operational, semantic, episodic, preference, or audit memory;
 - AWS infrastructure or deployed DocWeave workloads;
 - Amazon Bedrock invocation inside the product;
-- PySide6 desktop or cloud user interface;
+- a complete PySide6 desktop workflow or any cloud user interface;
 - PDF text extraction;
 - model-driven classification, naming, confidence, or relationship analysis;
 - live durable idempotency in the running application;
@@ -156,9 +158,9 @@ To preserve time for manual testing and personalization, the first desktop
 surface is now scheduled in parallel with the remaining live-integration work
 instead of waiting for the whole CockroachDB milestone to finish.
 
-The PySide6 desktop preview interface is no longer blocked by a missing batch
-model. Its first implementation should still wait for an approved surface
-contract so it does not invent persistence or authorization behavior.
+The initial desktop discovery shell is implemented but intentionally read-only.
+Its next increment must add progressive scan presentation and workspace state
+without inventing CockroachDB persistence or user authorization.
 
 AWS infrastructure should begin after the CockroachDB migration strategy and
 first local vertical slice are ready, so cloud work deploys real product
