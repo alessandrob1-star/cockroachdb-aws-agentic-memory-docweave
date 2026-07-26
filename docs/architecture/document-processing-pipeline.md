@@ -2,7 +2,7 @@
 
 **Status:** Approved architecture baseline
 **Approved:** 2026-07-22
-**Implementation status:** Not started
+**Implementation status:** In progress
 
 ## 1. Purpose
 
@@ -100,6 +100,13 @@ content spans, limitations, artifact hashes, and extraction status.
 **Result:** versioned extracted evidence or an explicit limited-processing
 state. Optical Character Recognition (OCR) remains outside this baseline until
 separately approved.
+
+**Current implementation:** ADR-0004 implements local Qt PDF text extraction in
+a disposable process with authorized-root, signature, size, page, character,
+timeout, and source-digest controls. Page text and extractor provenance are
+returned through path-free typed contracts. CockroachDB checkpointing,
+quarantine storage, Optical Character Recognition, malware scanning, and
+operating-system sandboxing remain pending.
 
 ### 4.3 Context assembly
 
@@ -259,19 +266,19 @@ Observed cost is stored after processing so estimates can be improved.
 The following remain separate approval points:
 
 1. embedding model, vector dimension, and distance metric;
-2. PDF extraction library and isolation mechanism;
-3. structured-output schema and prompt contract;
-4. raw confidence formula and calibration method;
-5. numerical review thresholds and bounded retry count;
-6. cloud storage, queue, compute, and application topology;
-7. desktop-to-cloud identity and authorization design;
-8. retention of extracted text and raw model responses; and
-9. whether and when a secondary model is evaluated.
+2. structured-output schema and prompt contract;
+3. raw confidence formula and calibration method;
+4. numerical review thresholds and bounded retry count;
+5. cloud storage, queue, compute, and application topology;
+6. desktop-to-cloud identity and authorization design;
+7. retention of extracted text and raw model responses; and
+8. whether and when a secondary model is evaluated.
 
 The physical CockroachDB schema, indexes, and transaction boundaries are
 approved by
-[`ADR-0002`](decisions/0002-cockroachdb-physical-data-model.md). Implementation
-and migration verification have not started.
+[`ADR-0002`](decisions/0002-cockroachdb-physical-data-model.md). The initial
+non-vector operational migration has been validated separately; document,
+extraction, analysis, and vector migrations remain pending.
 
 ## 9. Acceptance evidence
 

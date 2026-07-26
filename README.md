@@ -41,6 +41,14 @@ delegation of eligible PDF hyperlinks to the user's default browser, and a
 virtualized document table. Document-controlled persistence values remain bound
 parameters rather than executable Structured Query Language.
 
+The shared core now also performs real page-level text extraction through the
+already pinned Qt PDF module. Each attempt runs in a disposable child process
+with authorized-root validation, source-digest verification, and explicit
+file, page, character, and timeout budgets. Malformed, encrypted, unsupported,
+changed, and text-free documents receive explicit states. This is parser
+failure isolation, not a malware scanner or operating-system sandbox. Extracted
+text is not yet sent to Bedrock or persisted in CockroachDB.
+
 An initial, explicitly labelled corpus of 30 synthetic two-page PDFs is
 available in `pdf_sintetici` for desktop discovery, preview, guarded-link, and
 later relationship testing. Its manifest records deterministic provenance,
@@ -80,6 +88,7 @@ Approved architecture:
 - [Amazon Bedrock primary-model decision](docs/architecture/decisions/0001-amazon-bedrock-primary-model.md)
 - [CockroachDB physical-data-model decision](docs/architecture/decisions/0002-cockroachdb-physical-data-model.md)
 - [CockroachDB migration-tooling decision](docs/architecture/decisions/0003-cockroachdb-migration-tooling.md)
+- [Isolated PDF text-extraction decision](docs/architecture/decisions/0004-isolated-pdf-text-extraction.md)
 - [Document-processing pipeline](docs/architecture/document-processing-pipeline.md)
 - [CockroachDB physical-schema specification](docs/architecture/cockroachdb-physical-schema.md)
 - [CockroachDB Entity Relationship model](docs/architecture/cockroachdb-entity-relationship.md)
