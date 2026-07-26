@@ -38,6 +38,7 @@ from docweave.persistence import (
     PersistenceDisposition,
     RegisterDocumentVersion,
     build_classification_runtime,
+    provide_uncalibrated_confidence_v0,
 )
 
 NOW = datetime(2026, 7, 26, 18, 30, tzinfo=UTC)
@@ -272,7 +273,6 @@ def test_composes_runtime_without_database_or_model_io() -> None:
     runtime = build_classification_runtime(
         cast(Engine, engine),
         gateway=gateway,
-        score_provider=lambda _run, _extraction: scores(),
     )
 
     assert isinstance(
@@ -284,6 +284,7 @@ def test_composes_runtime_without_database_or_model_io() -> None:
     )
     assert engine.connect_count == 0
     assert events == []
+    assert runtime.score_provider is provide_uncalibrated_confidence_v0
 
 
 @pytest.mark.parametrize(

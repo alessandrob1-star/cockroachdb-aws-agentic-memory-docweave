@@ -17,6 +17,11 @@ from docweave.analysis.bedrock_gateway import (
     ConverseClient,
     create_bedrock_runtime_client,
 )
+from docweave.analysis.confidence import (
+    CONFIDENCE_METHOD_VERSION,
+    UncalibratedConfidence,
+    compute_uncalibrated_confidence,
+)
 from docweave.analysis.contracts import (
     CLASSIFICATION_CONTRACT_VERSION,
     AlternativeClass,
@@ -63,6 +68,7 @@ __all__ = [
     "CLASSIFICATION_CONTRACT_VERSION",
     "CLASSIFICATION_MAXIMUM_OUTPUT_TOKENS",
     "CLASSIFICATION_TOOL_NAME",
+    "CONFIDENCE_METHOD_VERSION",
     "MAXIMUM_CLASSIFICATION_INPUT_CHARACTERS",
     "MAXIMUM_CLASSIFICATION_INPUT_PAGES",
     "MAXIMUM_RESPONSE_BYTES",
@@ -90,10 +96,12 @@ __all__ = [
     "SignalStrength",
     "TaxonomyClass",
     "TaxonomyDefinition",
+    "UncalibratedConfidence",
     "classification_v1_converse_fields",
     "classification_v1_json_schema",
     "classification_v1_output_config",
     "classification_v1_tool_config",
+    "compute_uncalibrated_confidence",
     "create_bedrock_runtime_client",
     "decode_classification_v1",
 ]

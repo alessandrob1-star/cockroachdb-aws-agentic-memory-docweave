@@ -145,9 +145,10 @@ application-side budgets. The pinned Bedrock gateway has completed one bounded
 synthetic live classification. Local CockroachDB adapters now register verified
 document versions, initialize the approved taxonomy with human authority, and
 atomically persist validated run, proposal, provenance, and evidence records.
-The composed runtime requires an injected confidence provider and has no
-configured application engine; confidence calculation, corpus quality, human
-review, and live end-to-end persistence are not claimed.
+The composed runtime now defaults to the deterministic, uncalibrated
+`confidence.raw.v0_1` provider and still has no configured application engine.
+Calibration, corpus quality, human review, and live end-to-end persistence are
+not claimed.
 
 ### 5.3 Independent review
 
@@ -224,6 +225,13 @@ The calibration method, parameters, dataset version, sample size, class
 coverage, and evaluation date shall be recorded. The exact mathematical method
 requires evaluation before selection; candidate methods include isotonic
 regression and logistic calibration.
+
+ADR-0007 defines `confidence.raw.v0_1` as the pre-evaluation deterministic
+review-ordering method. It combines ordinal classification strength, evidence
+coverage, inverse ambiguity, contradictions, missing expected evidence, and
+alternatives. Extraction and metadata receive separate observable scores.
+Values are bounded for storage compatibility but are not probabilities, and
+`calibrated_confidence` remains null.
 
 No numerical confidence threshold is approved yet. Thresholds shall be selected
 from evaluation evidence and may vary by class or risk policy.
