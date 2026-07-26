@@ -140,6 +140,10 @@ The critical path is:
   hash-chained audit appends have local contract evidence.
 - Intent-before-mutation, result-after-mutation, replay event, and
   reconciliation-state ordering have local orchestration evidence.
+- Workspace-scoped terminal and execution-claim loading, active-lease
+  rejection, terminal replay, and expired-lease reconciliation have local
+  restart evidence. Live engine wiring, lease renewal, and fencing remain
+  pending.
 
 **Exit criteria:**
 
@@ -250,7 +254,7 @@ The critical path is:
 
 **Measurement date:** 2026-07-26
 
-The current evidence-weighted Schedule Performance Indicator is **32%**. This
+The current evidence-weighted Schedule Performance Indicator is **34%**. This
 is a planning estimate, not a product-completion or production-readiness claim.
 It is calculated from fixed milestone weights and conservative completion
 estimates based only on merged or locally verified evidence:
@@ -259,13 +263,13 @@ estimates based only on merged or locally verified evidence:
 | --- | ---: | ---: | ---: |
 | M0 - Baseline complete | 8% | 100% | 8.0% |
 | M1 - Decisions and scaffolding | 14% | 85% | 11.9% |
-| M2 - CockroachDB foundation | 18% | 60% | 10.8% |
+| M2 - CockroachDB foundation | 18% | 70% | 12.6% |
 | M3 - Real analysis slice | 18% | 0% | 0.0% |
 | M4 - Review and safe operations | 15% | 10% | 1.5% |
 | M5 - Product surfaces | 12% | 0% | 0.0% |
 | M6 - Evaluation and hardening | 9% | 0% | 0.0% |
 | M7 - Submission readiness | 6% | 0% | 0.0% |
-| **Total** | **100%** |  | **32.2%, rounded to 32%** |
+| **Total** | **100%** |  | **34.0%, rounded to 34%** |
 
 The project is **on plan overall and ahead on the database foundation**. M1 is
 at the end of its planned window with some later-slice decisions still open.
@@ -310,9 +314,11 @@ The approved local CockroachDB persistence boundary currently has:
 5. keep runtime identity creation, production data, cloud resources, and paid
    operations behind separate explicit approval.
 
-The next increment is durable state loading and restart reconciliation through
-the implemented orchestration boundary. Live CockroachDB execution, runtime
-identities, and paid operations remain separate approval gates.
+The durable state-loading and restart-reconciliation increment is now
+implemented and locally verified at the adapter boundary. The next increment
+is approved runtime engine construction and a controlled restart integration
+test. Live CockroachDB execution, runtime identities, and paid operations
+remain separate approval gates.
 
 ## 8. Operating rules during delivery
 

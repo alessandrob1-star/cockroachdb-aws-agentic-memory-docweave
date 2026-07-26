@@ -34,7 +34,7 @@ from docweave.operations.planning import (
     FileOperationStatus,
 )
 from docweave.operations.results import (
-    InMemoryExecutionLedger,
+    ExecutionLedger,
     OperationResultRecord,
     ResultDisposition,
 )
@@ -226,7 +226,7 @@ class _BatchExecutionContext:
     request: BatchExecutionRequest
     now_utc: datetime
     audit_trail: AppendOnlyAuditTrail
-    execution_ledger: InMemoryExecutionLedger
+    execution_ledger: ExecutionLedger
     operation_executor: OperationExecutor
     lifecycle_recorder: OperationLifecycleRecorder | None
 
@@ -443,7 +443,7 @@ def execute_operation_batch(
     request: BatchExecutionRequest,
     *,
     audit_trail: AppendOnlyAuditTrail,
-    execution_ledger: InMemoryExecutionLedger,
+    execution_ledger: ExecutionLedger,
     hooks: BatchExecutionHooks | None = None,
 ) -> BatchExecutionReport:
     """Execute independent approved items with fail-closed local idempotency."""
@@ -654,7 +654,10 @@ def _execute_batch_item(
         )
         return replayed_item, replay, True
 
-    if context.execution_ledger.is_in_progress(execution_key):
+    if context.execution_ledger.is_in_progress(
+        execution_key,
+        now_utc=context.now_utc,
+    ):
         reconciled = _reconcile_interrupted_item(
             context,
             item,

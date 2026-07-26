@@ -4,7 +4,9 @@ from docweave.persistence.contracts import (
     AuditAppend,
     BatchItemSnapshot,
     CreateBatch,
+    OperationExecutionIdentity,
     OperationPersistenceRepository,
+    PersistedOperationExecution,
     PersistenceDisposition,
     RecordExecutionIntent,
     RecordOperationResult,
@@ -24,6 +26,8 @@ from docweave.persistence.operation_repository import (
     PersistenceNotFoundError,
 )
 from docweave.persistence.orchestration import (
+    ActiveExecutionLeaseError,
+    DurableExecutionLedger,
     DurableOperationLifecycleRecorder,
     PersistenceEvidenceError,
 )
@@ -37,15 +41,19 @@ from docweave.persistence.transactions import (
 )
 
 __all__ = [
+    "ActiveExecutionLeaseError",
     "AuditAppend",
     "BatchItemSnapshot",
     "CockroachOperationRepository",
     "CockroachTransactionRunner",
     "CreateBatch",
+    "DurableExecutionLedger",
     "DurableOperationLifecycleRecorder",
     "ExecutionIntentMapping",
+    "OperationExecutionIdentity",
     "OperationPersistenceRepository",
     "OperationResultMapping",
+    "PersistedOperationExecution",
     "PersistenceConflictError",
     "PersistenceDisposition",
     "PersistenceEvidenceError",

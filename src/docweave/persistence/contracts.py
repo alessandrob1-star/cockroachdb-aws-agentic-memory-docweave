@@ -25,6 +25,96 @@ class PersistenceDisposition(StrEnum):
 
 
 @dataclass(frozen=True, slots=True)
+class OperationExecutionIdentity:
+    """Workspace-scoped identity for one persisted file operation."""
+
+    workspace_id: UUID
+    operation_batch_id: UUID
+    file_operation_id: UUID
+
+
+@dataclass(frozen=True, slots=True)
+class PersistedOperationExecution:
+    """Validated durable execution state used during restart recovery."""
+
+    identity: OperationExecutionIdentity
+    state: BatchItemState
+    idempotency_key: str | None
+    execution_id: str | None
+    approval_id: str | None
+    lease_expires_at_utc: datetime | None
+    intent_recorded_at_utc: datetime | None
+    started_at_utc: datetime | None
+    completed_at_utc: datetime | None
+    result_disposition: ResultDisposition | None
+    expected_source_sha256: bytes | None
+    actual_sha256: bytes | None
+    actual_size: int | None
+    source_exists_after: bool | None
+    destination_exists_after: bool | None
+    safe_error_summary: str | None
+    error_category: str | None
+
+    def __post_init__(self) -> None:
+        for field_name, value in (
+            ("idempotency_key", self.idempotency_key),
+            ("execution_id", self.execution_id),
+        ):
+            if value is not None:
+                _require_text(field_name, value)
+        _require_optional_digest(
+            "expected_source_sha256",
+            self.expected_source_sha256,
+        )
+        _require_optional_digest("actual_sha256", self.actual_sha256)
+        if self.actual_size is not None and self.actual_size < 0:
+            raise ValueError("actual_size must not be negative")
+
+        for field_name in (
+            "lease_expires_at_utc",
+            "intent_recorded_at_utc",
+            "started_at_utc",
+            "completed_at_utc",
+        ):
+            value = getattr(self, field_name)
+            if value is not None:
+                object.__setattr__(self, field_name, normalize_utc(value))
+
+        if self.state is BatchItemState.EXECUTING and (
+            self.idempotency_key is None
+            or self.execution_id is None
+            or self.lease_expires_at_utc is None
+            or self.intent_recorded_at_utc is None
+        ):
+            raise ValueError("executing state requires durable claim evidence")
+
+        execution_terminal_states = {
+            BatchItemState.BLOCKED,
+            BatchItemState.SUCCEEDED,
+            BatchItemState.FAILED,
+            BatchItemState.VERIFICATION_FAILED,
+        }
+        if self.state in execution_terminal_states and (
+            self.idempotency_key is None
+            or self.execution_id is None
+            or self.completed_at_utc is None
+            or self.result_disposition is None
+            or self.source_exists_after is None
+            or self.destination_exists_after is None
+            or self.safe_error_summary is None
+        ):
+            raise ValueError("terminal execution state requires result evidence")
+        if self.state is BatchItemState.SUCCEEDED and (
+            self.actual_sha256 is None
+            or self.actual_size is None
+            or self.destination_exists_after is not True
+        ):
+            raise ValueError(
+                "successful persisted result requires destination evidence"
+            )
+
+
+@dataclass(frozen=True, slots=True)
 class AuditAppend:
     """One append-only audit event without caller-controlled chain fields."""
 
@@ -293,6 +383,11 @@ class OperationPersistenceRepository(Protocol):
         self,
         command: RecordOperationResult,
     ) -> PersistenceDisposition: ...
+
+    def load_operation_execution(
+        self,
+        identity: OperationExecutionIdentity,
+    ) -> PersistedOperationExecution | None: ...
 
     def append_audit_events(
         self,

@@ -2,6 +2,7 @@
 
 import json
 from collections.abc import Callable, Mapping
+from datetime import datetime
 from hashlib import sha256
 from typing import Protocol, cast
 from uuid import UUID
@@ -10,11 +11,14 @@ import sqlalchemy as sa
 from sqlalchemy.engine import Connection
 
 from docweave.operations.batch import BatchItemState
+from docweave.operations.results import ResultDisposition
 from docweave.persistence.contracts import (
     AuditAppend,
     BatchItemSnapshot,
     CreateBatch,
+    OperationExecutionIdentity,
     OperationPersistenceRepository,
+    PersistedOperationExecution,
     PersistenceDisposition,
     RecordExecutionIntent,
     RecordOperationResult,
@@ -108,6 +112,19 @@ _SELECT_OPERATION_FOR_UPDATE = sa.text(
       AND operation_batch_id = :operation_batch_id
       AND file_operation_id = :file_operation_id
     FOR UPDATE
+    """
+)
+_SELECT_OPERATION_EXECUTION = sa.text(
+    """
+    SELECT state, idempotency_key, execution_id, approval_id,
+           lease_expires_at, intent_recorded_at, started_at, completed_at,
+           result_disposition, expected_source_sha256, actual_sha256,
+           actual_size, source_exists_after, destination_exists_after,
+           safe_error_summary, error_category
+    FROM docweave.file_operations
+    WHERE workspace_id = :workspace_id
+      AND operation_batch_id = :operation_batch_id
+      AND file_operation_id = :file_operation_id
     """
 )
 _RECORD_EXECUTION_INTENT = sa.text(
@@ -322,6 +339,30 @@ class CockroachOperationRepository(OperationPersistenceRepository):
 
         return self._transactions.run(persist).value
 
+    def load_operation_execution(
+        self,
+        identity: OperationExecutionIdentity,
+    ) -> PersistedOperationExecution | None:
+        """Load one operation state inside its exact authorized scope."""
+
+        def load(connection: Connection) -> PersistedOperationExecution | None:
+            row = (
+                connection.execute(
+                    _SELECT_OPERATION_EXECUTION,
+                    _execution_identity(identity),
+                )
+                .mappings()
+                .one_or_none()
+            )
+            if row is None:
+                return None
+            return _map_persisted_execution(
+                identity,
+                cast(Mapping[str, object], row),
+            )
+
+        return self._transactions.run(load).value
+
     def append_audit_events(
         self,
         events: tuple[AuditAppend, ...],
@@ -433,6 +474,91 @@ def _operation_identity(
         "operation_batch_id": command.operation_batch_id,
         "file_operation_id": command.file_operation_id,
     }
+
+
+def _execution_identity(
+    identity: OperationExecutionIdentity,
+) -> dict[str, object]:
+    return {
+        "workspace_id": identity.workspace_id,
+        "operation_batch_id": identity.operation_batch_id,
+        "file_operation_id": identity.file_operation_id,
+    }
+
+
+def _map_persisted_execution(
+    identity: OperationExecutionIdentity,
+    row: Mapping[str, object],
+) -> PersistedOperationExecution:
+    try:
+        disposition_value = row["result_disposition"]
+        return PersistedOperationExecution(
+            identity=identity,
+            state=BatchItemState(str(row["state"])),
+            idempotency_key=_optional_text(row["idempotency_key"]),
+            execution_id=_optional_text(row["execution_id"]),
+            approval_id=_optional_text(row["approval_id"]),
+            lease_expires_at_utc=_optional_datetime(row["lease_expires_at"]),
+            intent_recorded_at_utc=_optional_datetime(row["intent_recorded_at"]),
+            started_at_utc=_optional_datetime(row["started_at"]),
+            completed_at_utc=_optional_datetime(row["completed_at"]),
+            result_disposition=(
+                None
+                if disposition_value is None
+                else ResultDisposition(str(disposition_value))
+            ),
+            expected_source_sha256=_optional_bytes(row["expected_source_sha256"]),
+            actual_sha256=_optional_bytes(row["actual_sha256"]),
+            actual_size=_optional_int(row["actual_size"]),
+            source_exists_after=_optional_bool(row["source_exists_after"]),
+            destination_exists_after=_optional_bool(row["destination_exists_after"]),
+            safe_error_summary=_optional_text(row["safe_error_summary"]),
+            error_category=_optional_text(row["error_category"]),
+        )
+    except (KeyError, TypeError, ValueError):
+        raise PersistenceConflictError(
+            "persisted operation execution state is invalid"
+        ) from None
+
+
+def _optional_text(value: object) -> str | None:
+    if value is None:
+        return None
+    if not isinstance(value, str):
+        raise TypeError
+    return value
+
+
+def _optional_datetime(value: object) -> datetime | None:
+    if value is None:
+        return None
+    if not isinstance(value, datetime):
+        raise TypeError
+    return value
+
+
+def _optional_bytes(value: object) -> bytes | None:
+    if value is None:
+        return None
+    if not isinstance(value, bytes | bytearray | memoryview):
+        raise TypeError
+    return bytes(value)
+
+
+def _optional_int(value: object) -> int | None:
+    if value is None:
+        return None
+    if not isinstance(value, int) or isinstance(value, bool):
+        raise TypeError
+    return value
+
+
+def _optional_bool(value: object) -> bool | None:
+    if value is None:
+        return None
+    if not isinstance(value, bool):
+        raise TypeError
+    return value
 
 
 def _result_parameters(command: RecordOperationResult) -> dict[str, object]:

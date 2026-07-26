@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from enum import StrEnum
 from threading import RLock
+from typing import Protocol
 
 from docweave.operations.audit import normalize_utc
 from docweave.operations.execution import ExecutionReason, ExecutionStatus
@@ -61,7 +62,24 @@ class OperationResultRecord:
         return self.status is ExecutionStatus.SUCCEEDED
 
 
-class InMemoryExecutionLedger:
+class ExecutionLedger(Protocol):
+    """Idempotency and interrupted-execution state used by batch execution."""
+
+    def result_for(self, execution_key: str) -> OperationResultRecord | None: ...
+
+    def is_in_progress(
+        self,
+        execution_key: str,
+        *,
+        now_utc: datetime | None = None,
+    ) -> bool: ...
+
+    def record_intent(self, execution_key: str) -> None: ...
+
+    def record_result(self, result: OperationResultRecord) -> None: ...
+
+
+class InMemoryExecutionLedger(ExecutionLedger):
     """Thread-safe non-persistent intent and result registry.
 
     This object models idempotency and interrupted execution semantics locally.
@@ -78,7 +96,12 @@ class InMemoryExecutionLedger:
         with self._lock:
             return self._results.get(execution_key)
 
-    def is_in_progress(self, execution_key: str) -> bool:
+    def is_in_progress(
+        self,
+        execution_key: str,
+        *,
+        now_utc: datetime | None = None,
+    ) -> bool:
         """Return whether intent exists without a terminal result."""
         with self._lock:
             return execution_key in self._in_progress
