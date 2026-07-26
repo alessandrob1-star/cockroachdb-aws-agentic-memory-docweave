@@ -70,6 +70,15 @@ until the human-review workflow is implemented. Runtime wiring, document
 registration, taxonomy seeding, and the approved numeric confidence method
 remain pending.
 
+The local shared core now also defines an explicit classification runtime that
+keeps extraction, database transactions, and Bedrock invocation in separate
+failure boundaries. It can register a verified PDF document version, install
+or verify the approved workspace taxonomy with recorded human authority, invoke
+the real validated Bedrock gateway, obtain scores from a required injected
+confidence provider, and persist the proposal. Runtime construction performs
+no database or model input/output. No default confidence provider, configured
+database engine, desktop wiring, or live end-to-end execution is claimed.
+
 An initial, explicitly labelled corpus of 30 synthetic two-page PDFs is
 available in `pdf_sintetici` for desktop discovery, preview, guarded-link, and
 later relationship testing. Its manifest records deterministic provenance,

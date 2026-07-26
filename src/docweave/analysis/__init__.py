@@ -41,7 +41,12 @@ from docweave.analysis.schema import (
     classification_v1_output_config,
     classification_v1_tool_config,
 )
-from docweave.analysis.taxonomy import TAXONOMY_VERSION, TaxonomyClass
+from docweave.analysis.taxonomy import (
+    TAXONOMY_DEFINITIONS,
+    TAXONOMY_VERSION,
+    TaxonomyClass,
+    TaxonomyDefinition,
+)
 from docweave.analysis.validation import (
     MAXIMUM_RESPONSE_BYTES,
     ClassificationValidationCode,
@@ -61,6 +66,7 @@ __all__ = [
     "MAXIMUM_CLASSIFICATION_INPUT_CHARACTERS",
     "MAXIMUM_CLASSIFICATION_INPUT_PAGES",
     "MAXIMUM_RESPONSE_BYTES",
+    "TAXONOMY_DEFINITIONS",
     "TAXONOMY_VERSION",
     "AlternativeClass",
     "BedrockClassificationGateway",
@@ -83,6 +89,7 @@ __all__ = [
     "RawClassificationSignals",
     "SignalStrength",
     "TaxonomyClass",
+    "TaxonomyDefinition",
     "classification_v1_converse_fields",
     "classification_v1_json_schema",
     "classification_v1_output_config",
