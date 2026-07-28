@@ -1,14 +1,17 @@
 # Desktop Discovery Shell
 
 **Project:** DocWeave
-**Status:** Progressive read-only PySide6 surface implemented locally
-**Date:** 2026-07-26
+**Status:** Progressive read-only PySide6 cockpit surface implemented locally
+**Date:** 2026-07-28
 
 ## 1. Purpose
 
-The first desktop surface makes the existing deterministic discovery and intake
-core visible without implying that CockroachDB persistence, Amazon Bedrock
-analysis, review, or file operations are connected.
+The current desktop entrypoint uses the definitive transparent PySide6 cockpit
+surface supplied for DocWeave. Its graphical console, panel silhouettes,
+rotation, glass treatment, and central display behavior are treated as the
+desktop visual baseline. The cockpit makes the existing deterministic discovery
+and intake core visible without implying that CockroachDB persistence, Amazon
+Bedrock analysis, review, or file operations are connected.
 
 The shell lets a user:
 
@@ -17,10 +20,8 @@ The shell lets a user:
 3. observe separate discovery and deterministic-intake progress;
 4. cancel at cooperative file or fingerprint-chunk boundaries;
 5. inspect discovered, ready, and attention-required counts;
-6. view per-file relative path, deterministic intake state, byte size, and safe
-   diagnostic category; and
-7. select multiple completed rows for later review; and
-8. explicitly preview one ready PDF in a read-only DocWeave window.
+6. view discovered PDF rows and safe diagnostic status; and
+7. explicitly preview one ready PDF in the raised central cockpit display.
 
 It never renames, copies, moves, uploads, extracts text from, or sends a document
 to a model.
@@ -70,11 +71,11 @@ does not survive restart, and does not establish user or role authorization.
 
 ## 5. Embedded PDF preview boundary
 
-A double click or the `Preview PDF` button can request previewing exactly one
-completed `Ready` record. Immediately before the request, DocWeave verifies
-that the observed path still exists, is a regular `.pdf` file, is not a
-symbolic link, resolves inside the authorized root, and still has a valid PDF
-signature. A failed check blocks the request with a safe category.
+A click on one completed `Ready` row can request previewing that PDF in the
+central cockpit display. Immediately before the request, DocWeave verifies that
+the observed path still exists, is a regular `.pdf` file, is not a symbolic
+link, resolves inside the authorized root, and still has a valid PDF signature.
+A failed check blocks the request with a safe category.
 
 The preview uses Qt PDF's `QPdfDocument` and `QPdfView` from the already pinned
 PySide6 distribution. It presents all pages in a continuously scrollable
@@ -102,18 +103,17 @@ the current desktop shell, so end-to-end content persistence is not claimed.
 
 ## 6. Presentation and accessibility baseline
 
-The document table uses a read-only `QAbstractTableModel` rather than one widget
-per cell. This is the correct base for later pagination or virtualization.
-Controls, status messages, progress, selection count, metrics, and the table
-have accessible names. Status and safety meaning are expressed in text rather
-than color alone.
+The cockpit table is read-only and currently optimized for the supplied visual
+surface. The previous `QAbstractTableModel` shell remains covered by automated
+tests as a reference implementation for later pagination or virtualization.
+Controls, status messages, metrics, and the table expose textual state. Status
+and safety meaning are expressed in text rather than color alone.
 
-Windows rendering was inspected with an empty workspace and earlier with a
-controlled result. The product owner accepted the embedded preview's speed,
-scrolling, and basic behavior on 2026-07-26; visual polish, including larger
-zoom controls, remains planned. Web Content Accessibility Guidelines 2.2 Level
-AA conformance is not yet claimed; keyboard, screen-reader, contrast, high-DPI,
-and reduced-motion evidence remain pending.
+The cockpit has been smoke-tested with an empty workspace and with the
+`pdf_sintetici` corpus, including scan and central preview opening. Product
+owner visual review of the definitive surface remains required. Web Content
+Accessibility Guidelines 2.2 Level AA conformance is not yet claimed; keyboard,
+screen-reader, contrast, high-DPI, and reduced-motion evidence remain pending.
 
 ## 7. Dependency and launch
 
@@ -136,6 +136,8 @@ Packaged desktop delivery remains a separate architecture decision.
 Automated evidence covers:
 
 - application bootstrap and metadata;
+- cockpit import, construction, synthetic-corpus scan, and central PDF preview
+  smoke checks;
 - virtualized table content and size formatting;
 - authorized-root scanning and nested relative paths;
 - worker progress, success, cancellation, and minimized failure output;

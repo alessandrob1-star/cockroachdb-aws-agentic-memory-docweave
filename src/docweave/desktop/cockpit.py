@@ -1,0 +1,2183 @@
+# v31 glossy black bezel
+"""
+DocWeave cockpit UI — absolute positioning rewrite.
+
+Features:
+- frameless transparent window
+- no outer rectangular shell
+- two fixed side screens with outward-leaning silhouettes
+- dominant central PDF preview
+- high cockpit console
+- absolute positioning via resizeEvent()
+- click on a PDF row to open the central screen
+- close/minimize controls embedded in the left screen
+
+Run:
+    py docweave_cockpit_absolute.py
+
+Requires:
+    py -m pip install PySide6
+"""
+# mypy: ignore-errors
+# ruff: noqa: PLR0915, PLR2004, RUF001, B905, I001, F401
+
+from __future__ import annotations
+
+import sys
+import math
+from dataclasses import dataclass
+from pathlib import Path
+
+from PySide6.QtCore import (
+    QEasingCurve,
+    QPoint,
+    QPointF,
+    QPropertyAnimation,
+    QRect,
+    QRectF,
+    QThread,
+    Qt,
+    QUrl,
+    Signal,
+    Slot,
+    QTimer,
+)
+from PySide6.QtGui import (
+    QColor,
+    QFont,
+    QLinearGradient,
+    QRadialGradient,
+    QBrush,
+    QCloseEvent,
+    QMouseEvent,
+    QPainter,
+    QPainterPath,
+    QPen,
+    QPixmap,
+    QRegion,
+    QTransform,
+)
+from PySide6.QtPdf import QPdfDocument
+from PySide6.QtPdfWidgets import QPdfView
+from PySide6.QtWidgets import (
+    QApplication,
+    QFileDialog,
+    QFrame,
+    QGraphicsDropShadowEffect,
+    QGraphicsOpacityEffect,
+    QGraphicsProxyWidget,
+    QGraphicsScene,
+    QGraphicsView,
+    QHeaderView,
+    QLabel,
+    QMainWindow,
+    QPushButton,
+    QTableWidget,
+    QTableWidgetItem,
+    QWidget,
+)
+
+from docweave.desktop.link_security import (
+    ExternalLinkOutcome,
+    request_external_pdf_link,
+)
+from docweave.desktop.opening import PdfOpenValidationError, validate_pdf_for_open
+from docweave.desktop.preview import SecurePdfView
+from docweave.desktop.scan import (
+    DesktopScanResult,
+    ScanFunction,
+    ScanPhase,
+    ScanProgress,
+    ScanWorker,
+    scan_authorized_root,
+)
+from docweave.desktop.workspace import (
+    DesktopWorkspaceSession,
+    WorkspacePhase,
+)
+from docweave.intake import IntakeStatus
+
+
+SURFACE = QColor("#081E19")
+SURFACE_ALT = QColor("#0C2A23")
+EDGE = QColor("#59C6A2")
+EDGE_SOFT = QColor(89, 198, 162, 72)
+TEXT = QColor("#EAF5F1")
+MUTED = QColor("#8FAAA1")
+ACCENT = QColor("#67D8B0")
+WARNING = QColor("#E1AB4D")
+
+
+@dataclass(frozen=True)
+class Document:
+    name: str
+    category: str
+    pages: str
+    status: str
+    path: Path | None = None
+
+
+DOCUMENTS: list[Document] = []
+
+
+class ShapeWidget(QWidget):
+    """Base class for clipped, independently positioned cockpit parts."""
+
+    def __init__(self, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
+        self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, False)
+
+        self._pulse_phase = 0
+        self._pulse_timer = QTimer(self)
+        self._pulse_timer.setInterval(70)
+        self._pulse_timer.timeout.connect(self._advance_pulse)
+        self._pulse_timer.start()
+
+    def _advance_pulse(self) -> None:
+        self._pulse_phase = (self._pulse_phase + 1) % 40
+        self.update()
+
+    def shape_path(self) -> QPainterPath:
+        path = QPainterPath()
+        path.addRect(QRectF(self.rect()))
+        return path
+
+    def update_mask(self) -> None:
+        polygon = self.shape_path().toFillPolygon().toPolygon()
+        self.setMask(QRegion(polygon))
+
+    def resizeEvent(self, event) -> None:
+        super().resizeEvent(event)
+        self.update_mask()
+
+    def paintEvent(self, event) -> None:
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing, True)
+
+        path = self.shape_path()
+        bounds = path.boundingRect()
+
+        # Rear chassis depth.
+        chassis_transform = QTransform()
+        chassis_transform.translate(8.0, 10.0)
+        chassis_path = chassis_transform.map(path)
+
+        painter.setPen(QPen(QColor(0, 0, 0, 125), 18))
+        painter.drawPath(chassis_path)
+
+        # Outer glass frame.
+        glass = QLinearGradient(bounds.topLeft(), bounds.bottomRight())
+        glass.setColorAt(0.00, QColor(100, 225, 185, 52))
+        glass.setColorAt(0.22, QColor(62, 175, 140, 38))
+        glass.setColorAt(0.62, QColor(24, 92, 73, 28))
+        glass.setColorAt(1.00, QColor(8, 36, 29, 24))
+        painter.fillPath(path, QBrush(glass))
+
+        # Inner carbon panel: exact scaled copy of the outer silhouette.
+        # This preserves every cut corner and angled edge.
+        inner_transform = QTransform()
+        inner_transform.translate(bounds.center().x(), bounds.center().y())
+        inner_transform.scale(0.89, 0.87)
+        inner_transform.translate(-bounds.center().x(), -bounds.center().y())
+        inner_path = inner_transform.map(path)
+        inner = inner_path.boundingRect()
+
+        carbon_base = QLinearGradient(inner.topLeft(), inner.bottomRight())
+        carbon_base.setColorAt(0.00, QColor(30, 34, 33, 255))
+        carbon_base.setColorAt(0.45, QColor(18, 22, 21, 255))
+        carbon_base.setColorAt(1.00, QColor(7, 10, 10, 255))
+        painter.fillPath(inner_path, QBrush(carbon_base))
+
+        # Carbon-fiber weave texture.
+        painter.save()
+        painter.setClipPath(inner_path)
+
+        tile = 9
+        for y in range(int(inner.top()), int(inner.bottom()) + tile, tile):
+            for x in range(int(inner.left()), int(inner.right()) + tile, tile):
+                alt = ((x // tile) + (y // tile)) % 2
+
+                if alt == 0:
+                    c1 = QColor(58, 64, 62, 48)
+                    c2 = QColor(8, 12, 11, 58)
+                else:
+                    c1 = QColor(18, 24, 22, 46)
+                    c2 = QColor(70, 78, 75, 36)
+
+                painter.setPen(QPen(c1, 1.0))
+                painter.drawLine(x, y + tile, x + tile, y)
+
+                painter.setPen(QPen(c2, 0.55))
+                painter.drawLine(x - tile * 0.35, y + tile, x + tile * 0.65, y)
+
+        # Subtle diagonal sheen on carbon.
+        sheen = QLinearGradient(
+            inner.left(),
+            inner.top(),
+            inner.right(),
+            inner.bottom(),
+        )
+        sheen.setColorAt(0.00, QColor(255, 255, 255, 8))
+        sheen.setColorAt(0.35, QColor(120, 255, 210, 8))
+        sheen.setColorAt(0.65, QColor(0, 0, 0, 0))
+        sheen.setColorAt(1.00, QColor(0, 0, 0, 22))
+        painter.fillPath(inner_path, QBrush(sheen))
+
+        painter.restore()
+
+        # Recessed bevel between glass and carbon.
+        # Light catches the upper/left edge, while lower/right edges fall into shadow.
+        bevel_outer = inner_path
+
+        inner_bevel_transform = QTransform()
+        inner_bevel_transform.translate(inner.center().x(), inner.center().y())
+        inner_bevel_transform.scale(0.975, 0.970)
+        inner_bevel_transform.translate(-inner.center().x(), -inner.center().y())
+        bevel_inner = inner_bevel_transform.map(inner_path)
+
+        bevel_ring = bevel_outer.subtracted(bevel_inner)
+
+        bevel_black = QColor(8, 8, 10, 255)
+        painter.fillPath(bevel_ring, QBrush(bevel_black))
+        painter.setPen(QPen(QColor(42, 42, 46, 210), 0.8))
+        painter.drawPath(bevel_outer)
+        painter.setPen(QPen(QColor(0, 0, 0, 245), 1.2))
+        painter.drawPath(bevel_inner)
+
+        # Top bevel / glass reflection.
+        top_face = QPainterPath()
+        top_face.moveTo(bounds.left() + bounds.width() * 0.06, bounds.top() + 4)
+        top_face.lineTo(bounds.right() - bounds.width() * 0.06, bounds.top() + 4)
+        top_face.lineTo(
+            bounds.right() - bounds.width() * 0.10,
+            bounds.top() + bounds.height() * 0.12,
+        )
+        top_face.lineTo(
+            bounds.left() + bounds.width() * 0.10, bounds.top() + bounds.height() * 0.12
+        )
+        top_face.closeSubpath()
+
+        top_grad = QLinearGradient(
+            0,
+            bounds.top(),
+            0,
+            bounds.top() + bounds.height() * 0.15,
+        )
+        top_grad.setColorAt(0.00, QColor(235, 255, 248, 72))
+        top_grad.setColorAt(0.40, QColor(130, 245, 205, 26))
+        top_grad.setColorAt(1.00, QColor(0, 0, 0, 0))
+        painter.fillPath(top_face, QBrush(top_grad))
+
+        # Directional depth faces.
+        left_face = QPainterPath()
+        left_face.moveTo(bounds.left() + 3, bounds.top() + bounds.height() * 0.08)
+        left_face.lineTo(
+            bounds.left() + bounds.width() * 0.10, bounds.top() + bounds.height() * 0.12
+        )
+        left_face.lineTo(
+            bounds.left() + bounds.width() * 0.10,
+            bounds.bottom() - bounds.height() * 0.10,
+        )
+        left_face.lineTo(bounds.left() + 3, bounds.bottom() - bounds.height() * 0.06)
+        left_face.closeSubpath()
+
+        left_grad = QLinearGradient(
+            bounds.left(),
+            bounds.top(),
+            bounds.left() + bounds.width() * 0.14,
+            bounds.top(),
+        )
+        left_grad.setColorAt(0.00, QColor(175, 255, 226, 78))
+        left_grad.setColorAt(0.55, QColor(70, 210, 168, 22))
+        left_grad.setColorAt(1.00, QColor(0, 0, 0, 0))
+        painter.fillPath(left_face, QBrush(left_grad))
+
+        right_face = QPainterPath()
+        right_face.moveTo(bounds.right() - 3, bounds.top() + bounds.height() * 0.08)
+        right_face.lineTo(
+            bounds.right() - bounds.width() * 0.10,
+            bounds.top() + bounds.height() * 0.12,
+        )
+        right_face.lineTo(
+            bounds.right() - bounds.width() * 0.10,
+            bounds.bottom() - bounds.height() * 0.10,
+        )
+        right_face.lineTo(bounds.right() - 3, bounds.bottom() - bounds.height() * 0.06)
+        right_face.closeSubpath()
+
+        right_grad = QLinearGradient(
+            bounds.right() - bounds.width() * 0.14,
+            bounds.top(),
+            bounds.right(),
+            bounds.top(),
+        )
+        right_grad.setColorAt(0.00, QColor(0, 0, 0, 0))
+        right_grad.setColorAt(0.55, QColor(0, 8, 7, 55))
+        right_grad.setColorAt(1.00, QColor(0, 2, 2, 165))
+        painter.fillPath(right_face, QBrush(right_grad))
+
+        bottom_face = QPainterPath()
+        bottom_face.moveTo(
+            bounds.left() + bounds.width() * 0.10,
+            bounds.bottom() - bounds.height() * 0.10,
+        )
+        bottom_face.lineTo(
+            bounds.right() - bounds.width() * 0.10,
+            bounds.bottom() - bounds.height() * 0.10,
+        )
+        bottom_face.lineTo(bounds.right() - bounds.width() * 0.06, bounds.bottom() - 3)
+        bottom_face.lineTo(bounds.left() + bounds.width() * 0.06, bounds.bottom() - 3)
+        bottom_face.closeSubpath()
+
+        bottom_grad = QLinearGradient(
+            0,
+            bounds.bottom() - bounds.height() * 0.15,
+            0,
+            bounds.bottom(),
+        )
+        bottom_grad.setColorAt(0.00, QColor(0, 0, 0, 0))
+        bottom_grad.setColorAt(0.45, QColor(0, 6, 5, 50))
+        bottom_grad.setColorAt(1.00, QColor(0, 2, 2, 190))
+        painter.fillPath(bottom_face, QBrush(bottom_grad))
+
+        # Directional edge lighting.
+        painter.setPen(QPen(QColor(185, 255, 230, 190), 1.5))
+        painter.drawLine(
+            int(bounds.left() + bounds.width() * 0.08),
+            int(bounds.top() + 4),
+            int(bounds.right() - bounds.width() * 0.08),
+            int(bounds.top() + 4),
+        )
+
+        painter.setPen(QPen(QColor(115, 235, 195, 110), 1.0))
+        painter.drawLine(
+            int(bounds.left() + 4),
+            int(bounds.top() + bounds.height() * 0.08),
+            int(bounds.left() + 4),
+            int(bounds.bottom() - bounds.height() * 0.08),
+        )
+
+        painter.setPen(QPen(QColor(0, 6, 5, 180), 2.4))
+        painter.drawLine(
+            int(bounds.left() + bounds.width() * 0.08),
+            int(bounds.bottom() - 4),
+            int(bounds.right() - bounds.width() * 0.08),
+            int(bounds.bottom() - 4),
+        )
+
+        painter.setPen(QPen(QColor(0, 7, 6, 145), 1.8))
+        painter.drawLine(
+            int(bounds.right() - 4),
+            int(bounds.top() + bounds.height() * 0.08),
+            int(bounds.right() - 4),
+            int(bounds.bottom() - bounds.height() * 0.08),
+        )
+
+        # Soft asymmetric reflection: stronger near top-left, fading inward.
+        reflection = QLinearGradient(
+            bounds.left(),
+            bounds.top(),
+            bounds.right(),
+            bounds.bottom(),
+        )
+        reflection.setColorAt(0.00, QColor(255, 255, 255, 34))
+        reflection.setColorAt(0.18, QColor(205, 255, 238, 18))
+        reflection.setColorAt(0.42, QColor(120, 230, 195, 7))
+        reflection.setColorAt(0.72, QColor(0, 0, 0, 0))
+        reflection.setColorAt(1.00, QColor(0, 0, 0, 10))
+
+        reflection_path = QPainterPath()
+        reflection_path.moveTo(
+            bounds.left() + bounds.width() * 0.06,
+            bounds.top() + bounds.height() * 0.05,
+        )
+        reflection_path.lineTo(
+            bounds.right() - bounds.width() * 0.20,
+            bounds.top() + bounds.height() * 0.05,
+        )
+        reflection_path.lineTo(
+            bounds.right() - bounds.width() * 0.30,
+            bounds.top() + bounds.height() * 0.15,
+        )
+        reflection_path.lineTo(
+            bounds.left() + bounds.width() * 0.10,
+            bounds.top() + bounds.height() * 0.18,
+        )
+        reflection_path.closeSubpath()
+        painter.fillPath(reflection_path, QBrush(reflection))
+
+        # Mechanical details.
+        screw_points = (
+            QPointF(bounds.left() + 14, bounds.top() + 14),
+            QPointF(bounds.right() - 14, bounds.top() + 14),
+            QPointF(bounds.left() + 14, bounds.bottom() - 14),
+            QPointF(bounds.right() - 14, bounds.bottom() - 14),
+        )
+        for point in screw_points:
+            painter.setPen(QPen(QColor(0, 5, 4, 180), 1))
+            painter.setBrush(QColor(12, 30, 26, 230))
+            painter.drawEllipse(point, 3.4, 3.4)
+            painter.setPen(QPen(QColor(130, 235, 200, 80), 0.8))
+            painter.drawLine(
+                QPointF(point.x() - 1.8, point.y()),
+                QPointF(point.x() + 1.8, point.y()),
+            )
+
+        led = QPointF(bounds.right() - 34, bounds.top() + 18)
+        painter.setPen(Qt.PenStyle.NoPen)
+        pulse = 0.5 + 0.5 * math.sin(self._pulse_phase / 40 * math.tau)
+        painter.setBrush(QColor(80, 255, 185, int(150 + 70 * pulse)))
+        painter.drawEllipse(led, 3.2, 3.2)
+        painter.setBrush(QColor(80, 255, 185, int(24 + 34 * pulse)))
+        painter.drawEllipse(led, 7.5, 7.5)
+
+
+class LeftScreen(ShapeWidget):
+    document_selected = Signal(int)
+
+    def __init__(self, window: QMainWindow, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self.window = window
+        self._dragging = False
+        self._drag_offset = QPoint()
+
+        self.close_button = QPushButton("×", self)
+        self.close_button.setObjectName("windowButton")
+        self.close_button.clicked.connect(window.close)
+
+        self.min_button = QPushButton("—", self)
+        self.min_button.setObjectName("windowButton")
+        self.min_button.clicked.connect(window.showMinimized)
+
+        self.brand = QLabel("DOCWEAVE", self)
+        self.brand.setObjectName("brand")
+
+        self.local = QLabel("● LOCAL", self)
+        self.local.setObjectName("online")
+
+        self.section = QLabel("LOCAL DOCUMENTS", self)
+        self.section.setObjectName("sectionLabel")
+
+        self._documents: list[Document] = list(DOCUMENTS)
+        self.table = QTableWidget(0, 4, self)
+        self.table.setObjectName("documentTable")
+        self.table.setHorizontalHeaderLabels(["DOCUMENT", "TYPE", "PAGES", "STATUS"])
+        self.table.verticalHeader().setVisible(False)
+        self.table.setShowGrid(False)
+        self.table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
+        self.table.setSelectionMode(QTableWidget.SelectionMode.SingleSelection)
+        self.table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
+
+        header = self.table.horizontalHeader()
+        header.setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
+        header.setSectionResizeMode(1, QHeaderView.ResizeMode.ResizeToContents)
+        header.setSectionResizeMode(2, QHeaderView.ResizeMode.ResizeToContents)
+        header.setSectionResizeMode(3, QHeaderView.ResizeMode.ResizeToContents)
+
+        self.set_documents(self._documents)
+
+        self.table.cellClicked.connect(
+            lambda row, _column: self.document_selected.emit(row)
+        )
+
+        self.hint = QLabel("Choose a folder, scan, then select a ready PDF.", self)
+        self.hint.setObjectName("muted")
+
+        for label in (self.brand, self.local, self.section, self.hint):
+            glow = QGraphicsDropShadowEffect(label)
+            glow.setBlurRadius(14)
+            glow.setOffset(0, 0)
+            glow.setColor(QColor(255, 30, 30, 180))
+            label.setGraphicsEffect(glow)
+
+    def document_at(self, row: int) -> Document | None:
+        if not 0 <= row < len(self._documents):
+            return None
+        return self._documents[row]
+
+    def set_documents(self, documents: list[Document]) -> None:
+        self._documents = list(documents)
+        self.table.setRowCount(len(self._documents))
+        for row, doc in enumerate(self._documents):
+            for column, value in enumerate(
+                (doc.name, doc.category, doc.pages, doc.status)
+            ):
+                item = QTableWidgetItem(value)
+                if column == 3:
+                    item.setForeground(WARNING if doc.status == "ATTENTION" else ACCENT)
+                self.table.setItem(row, column, item)
+
+    def shape_path(self) -> QPainterPath:
+        r = self.rect().adjusted(3, 3, -3, -3)
+        x, y, w, h = map(float, (r.x(), r.y(), r.width(), r.height()))
+
+        path = QPainterPath()
+        path.moveTo(x + w * 0.08, y)
+        path.lineTo(x + w * 0.92, y)
+        path.lineTo(x + w, y + h * 0.08)
+        path.lineTo(x + w * 0.97, y + h * 0.92)
+        path.lineTo(x + w * 0.88, y + h)
+        path.lineTo(x + w * 0.12, y + h)
+        path.lineTo(x, y + h * 0.92)
+        path.lineTo(x + w * 0.03, y + h * 0.08)
+        path.closeSubpath()
+        return path
+
+    def resizeEvent(self, event) -> None:
+        super().resizeEvent(event)
+        w = self.width()
+        h = self.height()
+
+        # Header and footer labels remain on the glass frame.
+        self.close_button.setGeometry(34, 18, 31, 29)
+        self.min_button.setGeometry(71, 18, 31, 29)
+        self.brand.setGeometry(112, 16, 165, 32)
+        self.local.setGeometry(w - 94, 20, 72, 24)
+
+        # Carbon content area: extra lower/side clearance keeps the table
+        # entirely inside the scaled carbon silhouette.
+        content_left = int(w * 0.105)
+        content_right = int(w * 0.105)
+        content_top = int(h * 0.145)
+        content_width = w - content_left - content_right
+
+        self.section.setGeometry(
+            40,
+            61,
+            w - 80,
+            24,
+        )
+
+        table_top = content_top
+        hint_height = 22
+        hint_y = h - 46
+        self.table.setGeometry(
+            content_left,
+            table_top,
+            content_width,
+            hint_y - table_top - 30,
+        )
+        self.hint.setGeometry(
+            46,
+            hint_y,
+            w - 92,
+            hint_height,
+        )
+
+    def mousePressEvent(self, event: QMouseEvent) -> None:
+        if event.button() == Qt.MouseButton.LeftButton and event.position().y() < 58:
+            self._dragging = True
+            self._drag_offset = (
+                event.globalPosition().toPoint() - self.window.frameGeometry().topLeft()
+            )
+            event.accept()
+
+    def mouseMoveEvent(self, event: QMouseEvent) -> None:
+        if self._dragging and event.buttons() & Qt.MouseButton.LeftButton:
+            self.window.move(event.globalPosition().toPoint() - self._drag_offset)
+            event.accept()
+
+    def mouseReleaseEvent(self, event: QMouseEvent) -> None:
+        self._dragging = False
+        event.accept()
+
+
+class RightScreen(ShapeWidget):
+    def __init__(self, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+
+        self.title = QLabel("SYSTEM INTELLIGENCE", self)
+        self.title.setObjectName("screenTitle")
+
+        self.online = QLabel("● ONLINE", self)
+        self.online.setObjectName("online")
+
+        self.section = QLabel("MEMORY / AGENT STATUS", self)
+        self.section.setObjectName("sectionLabel")
+
+        self.metric_frames: list[QFrame] = []
+        for value, caption in (("0", "DISCOVERED"), ("0", "READY"), ("0", "REVIEW")):
+            frame = QFrame(self)
+            frame.setObjectName("metric")
+            number = QLabel(value, frame)
+            number.setObjectName("metricValue")
+            label = QLabel(caption, frame)
+            label.setObjectName("metricLabel")
+            frame.number = number
+            frame.caption = label
+            self.metric_frames.append(frame)
+
+        self.stream_label = QLabel("AGENT EVENT STREAM", self)
+        self.stream_label.setObjectName("sectionLabel")
+
+        for label in (self.title, self.online, self.section, self.stream_label):
+            glow = QGraphicsDropShadowEffect(label)
+            glow.setBlurRadius(14)
+            glow.setOffset(0, 0)
+            glow.setColor(QColor(255, 30, 30, 180))
+            label.setGraphicsEffect(glow)
+
+        self.event_rows: list[QFrame] = []
+        events = [
+            ("DISCOVERY", "Choose a folder to begin"),
+            ("PREVIEW", "Embedded PDF viewer ready"),
+            ("MEMORY", "CockroachDB not connected"),
+            ("BEDROCK", "Classification not active"),
+            ("SECURITY", "Read-only local boundary"),
+        ]
+        for name, text in events:
+            frame = QFrame(self)
+            frame.setObjectName("eventRow")
+            a = QLabel(name, frame)
+            a.setObjectName("eventName")
+            b = QLabel(text, frame)
+            b.setObjectName("eventText")
+            frame.event_name = a
+            frame.event_text = b
+            self.event_rows.append(frame)
+
+    def set_metrics(self, discovered: int, ready: int, review: int) -> None:
+        for frame, value in zip(
+            self.metric_frames,
+            (discovered, ready, review),
+            strict=True,
+        ):
+            frame.number.setText(str(value))
+
+    def set_events(self, events: list[tuple[str, str]]) -> None:
+        for frame, event in zip(self.event_rows, events, strict=False):
+            name, text = event
+            frame.event_name.setText(name)
+            frame.event_text.setText(text)
+
+    def shape_path(self) -> QPainterPath:
+        r = self.rect().adjusted(3, 3, -3, -3)
+        x, y, w, h = map(float, (r.x(), r.y(), r.width(), r.height()))
+
+        path = QPainterPath()
+        path.moveTo(x + w * 0.08, y)
+        path.lineTo(x + w * 0.92, y)
+        path.lineTo(x + w, y + h * 0.08)
+        path.lineTo(x + w * 0.97, y + h * 0.92)
+        path.lineTo(x + w * 0.88, y + h)
+        path.lineTo(x + w * 0.12, y + h)
+        path.lineTo(x, y + h * 0.92)
+        path.lineTo(x + w * 0.03, y + h * 0.08)
+        path.closeSubpath()
+        return path
+
+    def resizeEvent(self, event) -> None:
+        super().resizeEvent(event)
+        w = self.width()
+        h = self.height()
+
+        # Title and status remain on the glass frame.
+        self.title.setGeometry(44, 18, w - 150, 28)
+        self.online.setGeometry(w - 96, 20, 74, 22)
+        self.section.setGeometry(44, 58, w - 88, 22)
+
+        # Carbon content area.
+        content_left = int(w * 0.085)
+        content_right = int(w * 0.085)
+        content_top = int(h * 0.135)
+        content_width = w - content_left - content_right
+
+        metric_gap = 10
+        metric_top = content_top
+        metric_w = int((content_width - metric_gap * 2) / 3)
+        x = content_left
+        for frame in self.metric_frames:
+            frame.setGeometry(x, metric_top, metric_w, 78)
+            frame.number.setGeometry(11, 9, metric_w - 22, 31)
+            frame.caption.setGeometry(11, 44, metric_w - 22, 20)
+            x += metric_w + metric_gap
+
+        stream_top = metric_top + 94
+        self.stream_label.setGeometry(
+            content_left,
+            stream_top,
+            content_width,
+            21,
+        )
+
+        row_y = stream_top + 32
+        row_height = 58
+        row_gap = 10
+        for frame in self.event_rows:
+            frame.setGeometry(
+                content_left,
+                row_y,
+                content_width,
+                row_height,
+            )
+            frame.event_name.setGeometry(12, 7, content_width - 24, 18)
+            frame.event_text.setGeometry(12, 28, content_width - 24, 22)
+            row_y += row_height + row_gap
+
+
+class PdfPageMock(QWidget):
+    def __init__(self, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self.document_name = "Contract_Master_v3.pdf"
+
+    def set_document(self, name: str) -> None:
+        self.document_name = name
+        self.update()
+
+    def paintEvent(self, event) -> None:
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing, True)
+
+        available = self.rect().adjusted(25, 8, -25, -12)
+        ratio = 0.707
+
+        page_h = min(available.height(), int(available.width() / ratio))
+        page_w = int(page_h * ratio)
+
+        page = QRectF(
+            available.center().x() - page_w / 2,
+            available.top(),
+            page_w,
+            page_h,
+        )
+
+        painter.setPen(Qt.PenStyle.NoPen)
+        painter.setBrush(QColor(0, 0, 0, 85))
+        painter.drawRoundedRect(page.translated(9, 10), 5, 5)
+
+        painter.setBrush(QColor(248, 250, 249, 255))
+        painter.setPen(QPen(QColor("#AAB8B2"), 1.2))
+        painter.drawRoundedRect(page, 5, 5)
+
+        painter.setPen(QColor("#13211C"))
+        painter.setFont(QFont("Segoe UI", 12, QFont.Weight.Bold))
+        painter.drawText(
+            page.adjusted(28, 24, -28, -20),
+            Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignHCenter,
+            self.document_name.replace("_", " "),
+        )
+
+        y = page.top() + 74
+        painter.setPen(QPen(QColor("#51615B"), 1.8))
+
+        widths = (0.84, 0.92, 0.72, 0.88, 0.64, 0.90, 0.77, 0.86, 0.61)
+        for index, factor in enumerate(widths):
+            x1 = page.left() + 32
+            x2 = x1 + (page.width() - 64) * factor
+            painter.drawLine(x1, y, x2, y)
+            y += 18 if index not in (2, 5) else 31
+
+
+class CenterPreview(ShapeWidget):
+    def paintEvent(self, event) -> None:
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing, True)
+
+        path = self.shape_path()
+        bounds = path.boundingRect()
+
+        # Transparent green glass frame only. No carbon on the central screen.
+        glass = QLinearGradient(bounds.topLeft(), bounds.bottomRight())
+        glass.setColorAt(0.00, QColor(110, 230, 190, 48))
+        glass.setColorAt(0.25, QColor(65, 175, 140, 30))
+        glass.setColorAt(0.70, QColor(18, 80, 64, 18))
+        glass.setColorAt(1.00, QColor(5, 28, 23, 14))
+        painter.fillPath(path, QBrush(glass))
+
+        # Dark depth behind the frame only.
+        painter.setPen(QPen(QColor(0, 0, 0, 125), 16))
+        painter.drawPath(path)
+
+        # Directional highlights.
+        painter.setPen(QPen(QColor(205, 255, 238, 210), 1.8))
+        painter.drawLine(
+            int(bounds.left() + bounds.width() * 0.05),
+            int(bounds.top() + 4),
+            int(bounds.right() - bounds.width() * 0.05),
+            int(bounds.top() + 4),
+        )
+
+        painter.setPen(QPen(QColor(115, 235, 195, 110), 1.1))
+        painter.drawLine(
+            int(bounds.left() + 4),
+            int(bounds.top() + bounds.height() * 0.06),
+            int(bounds.left() + 4),
+            int(bounds.bottom() - bounds.height() * 0.06),
+        )
+
+        painter.setPen(QPen(QColor(0, 7, 6, 165), 2.0))
+        painter.drawLine(
+            int(bounds.right() - 4),
+            int(bounds.top() + bounds.height() * 0.06),
+            int(bounds.right() - 4),
+            int(bounds.bottom() - bounds.height() * 0.06),
+        )
+
+        # Red illuminated glass labels.
+        painter.setPen(Qt.PenStyle.NoPen)
+        led = QPointF(bounds.left() + 20, bounds.top() + 17)
+        painter.setBrush(QColor(255, 35, 35, 210))
+        painter.drawEllipse(led, 3.5, 3.5)
+        painter.setBrush(QColor(255, 35, 35, 45))
+        painter.drawEllipse(led, 8.0, 8.0)
+
+    def __init__(self, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+
+        self._target_rect = QRect()
+        self._geometry_animation = QPropertyAnimation(self, b"geometry", self)
+        self._geometry_animation.setDuration(360)
+        self._geometry_animation.setEasingCurve(QEasingCurve.Type.OutCubic)
+
+        self.opacity_effect = QGraphicsOpacityEffect(self)
+        self.opacity_effect.setOpacity(0.0)
+        self.setGraphicsEffect(self.opacity_effect)
+
+        self.opacity_animation = QPropertyAnimation(
+            self.opacity_effect,
+            b"opacity",
+            self,
+        )
+        self.opacity_animation.setDuration(260)
+        self.opacity_animation.setEasingCurve(QEasingCurve.Type.OutCubic)
+
+        self.title = QLabel("PDF PREVIEW", self)
+        self.title.setObjectName("screenTitle")
+
+        self.filename = QLabel("No document selected", self)
+        self.filename.setObjectName("muted")
+
+        for label in (self.title, self.filename):
+            glow = QGraphicsDropShadowEffect(label)
+            glow.setBlurRadius(14)
+            glow.setOffset(0, 0)
+            glow.setColor(QColor(255, 30, 30, 180))
+            label.setGraphicsEffect(glow)
+
+        self.lower_button = QPushButton("LOWER", self)
+        self.lower_button.setObjectName("smallButton")
+        self.lower_button.clicked.connect(self.close_preview)
+
+        self.zoom_out = QPushButton("−", self)
+        self.zoom_value = QPushButton("100%", self)
+        self.zoom_in = QPushButton("+", self)
+        self.fit = QPushButton("FIT", self)
+
+        for button in (self.zoom_out, self.zoom_value, self.zoom_in, self.fit):
+            button.setObjectName("smallButton")
+
+        self.counter = QLabel("1 / 1", self)
+        self.counter.setObjectName("muted")
+
+        self._document = QPdfDocument(self)
+        self.page = SecurePdfView(self)
+        self.page.setObjectName("centralPdfView")
+        self.page.setStyleSheet(
+            """
+            QPdfView#centralPdfView {
+                background: rgba(2, 8, 7, 235);
+                border: 1px solid rgba(103, 216, 176, 120);
+            }
+
+            QPdfView#centralPdfView QScrollBar:vertical {
+                background: rgba(4, 18, 15, 215);
+                border-left: 1px solid rgba(103, 216, 176, 85);
+                width: 18px;
+                margin: 2px;
+            }
+
+            QPdfView#centralPdfView QScrollBar:horizontal {
+                background: rgba(4, 18, 15, 215);
+                border-top: 1px solid rgba(103, 216, 176, 85);
+                height: 18px;
+                margin: 2px;
+            }
+
+            QPdfView#centralPdfView QScrollBar::handle:vertical,
+            QPdfView#centralPdfView QScrollBar::handle:horizontal {
+                background: rgba(103, 255, 200, 185);
+                border: 1px solid rgba(205, 255, 238, 210);
+                border-radius: 8px;
+                min-height: 42px;
+                min-width: 42px;
+            }
+
+            QPdfView#centralPdfView QScrollBar::handle:vertical:hover,
+            QPdfView#centralPdfView QScrollBar::handle:horizontal:hover {
+                background: rgba(150, 255, 220, 230);
+                border-color: rgba(235, 255, 248, 245);
+            }
+
+            QPdfView#centralPdfView QScrollBar::add-line,
+            QPdfView#centralPdfView QScrollBar::sub-line {
+                width: 0;
+                height: 0;
+            }
+
+            QPdfView#centralPdfView QScrollBar::add-page,
+            QPdfView#centralPdfView QScrollBar::sub-page {
+                background: transparent;
+            }
+            """
+        )
+        self.page.setDocument(self._document)
+        self.page.setPageMode(QPdfView.PageMode.MultiPage)
+        self.page.setZoomMode(QPdfView.ZoomMode.FitToWidth)
+        self.page.external_link_activated.connect(self._open_external_link)
+        self._document.statusChanged.connect(self._handle_document_status)
+        self._document.pageCountChanged.connect(self._update_page_counter)
+        self.page.pageNavigator().currentPageChanged.connect(self._update_page_counter)
+
+        self.zoom_out.clicked.connect(self.zoom_out_pdf)
+        self.zoom_in.clicked.connect(self.zoom_in_pdf)
+        self.fit.clicked.connect(self.fit_pdf_width)
+
+    def shape_path(self) -> QPainterPath:
+        r = self.rect().adjusted(3, 3, -3, -3)
+        x, y, w, h = map(float, (r.x(), r.y(), r.width(), r.height()))
+
+        path = QPainterPath()
+        path.moveTo(x + w * 0.04, y)
+        path.lineTo(x + w * 0.96, y)
+        path.lineTo(x + w, y + h * 0.05)
+        path.lineTo(x + w * 0.985, y + h * 0.96)
+        path.lineTo(x + w * 0.96, y + h)
+        path.lineTo(x + w * 0.04, y + h)
+        path.lineTo(x + w * 0.015, y + h * 0.96)
+        path.lineTo(x, y + h * 0.05)
+        path.closeSubpath()
+        return path
+
+    def resizeEvent(self, event) -> None:
+        super().resizeEvent(event)
+        w = self.width()
+        h = self.height()
+
+        # Header remains on the glass.
+        self.title.setGeometry(28, 16, 180, 27)
+        self.filename.setGeometry(28, 43, w - 200, 22)
+        self.lower_button.setGeometry(w - 96, 16, 68, 29)
+
+        self.zoom_out.setGeometry(28, 72, 62, 30)
+        self.zoom_value.setGeometry(98, 72, 72, 30)
+        self.zoom_in.setGeometry(178, 72, 62, 30)
+        self.fit.setGeometry(248, 72, 62, 30)
+        self.counter.setGeometry(w - 98, 75, 70, 25)
+
+        # PDF uses almost the entire inner screen and remains fully opaque.
+        self.page.setGeometry(18, 112, w - 36, h - 128)
+
+    def set_target_rect(self, rect: QRect) -> None:
+        self._target_rect = QRect(rect)
+
+    def open_document(self, path: Path) -> None:
+        self.filename.setText(path.name)
+        self.counter.setText("Loading")
+        self._document.close()
+        load_error = self._document.load(str(path))
+        if load_error is not QPdfDocument.Error.None_:
+            self.counter.setText("Blocked")
+
+        collapsed = QRect(
+            self._target_rect.center().x(),
+            self._target_rect.bottom() - 12,
+            0,
+            12,
+        )
+
+        if self.width() <= 10 or self.height() <= 20:
+            self.setGeometry(collapsed)
+
+        self.show()
+
+        self._geometry_animation.stop()
+        self.opacity_animation.stop()
+
+        self._geometry_animation.setStartValue(self.geometry())
+        self._geometry_animation.setEndValue(self._target_rect)
+
+        self.opacity_animation.setStartValue(self.opacity_effect.opacity())
+        self.opacity_animation.setEndValue(1.0)
+
+        self._geometry_animation.start()
+        self.opacity_animation.start()
+
+    @Slot()
+    def zoom_in_pdf(self) -> None:
+        self.page.setZoomMode(QPdfView.ZoomMode.Custom)
+        self.page.setZoomFactor(min(4.0, self.page.zoomFactor() * 1.2))
+        self._update_zoom_label()
+
+    @Slot()
+    def zoom_out_pdf(self) -> None:
+        self.page.setZoomMode(QPdfView.ZoomMode.Custom)
+        self.page.setZoomFactor(max(0.25, self.page.zoomFactor() / 1.2))
+        self._update_zoom_label()
+
+    @Slot()
+    def fit_pdf_width(self) -> None:
+        self.page.setZoomMode(QPdfView.ZoomMode.FitToWidth)
+        self.zoom_value.setText("FIT")
+
+    @Slot(QPdfDocument.Status)
+    def _handle_document_status(self, status: QPdfDocument.Status) -> None:
+        if status is QPdfDocument.Status.Ready:
+            self.fit_pdf_width()
+            self._update_page_counter()
+            return
+        if status is QPdfDocument.Status.Error:
+            self.counter.setText("Load error")
+
+    @Slot()
+    @Slot(int)
+    def _update_page_counter(self, unused_value: int | None = None) -> None:
+        del unused_value
+        page_count = self._document.pageCount()
+        if page_count < 1:
+            self.counter.setText("Page -")
+            return
+        current_page = self.page.pageNavigator().currentPage() + 1
+        self.counter.setText(f"{current_page} / {page_count}")
+
+    def _update_zoom_label(self) -> None:
+        self.zoom_value.setText(f"{int(self.page.zoomFactor() * 100)}%")
+
+    @Slot(QUrl)
+    def _open_external_link(self, url: QUrl) -> None:
+        outcome = request_external_pdf_link(url, self)
+        if outcome is ExternalLinkOutcome.OPENED:
+            self.counter.setText("Link opened")
+        elif outcome is ExternalLinkOutcome.BLOCKED:
+            self.counter.setText("Link blocked")
+        elif outcome is ExternalLinkOutcome.CANCELLED:
+            self.counter.setText("Link cancelled")
+        else:
+            self.counter.setText("Link failed")
+
+    def close_preview(self) -> None:
+        collapsed = QRect(
+            self._target_rect.center().x(),
+            self._target_rect.bottom() - 12,
+            0,
+            12,
+        )
+
+        self._geometry_animation.stop()
+        self.opacity_animation.stop()
+
+        self._geometry_animation.setStartValue(self.geometry())
+        self._geometry_animation.setEndValue(collapsed)
+
+        self.opacity_animation.setStartValue(self.opacity_effect.opacity())
+        self.opacity_animation.setEndValue(0.0)
+
+        self._geometry_animation.start()
+        self.opacity_animation.start()
+
+
+class CurvedConsoleButton(QPushButton):
+    """Curved trapezoidal control that can rotate along the console arc."""
+
+    def __init__(
+        self,
+        text: str,
+        parent: QWidget | None = None,
+        *,
+        angle: float = 0.0,
+    ) -> None:
+        super().__init__(text, parent)
+        self.angle = angle
+        self.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
+        self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, False)
+
+    def base_path(self) -> QPainterPath:
+        # Draw inside a smaller central box so rotation does not clip the shape.
+        margin_x = self.width() * 0.10
+        margin_y = self.height() * 0.18
+
+        x = margin_x
+        y = margin_y
+        w = self.width() - margin_x * 2
+        h = self.height() - margin_y * 2
+
+        path = QPainterPath()
+        path.moveTo(x + w * 0.10, y + h * 0.20)
+        path.quadTo(x + w * 0.50, y - h * 0.10, x + w * 0.90, y + h * 0.20)
+        path.lineTo(x + w * 0.96, y + h * 0.68)
+        path.quadTo(x + w * 0.50, y + h * 1.06, x + w * 0.04, y + h * 0.68)
+        path.closeSubpath()
+        return path
+
+    def button_path(self) -> QPainterPath:
+        path = self.base_path()
+
+        transform = QTransform()
+        transform.translate(self.width() / 2, self.height() / 2)
+        transform.rotate(self.angle)
+        transform.translate(-self.width() / 2, -self.height() / 2)
+
+        return transform.map(path)
+
+    def update_mask(self) -> None:
+        polygon = self.button_path().toFillPolygon().toPolygon()
+        self.setMask(QRegion(polygon))
+
+    def resizeEvent(self, event) -> None:
+        super().resizeEvent(event)
+        self.update_mask()
+
+    def paintEvent(self, event) -> None:
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing, True)
+
+        painter.translate(self.width() / 2, self.height() / 2)
+        painter.rotate(self.angle)
+        painter.translate(-self.width() / 2, -self.height() / 2)
+
+        path = self.base_path()
+        bounds = path.boundingRect()
+
+        pressed = self.isDown()
+        hovered = self.underMouse()
+
+        if pressed:
+            top = QColor(8, 38, 31, 235)
+            bottom = QColor(3, 20, 17, 245)
+        elif hovered:
+            top = QColor(37, 118, 94, 220)
+            bottom = QColor(10, 54, 43, 235)
+        else:
+            top = QColor(24, 82, 66, 220)
+            bottom = QColor(7, 38, 31, 238)
+
+        fill = QLinearGradient(0, bounds.top(), 0, bounds.bottom())
+        fill.setColorAt(0.00, top)
+        fill.setColorAt(0.42, QColor(top.red(), top.green(), top.blue(), 190))
+        fill.setColorAt(1.00, bottom)
+        painter.fillPath(path, QBrush(fill))
+
+        # Upper illuminated edge.
+        top_edge = QPainterPath()
+        top_edge.moveTo(
+            bounds.left() + bounds.width() * 0.10,
+            bounds.top() + bounds.height() * 0.20,
+        )
+        top_edge.quadTo(
+            bounds.center().x(),
+            bounds.top() - bounds.height() * 0.10,
+            bounds.right() - bounds.width() * 0.10,
+            bounds.top() + bounds.height() * 0.20,
+        )
+        painter.setPen(
+            QPen(
+                QColor(185, 255, 230, 215 if hovered else 175), 1.4 if hovered else 1.2
+            )
+        )
+        painter.drawPath(top_edge)
+
+        # Dark lower edge.
+        bottom_edge = QPainterPath()
+        bottom_edge.moveTo(
+            bounds.left() + bounds.width() * 0.04,
+            bounds.top() + bounds.height() * 0.68,
+        )
+        bottom_edge.quadTo(
+            bounds.center().x(),
+            bounds.bottom() + bounds.height() * 0.06,
+            bounds.right() - bounds.width() * 0.04,
+            bounds.top() + bounds.height() * 0.68,
+        )
+        painter.setPen(QPen(QColor(0, 8, 6, 190), 2.4))
+        painter.drawPath(bottom_edge)
+
+        painter.setPen(QPen(QColor(115, 235, 195, 100), 1.0))
+        painter.drawLine(
+            int(bounds.left() + bounds.width() * 0.10),
+            int(bounds.top() + bounds.height() * 0.20),
+            int(bounds.left() + bounds.width() * 0.04),
+            int(bounds.top() + bounds.height() * 0.68),
+        )
+
+        painter.setPen(QPen(QColor(0, 10, 8, 150), 1.3))
+        painter.drawLine(
+            int(bounds.right() - bounds.width() * 0.10),
+            int(bounds.top() + bounds.height() * 0.20),
+            int(bounds.right() - bounds.width() * 0.04),
+            int(bounds.top() + bounds.height() * 0.68),
+        )
+
+        painter.setPen(QColor("#EAF5F1"))
+        font = QFont("Segoe UI", 8, QFont.Weight.Bold)
+        font.setLetterSpacing(QFont.SpacingType.AbsoluteSpacing, 1.1)
+        painter.setFont(font)
+        painter.drawText(
+            QRectF(bounds),
+            Qt.AlignmentFlag.AlignCenter,
+            self.text(),
+        )
+
+
+class ConsolePanel(ShapeWidget):
+    def paintEvent(self, event) -> None:
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing, True)
+
+        path = self.shape_path()
+        bounds = path.boundingRect()
+
+        # Rear depth.
+        rear_transform = QTransform()
+        rear_transform.translate(9.0, 12.0)
+        rear = rear_transform.map(path)
+
+        painter.setPen(QPen(QColor(0, 0, 0, 190), 22))
+        painter.drawPath(rear)
+
+        # Outer glass shell.
+        glass = QLinearGradient(bounds.topLeft(), bounds.bottomRight())
+        glass.setColorAt(0.00, QColor(100, 225, 185, 52))
+        glass.setColorAt(0.24, QColor(62, 175, 140, 38))
+        glass.setColorAt(0.64, QColor(18, 70, 56, 70))
+        glass.setColorAt(0.86, QColor(10, 42, 34, 115))
+        glass.setColorAt(1.00, QColor(4, 18, 15, 165))
+        painter.fillPath(path, QBrush(glass))
+
+        # Inner carbon panel built from an explicit inset silhouette.
+        # Every carbon edge is parallel to the corresponding glass edge.
+        inner_path = self.carbon_path()
+        inner = inner_path.boundingRect()
+
+        carbon_base = QLinearGradient(inner.topLeft(), inner.bottomRight())
+        carbon_base.setColorAt(0.00, QColor(32, 36, 35, 255))
+        carbon_base.setColorAt(0.48, QColor(18, 22, 21, 255))
+        carbon_base.setColorAt(1.00, QColor(7, 10, 10, 255))
+        painter.fillPath(inner_path, QBrush(carbon_base))
+
+        painter.save()
+        painter.setClipPath(inner_path)
+
+        tile = 8
+        for y in range(int(inner.top()), int(inner.bottom()) + tile, tile):
+            for x in range(int(inner.left()), int(inner.right()) + tile, tile):
+                alt = ((x // tile) + (y // tile)) % 2
+
+                if alt == 0:
+                    c1 = QColor(62, 68, 66, 46)
+                    c2 = QColor(8, 12, 11, 58)
+                else:
+                    c1 = QColor(18, 24, 22, 46)
+                    c2 = QColor(74, 82, 78, 34)
+
+                painter.setPen(QPen(c1, 0.9))
+                painter.drawLine(x, y + tile, x + tile, y)
+
+                painter.setPen(QPen(c2, 0.5))
+                painter.drawLine(x - tile * 0.35, y + tile, x + tile * 0.65, y)
+
+        sheen = QLinearGradient(
+            inner.left(),
+            inner.top(),
+            inner.right(),
+            inner.bottom(),
+        )
+        sheen.setColorAt(0.00, QColor(255, 255, 255, 8))
+        sheen.setColorAt(0.35, QColor(120, 255, 210, 5))
+        sheen.setColorAt(0.65, QColor(0, 0, 0, 0))
+        sheen.setColorAt(1.00, QColor(0, 0, 0, 24))
+        painter.fillPath(inner_path, QBrush(sheen))
+
+        painter.restore()
+
+        # Deep inset bevel between glass and carbon.
+        inset_transform = QTransform()
+        inset_transform.translate(inner.center().x(), inner.center().y())
+        inset_transform.scale(0.978, 0.955)
+        inset_transform.translate(-inner.center().x(), -inner.center().y())
+        inset_inner_path = inset_transform.map(inner_path)
+
+        inset_ring = inner_path.subtracted(inset_inner_path)
+
+        inset_black = QColor(8, 8, 10, 255)
+        painter.fillPath(inset_ring, QBrush(inset_black))
+        painter.setPen(QPen(QColor(42, 42, 46, 210), 0.8))
+        painter.drawPath(inner_path)
+        painter.setPen(QPen(QColor(0, 0, 0, 245), 1.2))
+        painter.drawPath(inset_inner_path)
+
+        # Raised upper glass deck.
+        upper_face = QPainterPath()
+        upper_face.moveTo(
+            bounds.left() + bounds.width() * 0.08, bounds.top() + bounds.height() * 0.18
+        )
+        upper_face.lineTo(
+            bounds.left() + bounds.width() * 0.22, bounds.top() + bounds.height() * 0.04
+        )
+        upper_face.lineTo(
+            bounds.right() - bounds.width() * 0.22,
+            bounds.top() + bounds.height() * 0.04,
+        )
+        upper_face.lineTo(
+            bounds.right() - bounds.width() * 0.08,
+            bounds.top() + bounds.height() * 0.18,
+        )
+        upper_face.lineTo(
+            bounds.right() - bounds.width() * 0.12,
+            bounds.top() + bounds.height() * 0.34,
+        )
+        upper_face.lineTo(
+            bounds.left() + bounds.width() * 0.12, bounds.top() + bounds.height() * 0.34
+        )
+        upper_face.closeSubpath()
+
+        top_grad = QLinearGradient(
+            0,
+            bounds.top(),
+            0,
+            bounds.top() + bounds.height() * 0.36,
+        )
+        top_grad.setColorAt(0.00, QColor(235, 255, 248, 70))
+        top_grad.setColorAt(0.35, QColor(110, 235, 190, 28))
+        top_grad.setColorAt(1.00, QColor(0, 0, 0, 0))
+        painter.fillPath(upper_face, QBrush(top_grad))
+
+        # Deep central recess in carbon area.
+        recess = QPainterPath()
+        recess.moveTo(
+            bounds.left() + bounds.width() * 0.31,
+            bounds.bottom() - bounds.height() * 0.04,
+        )
+        recess.lineTo(
+            bounds.left() + bounds.width() * 0.40,
+            bounds.bottom() - bounds.height() * 0.28,
+        )
+        recess.lineTo(
+            bounds.left() + bounds.width() * 0.60,
+            bounds.bottom() - bounds.height() * 0.28,
+        )
+        recess.lineTo(
+            bounds.left() + bounds.width() * 0.69,
+            bounds.bottom() - bounds.height() * 0.04,
+        )
+        recess.closeSubpath()
+
+        recess_grad = QLinearGradient(
+            0,
+            bounds.bottom() - bounds.height() * 0.30,
+            0,
+            bounds.bottom(),
+        )
+        recess_grad.setColorAt(0.00, QColor(0, 0, 0, 20))
+        recess_grad.setColorAt(0.45, QColor(0, 5, 4, 90))
+        recess_grad.setColorAt(1.00, QColor(0, 2, 2, 215))
+        painter.fillPath(recess, QBrush(recess_grad))
+
+        # Directional edges.
+        painter.setPen(QPen(QColor(185, 255, 230, 185), 1.5))
+        painter.drawLine(
+            int(bounds.left() + bounds.width() * 0.22),
+            int(bounds.top() + bounds.height() * 0.04),
+            int(bounds.right() - bounds.width() * 0.22),
+            int(bounds.top() + bounds.height() * 0.04),
+        )
+
+        painter.setPen(QPen(QColor(120, 240, 198, 110), 1.1))
+        painter.drawLine(
+            int(bounds.left() + bounds.width() * 0.08),
+            int(bounds.top() + bounds.height() * 0.18),
+            int(bounds.left() + bounds.width() * 0.02),
+            int(bounds.top() + bounds.height() * 0.60),
+        )
+
+        painter.setPen(QPen(QColor(0, 7, 6, 185), 2.2))
+        painter.drawLine(
+            int(bounds.right() - bounds.width() * 0.08),
+            int(bounds.top() + bounds.height() * 0.18),
+            int(bounds.right() - bounds.width() * 0.02),
+            int(bounds.top() + bounds.height() * 0.60),
+        )
+
+        # Broad but subtle glass reflection across the console crown.
+        crown_reflection = QLinearGradient(
+            bounds.left(),
+            bounds.top(),
+            bounds.right(),
+            bounds.top(),
+        )
+        crown_reflection.setColorAt(0.00, QColor(255, 255, 255, 20))
+        crown_reflection.setColorAt(0.28, QColor(190, 255, 230, 13))
+        crown_reflection.setColorAt(0.62, QColor(80, 180, 150, 5))
+        crown_reflection.setColorAt(1.00, QColor(0, 0, 0, 0))
+
+        crown_path = QPainterPath()
+        crown_path.moveTo(
+            bounds.left() + bounds.width() * 0.09,
+            bounds.top() + bounds.height() * 0.18,
+        )
+        crown_path.lineTo(
+            bounds.left() + bounds.width() * 0.22,
+            bounds.top() + bounds.height() * 0.045,
+        )
+        crown_path.lineTo(
+            bounds.right() - bounds.width() * 0.22,
+            bounds.top() + bounds.height() * 0.045,
+        )
+        crown_path.lineTo(
+            bounds.right() - bounds.width() * 0.10,
+            bounds.top() + bounds.height() * 0.18,
+        )
+        crown_path.lineTo(
+            bounds.right() - bounds.width() * 0.14,
+            bounds.top() + bounds.height() * 0.25,
+        )
+        crown_path.lineTo(
+            bounds.left() + bounds.width() * 0.14,
+            bounds.top() + bounds.height() * 0.25,
+        )
+        crown_path.closeSubpath()
+        painter.fillPath(crown_path, QBrush(crown_reflection))
+
+    def __init__(self, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+
+        self.buttons: list[CurvedConsoleButton] = []
+
+        button_specs = (
+            ("CHOOSE", -13.0),
+            ("SCAN", 0.0),
+            ("CANCEL", 0.0),
+            ("ANALYZE", 0.0),
+        )
+
+        for text, angle in button_specs:
+            button = CurvedConsoleButton(text, self, angle=angle)
+            self.buttons.append(button)
+
+        self.status_title = QLabel("SYSTEM STATUS", self)
+        self.status_title.setObjectName("sectionLabel")
+
+        self.log_title = QLabel("ACTIVITY LOG", self)
+        self.log_title.setObjectName("sectionLabel")
+
+        self.action_title = QLabel("QUICK ACTIONS", self)
+        self.action_title.setObjectName("sectionLabel")
+
+        self.status_text = QLabel(
+            "● Local scan       Ready\n"
+            "● PDF preview      Ready\n"
+            "● CockroachDB      Not connected\n"
+            "● Bedrock          Not connected",
+            self,
+        )
+        self.status_text.setObjectName("consoleText")
+
+        self.log_text = QLabel(
+            "Session started\n"
+            "Read-only desktop cockpit loaded\n"
+            "No files changed\n"
+            "Awaiting authorized folder\n"
+            "Human approval required for actions",
+            self,
+        )
+        self.log_text.setObjectName("consoleText")
+
+        self.quick_text = QLabel(
+            "+ Choose folder\n◉ Scan PDFs\n▣ Preview selected PDF\nSettings planned",
+            self,
+        )
+        self.quick_text.setObjectName("consoleText")
+
+    def carbon_path(self) -> QPainterPath:
+        """Inset carbon silhouette aligned with every outer console face."""
+        r = self.rect().adjusted(3, 3, -3, -3)
+        x, y, w, h = map(float, (r.x(), r.y(), r.width(), r.height()))
+
+        path = QPainterPath()
+        path.moveTo(x + w * 0.105, y + h * 0.215)
+        path.lineTo(x + w * 0.235, y + h * 0.075)
+        path.lineTo(x + w * 0.765, y + h * 0.075)
+        path.lineTo(x + w * 0.895, y + h * 0.215)
+        path.lineTo(x + w * 0.945, y + h * 0.595)
+        path.lineTo(x + w * 0.845, y + h * 0.890)
+        path.lineTo(x + w * 0.705, y + h * 0.910)
+        path.lineTo(x + w * 0.615, y + h * 0.690)
+        path.lineTo(x + w * 0.385, y + h * 0.690)
+        path.lineTo(x + w * 0.295, y + h * 0.910)
+        path.lineTo(x + w * 0.155, y + h * 0.890)
+        path.lineTo(x + w * 0.055, y + h * 0.595)
+        path.closeSubpath()
+        return path
+
+    def upper_carbon_surface(self, x_center: float) -> tuple[float, float]:
+        """Return y coordinate and tangent angle of the upper carbon face."""
+        w = float(self.width())
+        h = float(self.height())
+        t = x_center / w
+
+        left_x1, left_y1 = 0.105, 0.215
+        left_x2, left_y2 = 0.235, 0.075
+        right_x1, right_y1 = 0.765, 0.075
+        right_x2, right_y2 = 0.895, 0.215
+
+        if t < left_x2:
+            local = (t - left_x1) / (left_x2 - left_x1)
+            local = max(0.0, min(1.0, local))
+            y_ratio = left_y1 + (left_y2 - left_y1) * local
+            angle = math.degrees(
+                math.atan2(
+                    (left_y2 - left_y1) * h,
+                    (left_x2 - left_x1) * w,
+                )
+            )
+            return h * y_ratio, angle
+
+        if t <= right_x1:
+            return h * left_y2, 0.0
+
+        local = (t - right_x1) / (right_x2 - right_x1)
+        local = max(0.0, min(1.0, local))
+        y_ratio = right_y1 + (right_y2 - right_y1) * local
+        angle = math.degrees(
+            math.atan2(
+                (right_y2 - right_y1) * h,
+                (right_x2 - right_x1) * w,
+            )
+        )
+        return h * y_ratio, angle
+
+    def shape_path(self) -> QPainterPath:
+        r = self.rect().adjusted(3, 3, -3, -3)
+        x, y, w, h = map(float, (r.x(), r.y(), r.width(), r.height()))
+
+        path = QPainterPath()
+        path.moveTo(x + w * 0.08, y + h * 0.18)
+        path.lineTo(x + w * 0.22, y + h * 0.03)
+        path.lineTo(x + w * 0.78, y + h * 0.03)
+        path.lineTo(x + w * 0.92, y + h * 0.18)
+        path.lineTo(x + w * 0.98, y + h * 0.60)
+        path.lineTo(x + w * 0.87, y + h * 0.94)
+        path.lineTo(x + w * 0.69, y + h * 0.96)
+        path.lineTo(x + w * 0.60, y + h * 0.73)
+        path.lineTo(x + w * 0.40, y + h * 0.73)
+        path.lineTo(x + w * 0.31, y + h * 0.96)
+        path.lineTo(x + w * 0.13, y + h * 0.94)
+        path.lineTo(x + w * 0.02, y + h * 0.60)
+        path.closeSubpath()
+        return path
+
+    def resizeEvent(self, event) -> None:
+        super().resizeEvent(event)
+        w = self.width()
+        h = self.height()
+
+        # Only NEW SCAN follows the first angled face.
+        # IMPORT, FILTER and ANALYZE sit on the long flat upper axis.
+        button_w = 132
+        button_h = 62
+
+        first_x = int(w * 0.165)
+        first_surface_y, _ = self.upper_carbon_surface(first_x + button_w / 2)
+        first_y = int(first_surface_y - button_h * 0.14 + h * 0.060)
+
+        self.buttons[0].angle = -13.0
+        self.buttons[0].setGeometry(
+            first_x,
+            first_y,
+            button_w,
+            button_h,
+        )
+        self.buttons[0].update_mask()
+        self.buttons[0].update()
+
+        flat_y = int(h * 0.108)
+        flat_xs = (
+            int(w * 0.255),
+            int(w * 0.345),
+            int(w * 0.435),
+        )
+
+        for button, x_pos in zip(self.buttons[1:], flat_xs):
+            button.angle = 0.0
+            button.setGeometry(
+                x_pos,
+                flat_y,
+                button_w,
+                button_h,
+            )
+            button.update_mask()
+            button.update()
+
+        # Keep all text blocks clear of the lower recess.
+        title_y = int(h * 0.455)
+        text_y = int(h * 0.525)
+        text_h = int(h * 0.205)
+
+        self.status_title.setGeometry(int(w * 0.17), title_y, 170, 22)
+        self.log_title.setGeometry(int(w * 0.39), title_y - int(h * 0.085), 170, 22)
+        self.action_title.setGeometry(int(w * 0.715), title_y, 170, 22)
+
+        self.status_text.setGeometry(int(w * 0.17), text_y, 270, text_h)
+        self.log_text.setGeometry(
+            int(w * 0.39),
+            text_y - int(h * 0.105),
+            450,
+            int(h * 0.17),
+        )
+        self.quick_text.setGeometry(int(w * 0.715), text_y, 250, text_h)
+
+
+class CockpitWindow(QMainWindow):
+    scan_finished = Signal()
+
+    def __init__(
+        self,
+        *,
+        scan_function: ScanFunction = scan_authorized_root,
+    ) -> None:
+        super().__init__()
+        self._scan_function = scan_function
+        self._scan_thread: QThread | None = None
+        self._scan_worker: ScanWorker | None = None
+        self._workspace = DesktopWorkspaceSession()
+
+        self.setWindowTitle("DocWeave Cockpit")
+        self.resize(1760, 1080)
+        self.setMinimumSize(1460, 900)
+
+        self.setWindowFlags(Qt.WindowType.FramelessWindowHint | Qt.WindowType.Window)
+        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
+
+        self.root = QWidget()
+        self.root.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
+        self.setCentralWidget(self.root)
+
+        # Side screens are hosted in a QGraphicsScene so the complete widgets
+        # can be rotated: frame, table, text and controls all tilt together.
+        self.side_view = QGraphicsView(self.root)
+        self.side_view.setFrameShape(QFrame.Shape.NoFrame)
+        self.side_view.setStyleSheet("background: transparent; border: none;")
+        self.side_view.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
+        self.side_view.setHorizontalScrollBarPolicy(
+            Qt.ScrollBarPolicy.ScrollBarAlwaysOff
+        )
+        self.side_view.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.side_view.setAlignment(
+            Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop
+        )
+        self.side_view.setRenderHints(
+            QPainter.RenderHint.Antialiasing
+            | QPainter.RenderHint.TextAntialiasing
+            | QPainter.RenderHint.SmoothPixmapTransform
+        )
+        self.side_view.setInteractive(True)
+
+        self.side_scene = QGraphicsScene(self.side_view)
+        self.side_scene.setBackgroundBrush(Qt.BrushStyle.NoBrush)
+        self.side_view.setScene(self.side_scene)
+
+        self.left = LeftScreen(self)
+        self.right = RightScreen()
+
+        self.left_proxy = self.side_scene.addWidget(self.left)
+        self.right_proxy = self.side_scene.addWidget(self.right)
+
+        # Strong, visible outward inclination.
+        self.left_proxy.setRotation(-10.5)
+        self.right_proxy.setRotation(10.5)
+
+        self.center = CenterPreview(self.root)
+        self.console = ConsolePanel(self.root)
+
+        self.left.document_selected.connect(self._open_document_row)
+        self.console.buttons[0].clicked.connect(self._choose_folder)
+        self.console.buttons[1].clicked.connect(self.start_scan)
+        self.console.buttons[2].clicked.connect(self.cancel_scan)
+        self.console.buttons[3].setEnabled(False)
+        self.console.buttons[3].setToolTip("Classification is not wired yet.")
+
+        self.setStyleSheet(
+            """
+            QMainWindow, QWidget {
+                background: transparent;
+                color: #EAF5F1;
+                font-family: "Segoe UI";
+            }
+
+            QLabel#brand {
+                color: #FF3B3B;
+                font-size: 15px;
+                font-weight: 700;
+                letter-spacing: 0.7px;
+                background: transparent;
+            }
+
+            QLabel#screenTitle {
+                color: #FF3B3B;
+                font-size: 14px;
+                font-weight: 700;
+                letter-spacing: 0.4px;
+                background: transparent;
+            }
+
+            QLabel#sectionLabel {
+                color: #FF4C4C;
+                font-size: 10px;
+                font-weight: 700;
+                letter-spacing: 0.5px;
+                background: transparent;
+            }
+
+            QLabel#online {
+                color: #FF3B3B;
+                font-size: 10px;
+                font-weight: 800;
+                background: transparent;
+            }
+
+            QLabel#muted {
+                color: #FF6A6A;
+                font-size: 10px;
+                font-weight: 700;
+                background: transparent;
+            }
+
+            QLabel#consoleText {
+                color: #E8F2EE;
+                font-size: 10px;
+                font-weight: 500;
+                letter-spacing: 0.1px;
+            }
+
+            QTableWidget#documentTable {
+                background: rgba(7, 10, 10, 215);
+                border: 1px solid rgba(140, 245, 205, 92);
+                border-radius: 8px;
+                color: #F1FBF7;
+                outline: none;
+                selection-background-color: rgba(73, 179, 144, 75);
+                selection-color: #FFFFFF;
+            }
+
+            QTableWidget#documentTable::item {
+                border-bottom: 1px solid rgba(89, 198, 162, 28);
+                padding: 7px;
+            }
+
+            QHeaderView::section {
+                background: rgba(20, 26, 24, 230);
+                border: none;
+                border-bottom: 1px solid rgba(89, 198, 162, 80);
+                color: #A8C2B8;
+                font-size: 10px;
+                font-weight: 600;
+                padding: 8px;
+            }
+
+            QFrame#metric {
+                background: rgba(16, 22, 21, 210);
+                border: 1px solid rgba(155, 250, 218, 95);
+                border-radius: 9px;
+            }
+
+            QLabel#metricValue {
+                color: #EAF5F1;
+                font-size: 24px;
+                font-weight: 800;
+            }
+
+            QLabel#metricLabel {
+                color: #7EA496;
+                font-size: 9px;
+                font-weight: 700;
+            }
+
+            QFrame#eventRow {
+                background: rgba(12, 18, 17, 205);
+                border-left: 2px solid rgba(125, 240, 200, 165);
+                border-radius: 5px;
+            }
+
+            QLabel#eventName {
+                color: #67D8B0;
+                font-size: 9px;
+                font-weight: 800;
+            }
+
+            QLabel#eventText {
+                color: #EDF7F3;
+                font-size: 10px;
+                font-weight: 500;
+            }
+
+            QPushButton {
+                color: #E6F6F0;
+                background: rgba(14, 20, 19, 215);
+                border: 1px solid rgba(145, 245, 210, 100);
+                border-radius: 8px;
+                padding: 6px 11px;
+                font-weight: 700;
+            }
+
+            QPushButton:hover {
+                background: rgba(38, 132, 104, 165);
+                border-color: #9CFFE0;
+            }
+
+            QPushButton:pressed {
+                background: #091F1A;
+            }
+
+            QPushButton#windowButton {
+                background: rgba(10, 35, 29, 190);
+                border: 1px solid rgba(103, 216, 176, 72);
+                border-radius: 7px;
+                padding: 0;
+                font-size: 14px;
+            }
+
+            QPushButton#smallButton {
+                font-size: 9px;
+                min-width: 44px;
+            }
+
+            QPushButton#consoleButton {
+                background: rgba(10, 42, 34, 225);
+                border: 1px solid rgba(145, 245, 210, 125);
+                border-bottom: 3px solid rgba(0, 10, 8, 185);
+                border-radius: 13px;
+                letter-spacing: 1px;
+                font-size: 10px;
+                padding-top: 2px;
+            }
+
+            QPushButton#consoleButton:hover {
+                background: rgba(30, 105, 84, 210);
+                border-color: rgba(175, 255, 228, 190);
+            }
+
+            QPushButton#consoleButton:pressed {
+                background: rgba(5, 28, 23, 235);
+                border-bottom: 1px solid rgba(0, 8, 6, 210);
+                padding-top: 4px;
+            }
+
+            QScrollBar:vertical {
+                background: transparent;
+                width: 8px;
+                margin: 2px;
+            }
+
+            QScrollBar::handle:vertical {
+                background: rgba(103, 216, 176, 90);
+                border-radius: 4px;
+                min-height: 24px;
+            }
+
+            QScrollBar::add-line:vertical,
+            QScrollBar::sub-line:vertical {
+                height: 0;
+            }
+            """
+        )
+
+        self._set_status(
+            "Ready. Choose an authorized folder; no files will be changed."
+        )
+
+    @property
+    def authorized_root(self) -> Path | None:
+        return self._workspace.snapshot.authorized_root
+
+    @property
+    def scan_in_progress(self) -> bool:
+        return self._scan_thread is not None and self._scan_thread.isRunning()
+
+    def set_authorized_root(self, root: Path) -> None:
+        resolved = root.resolve(strict=True)
+        if not resolved.is_dir():
+            raise NotADirectoryError("authorized root must be a directory")
+        if self.scan_in_progress:
+            raise RuntimeError("authorized root cannot change during a scan")
+        self._workspace.authorize(resolved)
+        self.left.set_documents([])
+        self.right.set_metrics(0, 0, 0)
+        self._set_status(f"Authorized folder: {resolved}")
+
+    @Slot()
+    def start_scan(self) -> None:
+        authorized_root = self.authorized_root
+        if authorized_root is None:
+            self._set_status("Choose a folder before starting a scan.")
+            return
+        if self.scan_in_progress:
+            return
+
+        self.left.set_documents([])
+        self._workspace.start_scan()
+        self.right.set_metrics(0, 0, 0)
+        self._set_busy(True)
+        self._set_status("Scanning PDFs in the background. No files are changed.")
+
+        thread = QThread(self)
+        worker = ScanWorker(authorized_root, self._scan_function)
+        worker.moveToThread(thread)
+        thread.started.connect(worker.run)
+        worker.progressed.connect(self._handle_scan_progress)
+        worker.completed.connect(self._handle_scan_completed)
+        worker.cancelled.connect(self._handle_scan_cancelled)
+        worker.failed.connect(self._handle_scan_failed)
+        worker.completed.connect(thread.quit)
+        worker.cancelled.connect(thread.quit)
+        worker.failed.connect(thread.quit)
+        thread.finished.connect(worker.deleteLater)
+        thread.finished.connect(self._handle_thread_finished)
+        self._scan_thread = thread
+        self._scan_worker = worker
+        thread.start()
+
+    @Slot()
+    def cancel_scan(self) -> None:
+        if not self.scan_in_progress or self._scan_worker is None:
+            return
+        self._workspace.request_cancellation()
+        self._scan_worker.request_cancellation()
+        self.console.buttons[2].setEnabled(False)
+        self._set_status("Cancelling at the next safe file boundary.")
+
+    def closeEvent(self, event: QCloseEvent) -> None:
+        if self.scan_in_progress:
+            self._set_status("Scan still running. Wait before closing DocWeave.")
+            event.ignore()
+            return
+        event.accept()
+
+    @Slot(object)
+    def _handle_scan_progress(self, raw_progress: object) -> None:
+        if not isinstance(raw_progress, ScanProgress):
+            self.cancel_scan()
+            self._set_status("Invalid scan progress. Cancellation requested safely.")
+            return
+        try:
+            self._workspace.record_progress(raw_progress)
+        except (RuntimeError, ValueError):
+            self.cancel_scan()
+            self._set_status(
+                "Inconsistent scan progress. Cancellation requested safely."
+            )
+            return
+        if raw_progress.phase is ScanPhase.DISCOVERY:
+            self.right.set_metrics(raw_progress.completed, 0, 0)
+            self._set_status(f"Discovering files: {raw_progress.completed} observed.")
+            return
+        total = raw_progress.total or 0
+        self.right.set_metrics(total, 0, 0)
+        self._set_status(f"Inspecting PDFs: {raw_progress.completed} of {total}.")
+
+    @Slot(object)
+    def _handle_scan_completed(self, raw_result: object) -> None:
+        if not isinstance(raw_result, DesktopScanResult):
+            self._handle_scan_failed("InvalidScanResult")
+            return
+        try:
+            self._workspace.complete(raw_result)
+        except (RuntimeError, ValueError) as error:
+            self._handle_scan_failed(error.__class__.__name__)
+            return
+        documents = [
+            Document(
+                name=record.absolute_path.name,
+                category=(
+                    "PDF" if record.status is IntakeStatus.READY else "Needs check"
+                ),
+                pages="-",
+                status="READY" if record.status is IntakeStatus.READY else "ATTENTION",
+                path=record.absolute_path,
+            )
+            for record in raw_result.intake.records
+        ]
+        self.left.set_documents(documents)
+        self.right.set_metrics(
+            len(raw_result.discovery.files),
+            raw_result.intake.ready_count,
+            raw_result.attention_count,
+        )
+        self._set_status(
+            f"Scan complete: {len(raw_result.discovery.files)} files inspected. "
+            "No files were changed."
+        )
+
+    @Slot()
+    def _handle_scan_cancelled(self) -> None:
+        self._workspace.cancel()
+        self.left.set_documents([])
+        self.right.set_metrics(0, 0, 0)
+        self._set_status("Scan cancelled safely. Partial results were discarded.")
+
+    @Slot(str)
+    def _handle_scan_failed(self, error_category: str) -> None:
+        if self._workspace.snapshot.phase in {
+            WorkspacePhase.SCANNING,
+            WorkspacePhase.CANCELLING,
+        }:
+            self._workspace.fail(error_category)
+        self._set_status(f"Scan failed safely ({error_category}). No files changed.")
+
+    @Slot()
+    def _handle_thread_finished(self) -> None:
+        self._scan_thread = None
+        self._scan_worker = None
+        self._set_busy(False)
+        self.scan_finished.emit()
+
+    @Slot()
+    def _choose_folder(self) -> None:
+        selected = QFileDialog.getExistingDirectory(
+            self,
+            "Choose an authorized document folder",
+        )
+        if not selected:
+            return
+        try:
+            self.set_authorized_root(Path(selected))
+        except (OSError, RuntimeError) as error:
+            self._set_status(
+                f"Folder authorization failed safely ({error.__class__.__name__})."
+            )
+
+    @Slot(int)
+    def _open_document_row(self, row: int) -> None:
+        document = self.left.document_at(row)
+        root = self.authorized_root
+        if document is None or document.path is None or root is None:
+            self._set_status("No ready PDF is available for preview.")
+            return
+        if document.status != "READY":
+            self._set_status("Only ready PDFs can be previewed safely.")
+            return
+        try:
+            validated_path = validate_pdf_for_open(document.path, root)
+        except PdfOpenValidationError as error:
+            self._set_status(f"PDF preview blocked safely ({error.category.value}).")
+            return
+        self.center.open_document(validated_path)
+        self._set_status("PDF preview raised inside DocWeave. No files were changed.")
+
+    def _set_busy(self, busy: bool) -> None:
+        self.console.buttons[0].setEnabled(not busy)
+        self.console.buttons[1].setEnabled(
+            not busy and self.authorized_root is not None
+        )
+        self.console.buttons[2].setEnabled(busy)
+
+    def _set_status(self, message: str) -> None:
+        self.console.log_text.setText(message)
+        self.console.status_text.setText(
+            "● Local scan       "
+            + ("Running" if self.scan_in_progress else "Ready")
+            + "\n"
+            "● PDF preview      Ready\n"
+            "● CockroachDB      Not connected\n"
+            "● Bedrock          Not connected"
+        )
+        self.right.set_events(
+            [
+                ("DISCOVERY", message[:42]),
+                ("PREVIEW", "Embedded PDF viewer ready"),
+                ("MEMORY", "CockroachDB not connected"),
+                ("BEDROCK", "Classification not active"),
+                ("SECURITY", "Read-only local boundary"),
+            ]
+        )
+
+    def resizeEvent(self, event) -> None:
+        super().resizeEvent(event)
+
+        w = self.width()
+        h = self.height()
+
+        margin_x = int(w * 0.075)
+        top = int(h * 0.085)
+
+        side_w = int(w * 0.225)
+        side_h = int(h * 0.585)
+
+        center_w = int(w * 0.43)
+        center_h = int(h * 0.61)
+
+        console_w = int(w * 0.84)
+        console_h = int(h * 0.29)
+
+        # All three screens are lifted away from the console.
+        # The side displays also move outward along their inclined axes,
+        # creating more separation across their upper edges.
+        side_lift = int(h * 0.055)
+        center_lift = int(h * 0.075)
+
+        left_y = top - side_lift
+        center_x = (w - center_w) // 2
+        center_y = top - center_lift
+
+        console_x = (w - console_w) // 2
+        console_y = h - console_h - int(h * 0.005)
+
+        self.side_view.setGeometry(0, 0, w, h)
+        self.side_scene.setSceneRect(0, 0, w, h)
+
+        # The widgets themselves remain rectangular; the proxies rotate them.
+        self.left.resize(side_w, side_h)
+        self.right.resize(side_w, side_h)
+
+        # Rotation pivots around the exact centre of each panel.
+        self.left_proxy.setTransformOriginPoint(side_w / 2, side_h / 2)
+        self.right_proxy.setTransformOriginPoint(side_w / 2, side_h / 2)
+
+        # Exact mirror symmetry around the vertical centre of the window.
+        # Both panels use the same distance from the centre and the same height.
+        screen_center_y = left_y + side_h / 2
+        horizontal_distance = (w * 0.5) - margin_x - (side_w * 0.5)
+
+        left_center_x = (w * 0.5) - horizontal_distance
+        right_center_x = (w * 0.5) + horizontal_distance
+
+        self.left_proxy.setPos(
+            left_center_x - side_w / 2,
+            screen_center_y - side_h / 2,
+        )
+        self.right_proxy.setPos(
+            right_center_x - side_w / 2,
+            screen_center_y - side_h / 2,
+        )
+
+        self.console.setGeometry(console_x, console_y, console_w, console_h)
+
+        target = QRect(center_x, center_y, center_w, center_h)
+        self.center.set_target_rect(target)
+
+        if self.center.opacity_effect.opacity() > 0.01:
+            self.center.setGeometry(target)
+        else:
+            self.center.setGeometry(
+                target.center().x(),
+                target.bottom() - 12,
+                0,
+                12,
+            )
+
+        self.side_view.raise_()
+        self.console.raise_()
+        self.center.raise_()
+
+
+def main() -> int:
+    app = QApplication(sys.argv)
+    app.setApplicationName("DocWeave Cockpit")
+
+    window = CockpitWindow()
+    window.show()
+
+    return app.exec()
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

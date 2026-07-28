@@ -32,14 +32,18 @@ against a clean, isolated live validation database. No configured runtime
 engine connects these boundaries to that schema, so durable application
 persistence is not yet claimed. No runtime database integration, restore, AWS
 workload, complete review interface, or intelligent document analysis is
-claimed yet. An initial read-only PySide6 desktop shell now exposes
-authorized-folder selection, non-blocking local discovery, deterministic intake
-counts, phase-aware progress, cooperative cancellation, explicit in-memory
-workspace state, multiple document selection, safe user-initiated opening of
-ready PDFs in a read-only embedded preview, confirmed and policy-validated
-delegation of eligible PDF hyperlinks to the user's default browser, and a
-virtualized document table. Document-controlled persistence values remain bound
-parameters rather than executable Structured Query Language.
+claimed yet. The read-only PySide6 desktop entrypoint now opens the definitive
+cockpit surface supplied for DocWeave, preserving its transparent frameless
+console geometry while replacing demonstration content with compatible local
+DocWeave state. It exposes authorized-folder selection, non-blocking local
+discovery, deterministic intake counts, phase-aware progress, cooperative
+cancellation, explicit in-memory workspace state, a real discovered-PDF table,
+safe user-initiated opening of ready PDFs in the central embedded read-only
+preview, and confirmed and policy-validated delegation of eligible PDF
+hyperlinks to the user's default browser. CockroachDB and Amazon Bedrock remain
+visibly not connected in this desktop surface. Document-controlled persistence
+values remain bound parameters rather than executable Structured Query
+Language.
 
 The shared core now also performs real page-level text extraction through the
 already pinned Qt PDF module. Each attempt runs in a disposable child process

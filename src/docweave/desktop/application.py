@@ -5,7 +5,7 @@ from collections.abc import Sequence
 
 from PySide6.QtWidgets import QApplication
 
-from docweave.desktop.main_window import DocWeaveMainWindow
+from docweave.desktop.cockpit import CockpitWindow
 
 
 def create_application(arguments: Sequence[str] | None = None) -> QApplication:
@@ -25,6 +25,6 @@ def create_application(arguments: Sequence[str] | None = None) -> QApplication:
 def main() -> int:
     """Launch the DocWeave desktop shell."""
     application = create_application(sys.argv)
-    window = DocWeaveMainWindow()
+    window = CockpitWindow()
     window.show()
     return application.exec()
