@@ -42,7 +42,12 @@ safe user-initiated opening of ready PDFs in the central embedded read-only
 preview, and confirmed and policy-validated delegation of eligible PDF
 hyperlinks to the user's default browser. The cockpit now displays sanitized
 runtime readiness for CockroachDB configuration and the approved Amazon Bedrock
-client without exposing connection values or performing startup I/O.
+client without exposing connection values or performing startup I/O. The
+`ANALYZE` control dispatches the selected ready PDF to a background
+classification worker using the same configured runtime path; automated tests
+exercise that dispatch with an injected non-cloud function, and live desktop
+classification remains dependent on runtime configuration and a migrated
+database.
 Document-controlled persistence values remain bound parameters rather than
 executable Structured Query Language.
 
