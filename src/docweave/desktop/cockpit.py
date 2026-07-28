@@ -25,11 +25,13 @@ from __future__ import annotations
 
 import sys
 import math
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 
 from PySide6.QtCore import (
     QEasingCurve,
+    QObject,
     QPoint,
     QPointF,
     QPropertyAnimation,
@@ -78,8 +80,13 @@ from PySide6.QtWidgets import (
 )
 
 from docweave.application_runtime import (
+    RuntimeConfigurationError,
     RuntimeIntegrationSnapshot,
     runtime_integration_snapshot,
+)
+from docweave.classification_cli import (
+    ClassificationCommandResult,
+    classify_pdf_once,
 )
 from docweave.desktop.link_security import (
     ExternalLinkOutcome,
@@ -100,6 +107,7 @@ from docweave.desktop.workspace import (
     WorkspacePhase,
 )
 from docweave.intake import IntakeStatus
+from docweave.persistence import ClassificationPipelineError
 
 
 SURFACE = QColor("#081E19")
@@ -122,6 +130,54 @@ class Document:
 
 
 DOCUMENTS: list[Document] = []
+ClassificationFunction = Callable[[Path, Path], ClassificationCommandResult]
+
+
+def classify_pdf_for_cockpit(
+    source_path: Path,
+    authorized_root: Path,
+) -> ClassificationCommandResult:
+    """Run the configured classification command with positional UI inputs."""
+    return classify_pdf_once(source_path, authorized_root=authorized_root)
+
+
+class ClassificationWorker(QObject):
+    """Run one configured classification outside the Qt user-interface thread."""
+
+    completed = Signal(object)
+    failed = Signal(str)
+
+    def __init__(
+        self,
+        source_path: Path,
+        authorized_root: Path,
+        classification_function: ClassificationFunction,
+    ) -> None:
+        super().__init__()
+        self._source_path = source_path
+        self._authorized_root = authorized_root
+        self._classification_function = classification_function
+
+    @Slot()
+    def run(self) -> None:
+        """Emit a sanitized completion result or failure category."""
+        try:
+            result = self._classification_function(
+                self._source_path,
+                self._authorized_root,
+            )
+        except RuntimeConfigurationError as error:
+            self.failed.emit(f"configuration:{error.code.value}")
+            return
+        except ClassificationPipelineError as error:
+            self.failed.emit(
+                f"classification:{error.code.value}:{error.extraction_status.value}"
+            )
+            return
+        except Exception as error:
+            self.failed.emit(error.__class__.__name__)
+            return
+        self.completed.emit(result)
 
 
 class ShapeWidget(QWidget):
@@ -1639,9 +1695,11 @@ class CockpitWindow(QMainWindow):
         *,
         scan_function: ScanFunction = scan_authorized_root,
         integration_snapshot: RuntimeIntegrationSnapshot | None = None,
+        classification_function: ClassificationFunction = classify_pdf_for_cockpit,
     ) -> None:
         super().__init__()
         self._scan_function = scan_function
+        self._classification_function = classification_function
         self._integration_snapshot = (
             integration_snapshot
             if integration_snapshot is not None
@@ -1649,6 +1707,9 @@ class CockpitWindow(QMainWindow):
         )
         self._scan_thread: QThread | None = None
         self._scan_worker: ScanWorker | None = None
+        self._classification_thread: QThread | None = None
+        self._classification_worker: ClassificationWorker | None = None
+        self._selected_document_row: int | None = None
         self._workspace = DesktopWorkspaceSession()
 
         self.setWindowTitle("DocWeave Cockpit")
@@ -1703,8 +1764,11 @@ class CockpitWindow(QMainWindow):
         self.console.buttons[0].clicked.connect(self._choose_folder)
         self.console.buttons[1].clicked.connect(self.start_scan)
         self.console.buttons[2].clicked.connect(self.cancel_scan)
+        self.console.buttons[3].clicked.connect(self._analyze_selected_document)
         self.console.buttons[3].setEnabled(False)
-        self.console.buttons[3].setToolTip("Classification is not wired yet.")
+        self.console.buttons[3].setToolTip(
+            "Preview a ready PDF, then run configured classification."
+        )
 
         self.setStyleSheet(
             """
@@ -1903,13 +1967,21 @@ class CockpitWindow(QMainWindow):
     def scan_in_progress(self) -> bool:
         return self._scan_thread is not None and self._scan_thread.isRunning()
 
+    @property
+    def classification_in_progress(self) -> bool:
+        return (
+            self._classification_thread is not None
+            and self._classification_thread.isRunning()
+        )
+
     def set_authorized_root(self, root: Path) -> None:
         resolved = root.resolve(strict=True)
         if not resolved.is_dir():
             raise NotADirectoryError("authorized root must be a directory")
-        if self.scan_in_progress:
-            raise RuntimeError("authorized root cannot change during a scan")
+        if self.scan_in_progress or self.classification_in_progress:
+            raise RuntimeError("authorized root cannot change during active work")
         self._workspace.authorize(resolved)
+        self._selected_document_row = None
         self.left.set_documents([])
         self.right.set_metrics(0, 0, 0)
         self._set_status(f"Authorized folder: {resolved}")
@@ -1923,6 +1995,7 @@ class CockpitWindow(QMainWindow):
         if self.scan_in_progress:
             return
 
+        self._selected_document_row = None
         self.left.set_documents([])
         self._workspace.start_scan()
         self.right.set_metrics(0, 0, 0)
@@ -1958,6 +2031,12 @@ class CockpitWindow(QMainWindow):
     def closeEvent(self, event: QCloseEvent) -> None:
         if self.scan_in_progress:
             self._set_status("Scan still running. Wait before closing DocWeave.")
+            event.ignore()
+            return
+        if self.classification_in_progress:
+            self._set_status(
+                "Classification still running. Wait before closing DocWeave."
+            )
             event.ignore()
             return
         event.accept()
@@ -2071,14 +2150,75 @@ class CockpitWindow(QMainWindow):
             self._set_status(f"PDF preview blocked safely ({error.category.value}).")
             return
         self.center.open_document(validated_path)
+        self._selected_document_row = row
+        self._set_busy(False)
         self._set_status("PDF preview raised inside DocWeave. No files were changed.")
 
-    def _set_busy(self, busy: bool) -> None:
-        self.console.buttons[0].setEnabled(not busy)
-        self.console.buttons[1].setEnabled(
-            not busy and self.authorized_root is not None
+    @Slot()
+    def _analyze_selected_document(self) -> None:
+        row = self._selected_document_row
+        root = self.authorized_root
+        if row is None or root is None:
+            self._set_status("Preview a ready PDF before classification.")
+            return
+        document = self.left.document_at(row)
+        if document is None or document.path is None or document.status != "READY":
+            self._set_status("Only a ready previewed PDF can be classified.")
+            return
+        if self.scan_in_progress or self.classification_in_progress:
+            return
+
+        thread = QThread(self)
+        worker = ClassificationWorker(
+            document.path,
+            root,
+            self._classification_function,
         )
-        self.console.buttons[2].setEnabled(busy)
+        worker.moveToThread(thread)
+        thread.started.connect(worker.run)
+        worker.completed.connect(self._handle_classification_completed)
+        worker.failed.connect(self._handle_classification_failed)
+        worker.completed.connect(thread.quit)
+        worker.failed.connect(thread.quit)
+        thread.finished.connect(worker.deleteLater)
+        thread.finished.connect(self._handle_classification_thread_finished)
+        self._classification_thread = thread
+        self._classification_worker = worker
+        self._set_busy(True)
+        self._set_status("Classifying selected PDF through configured runtime.")
+        thread.start()
+
+    @Slot(object)
+    def _handle_classification_completed(self, raw_result: object) -> None:
+        if not isinstance(raw_result, ClassificationCommandResult):
+            self._handle_classification_failed("InvalidClassificationResult")
+            return
+        self._set_status(
+            "Classification proposal persisted: "
+            f"{raw_result.proposed_class}; "
+            f"tokens {raw_result.total_tokens}."
+        )
+
+    @Slot(str)
+    def _handle_classification_failed(self, error_category: str) -> None:
+        self._set_status(f"Classification failed safely ({error_category}).")
+
+    @Slot()
+    def _handle_classification_thread_finished(self) -> None:
+        self._classification_thread = None
+        self._classification_worker = None
+        self._set_busy(False)
+
+    def _set_busy(self, busy: bool) -> None:
+        blocked = busy or self.scan_in_progress or self.classification_in_progress
+        self.console.buttons[0].setEnabled(not blocked)
+        self.console.buttons[1].setEnabled(
+            not blocked and self.authorized_root is not None
+        )
+        self.console.buttons[2].setEnabled(self.scan_in_progress)
+        self.console.buttons[3].setEnabled(
+            not blocked and self._selected_document_row is not None
+        )
 
     def _set_status(self, message: str) -> None:
         self.console.log_text.setText(message)

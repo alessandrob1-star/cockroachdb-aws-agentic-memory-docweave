@@ -5,6 +5,7 @@ import pytest
 from PySide6.QtCore import QEventLoop, QTimer
 
 from docweave.application_runtime import RuntimeIntegrationSnapshot
+from docweave.classification_cli import ClassificationCommandResult
 from docweave.desktop.cockpit import CockpitWindow
 from docweave.desktop.scan import DesktopScanResult
 from docweave.discovery import DiscoveredFile, DiscoveryResult, DiscoveryStatus
@@ -23,6 +24,27 @@ def wait_for_cockpit_scan(window: CockpitWindow) -> None:
     window.scan_finished.connect(loop.quit)
     QTimer.singleShot(3_000, mark_timeout)
     window.start_scan()
+    loop.exec()
+    assert not timed_out
+
+
+def wait_for_cockpit_classification(window: CockpitWindow) -> None:
+    loop = QEventLoop()
+    timed_out = False
+
+    def mark_timeout() -> None:
+        nonlocal timed_out
+        timed_out = True
+        loop.quit()
+
+    def poll() -> None:
+        if not window.classification_in_progress:
+            loop.quit()
+            return
+        QTimer.singleShot(10, poll)
+
+    QTimer.singleShot(10, poll)
+    QTimer.singleShot(3_000, mark_timeout)
     loop.exec()
     assert not timed_out
 
@@ -51,7 +73,25 @@ def test_cockpit_scans_synthetic_pdfs_and_raises_central_preview(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     corpus = Path("pdf_sintetici").resolve(strict=True)
-    window = CockpitWindow()
+    classified_paths: list[tuple[Path, Path]] = []
+
+    def fake_classification(
+        source_path: Path,
+        authorized_root: Path,
+    ) -> ClassificationCommandResult:
+        classified_paths.append((source_path, authorized_root))
+        return ClassificationCommandResult(
+            proposed_class="invoice",
+            document_disposition="applied",
+            taxonomy_disposition="applied",
+            proposal_disposition="applied",
+            input_tokens=10,
+            output_tokens=5,
+            total_tokens=15,
+            estimated_cost_usd=None,
+        )
+
+    window = CockpitWindow(classification_function=fake_classification)
     window.set_authorized_root(corpus)
 
     first_pdf = sorted(corpus.glob("*.pdf"))[0]
@@ -107,5 +147,14 @@ def test_cockpit_scans_synthetic_pdfs_and_raises_central_preview(
     assert window.center.filename.text().endswith(".pdf")
     assert opened_paths == [first_pdf]
     assert "No files were changed" in window.console.log_text.text()
+    assert window.console.buttons[3].isEnabled()
+
+    window._analyze_selected_document()
+    wait_for_cockpit_classification(window)
+
+    assert classified_paths == [(first_pdf, corpus)]
+    assert (
+        "Classification proposal persisted: invoice" in window.console.log_text.text()
+    )
 
     window.close()

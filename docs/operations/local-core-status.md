@@ -186,10 +186,10 @@ instead of waiting for the whole CockroachDB milestone to finish.
 
 The desktop cockpit now presents phase progress, cooperative cancellation,
 process-local workspace state, discovered PDF preview, guarded external-link
-delegation, and sanitized CockroachDB/Bedrock runtime readiness while remaining
-intentionally read-only. Its next increment must connect a reviewed local
-analysis workflow without inventing CockroachDB persistence or user
-authorization.
+delegation, sanitized CockroachDB/Bedrock runtime readiness, and a background
+Analyze dispatch for the selected ready PDF. Its next increment must run that
+workflow against the approved live validation target without inventing
+CockroachDB persistence or user authorization.
 
 AWS infrastructure should begin after the CockroachDB migration strategy and
 first local vertical slice are ready, so cloud work deploys real product
