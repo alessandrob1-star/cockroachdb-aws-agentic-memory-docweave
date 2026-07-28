@@ -40,10 +40,11 @@ discovery, deterministic intake counts, phase-aware progress, cooperative
 cancellation, explicit in-memory workspace state, a real discovered-PDF table,
 safe user-initiated opening of ready PDFs in the central embedded read-only
 preview, and confirmed and policy-validated delegation of eligible PDF
-hyperlinks to the user's default browser. CockroachDB and Amazon Bedrock remain
-visibly not connected in this desktop surface. Document-controlled persistence
-values remain bound parameters rather than executable Structured Query
-Language.
+hyperlinks to the user's default browser. The cockpit now displays sanitized
+runtime readiness for CockroachDB configuration and the approved Amazon Bedrock
+client without exposing connection values or performing startup I/O.
+Document-controlled persistence values remain bound parameters rather than
+executable Structured Query Language.
 
 The shared core now also performs real page-level text extraction through the
 already pinned Qt PDF module. Each attempt runs in a disposable child process
@@ -72,8 +73,11 @@ runtime provenance. Model and document values remain bound SQL parameters, and
 the schema deliberately omits canonical classifications and review decisions
 until the human-review workflow is implemented. Runtime wiring, document
 registration, taxonomy initialization, and an uncalibrated scoring boundary are
-implemented locally; configured application and live database wiring remain
-pending.
+implemented locally. A side-effect-free application runtime configuration
+boundary can now compose the CockroachDB SQLAlchemy engine, approved Bedrock
+Runtime client, validated Bedrock gateway, and classification runtime from
+explicit environment values without opening a database connection or invoking a
+model during startup. Live end-to-end database execution remains pending.
 
 The local shared core now also defines an explicit classification runtime that
 keeps extraction, database transactions, and Bedrock invocation in separate
@@ -82,8 +86,7 @@ or verify the approved workspace taxonomy with recorded human authority, invoke
 the real validated Bedrock gateway, obtain scores from the versioned
 pre-evaluation method or an explicitly injected later provider, and persist the
 proposal. Runtime construction performs no database or model input/output. No
-configured database engine, desktop wiring, or live end-to-end execution is
-claimed.
+live end-to-end execution is claimed.
 
 `confidence.raw.v0_1` now provides a deterministic pre-evaluation default for
 review ordering. It uses validated ordinal model signals, extraction coverage,

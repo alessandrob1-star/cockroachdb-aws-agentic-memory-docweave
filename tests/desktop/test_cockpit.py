@@ -4,6 +4,7 @@ from typing import Any, cast
 import pytest
 from PySide6.QtCore import QEventLoop, QTimer
 
+from docweave.application_runtime import RuntimeIntegrationSnapshot
 from docweave.desktop.cockpit import CockpitWindow
 from docweave.desktop.scan import DesktopScanResult
 from docweave.discovery import DiscoveredFile, DiscoveryResult, DiscoveryStatus
@@ -29,12 +30,18 @@ def wait_for_cockpit_scan(window: CockpitWindow) -> None:
 def test_cockpit_starts_with_definitive_local_surface(
     qt_application: object,
 ) -> None:
-    window = CockpitWindow()
+    window = CockpitWindow(
+        integration_snapshot=RuntimeIntegrationSnapshot(
+            cockroachdb_configured=True,
+            bedrock_region="eu-central-1",
+            bedrock_model_id="eu.amazon.nova-2-lite-v1:0",
+        )
+    )
 
     assert window.windowTitle() == "DocWeave Cockpit"
     assert window.left.table.rowCount() == 0
-    assert "CockroachDB      Not connected" in window.console.status_text.text()
-    assert "Bedrock          Not connected" in window.console.status_text.text()
+    assert "CockroachDB      Configured" in window.console.status_text.text()
+    assert "Bedrock          Client configured" in window.console.status_text.text()
 
     window.close()
 
