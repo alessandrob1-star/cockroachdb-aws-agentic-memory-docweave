@@ -38,7 +38,7 @@ def test_main_shows_window_and_returns_event_loop_status(
     )
     monkeypatch.setattr(
         application_module,
-        "DocWeaveMainWindow",
+        "CockpitWindow",
         lambda: fake_window,
     )
 
