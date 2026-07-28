@@ -77,6 +77,10 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from docweave.application_runtime import (
+    RuntimeIntegrationSnapshot,
+    runtime_integration_snapshot,
+)
 from docweave.desktop.link_security import (
     ExternalLinkOutcome,
     request_external_pdf_link,
@@ -1634,9 +1638,15 @@ class CockpitWindow(QMainWindow):
         self,
         *,
         scan_function: ScanFunction = scan_authorized_root,
+        integration_snapshot: RuntimeIntegrationSnapshot | None = None,
     ) -> None:
         super().__init__()
         self._scan_function = scan_function
+        self._integration_snapshot = (
+            integration_snapshot
+            if integration_snapshot is not None
+            else runtime_integration_snapshot()
+        )
         self._scan_thread: QThread | None = None
         self._scan_worker: ScanWorker | None = None
         self._workspace = DesktopWorkspaceSession()
@@ -2072,20 +2082,22 @@ class CockpitWindow(QMainWindow):
 
     def _set_status(self, message: str) -> None:
         self.console.log_text.setText(message)
+        cockroachdb_status = self._integration_snapshot.cockroachdb_status
+        bedrock_status = self._integration_snapshot.bedrock_status
         self.console.status_text.setText(
             "● Local scan       "
             + ("Running" if self.scan_in_progress else "Ready")
             + "\n"
             "● PDF preview      Ready\n"
-            "● CockroachDB      Not connected\n"
-            "● Bedrock          Not connected"
+            f"● CockroachDB      {cockroachdb_status}\n"
+            f"● Bedrock          {bedrock_status}"
         )
         self.right.set_events(
             [
                 ("DISCOVERY", message[:42]),
                 ("PREVIEW", "Embedded PDF viewer ready"),
-                ("MEMORY", "CockroachDB not connected"),
-                ("BEDROCK", "Classification not active"),
+                ("MEMORY", f"CockroachDB {cockroachdb_status.lower()}"),
+                ("BEDROCK", f"Bedrock {bedrock_status.lower()}"),
                 ("SECURITY", "Read-only local boundary"),
             ]
         )

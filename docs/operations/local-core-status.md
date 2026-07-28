@@ -102,13 +102,12 @@ The latest verified local quality gate on
 - online migration execution was verified to fail closed when no database URL
   is explicitly supplied.
 
-The first complete local run ended during an existing native Qt desktop test
-on local Python 3.14.5. Subsequent complete reruns passed, most recently with
-all 401 tests and
-quality gates. The merged `main` baseline passed GitHub Actions through pull
-request 36. The Bedrock gateway increment remains local evidence until this
-separately authorized pull request passes GitHub Actions. GitHub Actions uses
-the supported Python 3.12 test target.
+Native Qt desktop tests can abort on some local and hosted headless runners
+when the real Qt PDF widget is exercised directly. The cockpit tests therefore
+verify scan, table, metric, and selected-document preview wiring while avoiding
+the native PDF load path in Continuous Integration. The most recent complete
+local gate passed with all 428 tests, formatting, linting, and strict type
+checking. GitHub Actions uses the supported Python 3.12 test target.
 
 The check command is:
 
@@ -120,7 +119,7 @@ The check command is:
 
 DocWeave does not yet implement or claim:
 
-- an application connection to CockroachDB or a production schema;
+- a live application transaction against CockroachDB or a production schema;
 - persistent operational, semantic, episodic, preference, or audit memory;
 - AWS infrastructure or deployed DocWeave workloads;
 - Amazon Bedrock invocation inside the product bootstrap;
@@ -134,9 +133,11 @@ DocWeave does not yet implement or claim:
 
 The batch executor remains a local primitive, but its optional lifecycle
 recorder and restart-aware ledger now connect execution ordering and state
-loading to the durable adapter contract. No live runtime engine constructs
-these components or loads a CockroachDB row. The project therefore does not
-claim persistent application behavior.
+loading to the durable adapter contract. The application runtime boundary can
+now compose a CockroachDB SQLAlchemy engine and approved Bedrock gateway from
+explicit runtime configuration without opening either service. No live
+application invocation has loaded or written a CockroachDB row through this
+boundary, so the project does not yet claim persistent application behavior.
 
 ## 5. Contract review findings
 
@@ -152,7 +153,7 @@ must be closed before production-grade batch execution:
 
 | Gap | Impact | Required next control |
 | --- | --- | --- |
-| No approved engine configuration or application bootstrap | The composed restart path is not yet a live application integration | Add approved engine configuration and bootstrap invocation |
+| No live application bootstrap execution | The composed restart path is not yet a live application integration | Run the configured runtime against the approved validation target |
 | Audit adapter has no live runtime evidence | Activity History cannot yet survive restart | Run approved integration and restart tests against CockroachDB |
 | Lease renewal and execution fencing are not implemented | A worker that outlives its lease is not yet safe for concurrent production execution | Add renewal or fencing before enabling multiple workers |
 | No restore contract | Move and copy outcomes are not yet reversible through tested restore semantics | Add restore planning after batch result and audit semantics |
@@ -175,18 +176,19 @@ contention, or recovery.
 
 ## 7. Readiness for CockroachDB, AWS, and UI
 
-The next CockroachDB application step is approved engine configuration and a
-controlled restart integration test using the implemented runtime composer.
-Live execution remains behind separate approval and a current cost preflight.
+The next CockroachDB application step is a controlled live integration test
+using the configured classification runtime boundary. Live execution remains
+behind explicit runtime environment values and a current validation target.
 
 To preserve time for manual testing and personalization, the first desktop
 surface is now scheduled in parallel with the remaining live-integration work
 instead of waiting for the whole CockroachDB milestone to finish.
 
-The desktop discovery shell now presents phase progress, cooperative
-cancellation, process-local workspace state, and multiple selection while
-remaining intentionally read-only. Its next increment must connect a reviewed
-local project workflow without inventing CockroachDB persistence or user
+The desktop cockpit now presents phase progress, cooperative cancellation,
+process-local workspace state, discovered PDF preview, guarded external-link
+delegation, and sanitized CockroachDB/Bedrock runtime readiness while remaining
+intentionally read-only. Its next increment must connect a reviewed local
+analysis workflow without inventing CockroachDB persistence or user
 authorization.
 
 AWS infrastructure should begin after the CockroachDB migration strategy and
