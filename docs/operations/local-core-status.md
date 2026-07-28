@@ -106,7 +106,7 @@ Native Qt desktop tests can abort on some local and hosted headless runners
 when the real Qt PDF widget is exercised directly. The cockpit tests therefore
 verify scan, table, metric, and selected-document preview wiring while avoiding
 the native PDF load path in Continuous Integration. The most recent complete
-local gate passed with all 428 tests, formatting, linting, and strict type
+local gate passed with all 431 tests, formatting, linting, and strict type
 checking. GitHub Actions uses the supported Python 3.12 test target.
 
 The check command is:

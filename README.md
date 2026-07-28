@@ -77,7 +77,10 @@ implemented locally. A side-effect-free application runtime configuration
 boundary can now compose the CockroachDB SQLAlchemy engine, approved Bedrock
 Runtime client, validated Bedrock gateway, and classification runtime from
 explicit environment values without opening a database connection or invoking a
-model during startup. Live end-to-end database execution remains pending.
+model during startup. The `docweave-classify-pdf` command now exposes the first
+controlled single-PDF runtime slice for real extraction, Bedrock invocation,
+and CockroachDB persistence when those runtime values and a migrated database
+are supplied. Live end-to-end database execution remains pending.
 
 The local shared core now also defines an explicit classification runtime that
 keeps extraction, database transactions, and Bedrock invocation in separate
@@ -118,6 +121,25 @@ The current approved product direction includes:
 ## Documentation
 
 Start with the [requirements index](docs/requirements/README.md).
+
+## Runtime commands
+
+The desktop shell is launched with:
+
+```powershell
+docweave-desktop
+```
+
+The first controlled classification runtime slice is launched with:
+
+```powershell
+docweave-classify-pdf <pdf-path> --authorized-root <folder>
+```
+
+This command requires explicit runtime configuration through environment
+variables and performs real extraction, Amazon Bedrock invocation, and
+CockroachDB writes only when invoked. It does not create cloud resources,
+schemas, migrations, or secrets.
 
 Mandatory governance:
 
