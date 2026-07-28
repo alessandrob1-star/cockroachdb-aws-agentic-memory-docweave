@@ -50,6 +50,35 @@ success:
 The final accepted run followed deterministic evidence segmentation and a
 forced, side-effect-free `emit_classification` envelope.
 
+## Follow-up accepted run
+
+On 2026-07-28, the approved European Amazon Nova 2 Lite profile was invoked
+again through the application gateway after strengthening the
+`classification.v1` system prompt with an explicit pre-emission checklist. The
+model-visible input was extracted only from `pdf_sintetici/received_file_003.pdf`;
+the separate manifest label was used only after the run for comparison.
+
+| Observation | Value |
+| --- | --- |
+| Manifest reference class | `invoice` |
+| Proposed class | `invoice` |
+| Stop reason | `tool_use` |
+| Input tokens | 4,803 |
+| Output tokens | 1,054 |
+| Total tokens | 5,857 |
+| Service latency | 4,195 ms |
+| Observed duration | 4,574 ms |
+| SDK retries | 0 |
+| Estimated cost | 0.00054114 USD |
+| Extracted pages | 2 |
+| Extracted characters | 2,044 |
+
+Earlier attempts on the same document were rejected fail-closed because Nova
+omitted required contract fields or emitted candidate metadata with undeclared
+evidence references. The accepted run did not relax validation; it improved the
+model instruction so the emitted object satisfied the existing schema and
+evidence-reference rules.
+
 ## Limitation
 
 The selected synthetic PDF includes controlled-testing notes and an expected

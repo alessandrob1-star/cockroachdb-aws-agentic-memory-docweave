@@ -30,7 +30,25 @@ only when evidence supports that no configured class applies. Use
 `unclassified` and a clear abstention reason when evidence is insufficient or
 contradictory. Raw ordinal signals are not calibrated probabilities. Call only
 the supplied emit_classification tool with the structured classification.v1
-result. The tool records a proposal and performs no action."""
+result. The tool records a proposal and performs no action.
+
+Before calling emit_classification, complete this strict emission checklist:
+1. Include exactly these top-level keys: contract_version, taxonomy_version,
+   proposed_class, document_language, rationale, rationale_evidence_ids,
+   evidence, candidate_metadata, alternative_classes, contradictions,
+   missing_expected_evidence, raw_signals, abstention_reason. Do not omit
+   rationale or rationale_evidence_ids.
+2. First choose the evidence array. Every evidence_id used anywhere must be
+   declared in that array.
+3. After writing candidate_metadata, alternative_classes, contradictions, and
+   rationale_evidence_ids, cross-check every evidence_ids value against the
+   evidence array. Remove any metadata item whose evidence_ids are not all
+   declared.
+4. Keep candidate_metadata to at most six high-value fields. This is a hard
+   maximum, not a preference.
+5. Keep alternative_classes empty unless a distinct supported alternative
+   exists; never include unclassified as an alternative.
+6. Keep contradictions empty unless real contradictory evidence exists."""
 
 
 class ClassificationInputCode(StrEnum):
