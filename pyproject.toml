@@ -22,6 +22,7 @@ dependencies = [
 ]
 
 [project.scripts]
+docweave-classify-pdf = "docweave.classification_cli:main"
 docweave-desktop = "docweave.desktop.application:main"
 
 [project.optional-dependencies]
