@@ -49,12 +49,14 @@ classification worker using the same configured runtime path. Each accepted
 proposal moves its document into non-authoritative human review state in the
 cockpit, with progress and terminal batch status surfaced without changing any
 file. The cockpit also prepares a deterministic, non-mutating copy destination
-proposal from the model-proposed class and a sanitized original filename, then
-binds it to the existing safe file-operation planner so collisions and unsafe
-paths remain blocked before any future approval. This is not yet semantic
-Bedrock filename generation. Automated tests exercise a 30-PDF cockpit batch
-with an injected non-cloud function, and live desktop classification remains
-dependent on runtime configuration and a migrated database.
+proposal from the model-proposed class, validated candidate metadata when
+available, and a sanitized original filename fallback, then binds it to the
+existing safe file-operation planner so collisions and unsafe paths remain
+blocked before any future approval. This is still a transparent planning layer,
+not free-form semantic Bedrock filename generation. Automated tests exercise a
+30-PDF cockpit batch with an injected non-cloud function, and live desktop
+classification remains dependent on runtime configuration and a migrated
+database.
 Document-controlled persistence values remain bound parameters rather than
 executable Structured Query Language.
 

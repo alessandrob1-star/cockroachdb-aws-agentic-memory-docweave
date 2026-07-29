@@ -8,6 +8,7 @@ from docweave.application_runtime import RuntimeIntegrationSnapshot
 from docweave.classification_cli import (
     ClassificationCommandResult,
     ClassificationEvidenceDetail,
+    ClassificationMetadataDetail,
 )
 from docweave.desktop.cockpit import CockpitWindow, Document
 from docweave.desktop.scan import DesktopScanResult
@@ -45,13 +46,7 @@ def wait_for_cockpit_classification(window: CockpitWindow) -> None:
         timed_out = True
         loop.quit()
 
-    def poll() -> None:
-        if not window.classification_in_progress:
-            loop.quit()
-            return
-        QTimer.singleShot(10, poll)
-
-    QTimer.singleShot(10, poll)
+    window.classification_finished.connect(loop.quit)
     QTimer.singleShot(3_000, mark_timeout)
     loop.exec()
     assert not timed_out
@@ -103,6 +98,7 @@ def assert_visible_classification_proposal(window: CockpitWindow) -> None:
     assert "Proposed copy target: DocWeave Organized/Invoices/" in (
         proposed_class_item.toolTip()
     )
+    assert "invoice_acme-srl_inv-2026-004.pdf" in proposed_class_item.toolTip()
 
     ready_metric = cast(Any, window.right.metric_frames[1]).number
     review_metric = cast(Any, window.right.metric_frames[2]).number
@@ -194,6 +190,18 @@ def test_cockpit_blocks_analyze_when_runtime_preflight_failed(
             rationale="The document contains invoice wording and a total.",
             evidence_count=2,
             metadata_count=1,
+            metadata_details=(
+                ClassificationMetadataDetail(
+                    name="supplier",
+                    value="ACME SRL",
+                    evidence_ids=("ev_1",),
+                ),
+                ClassificationMetadataDetail(
+                    name="invoice_number",
+                    value="INV-2026-004",
+                    evidence_ids=("ev_1",),
+                ),
+            ),
             evidence_details=(
                 ClassificationEvidenceDetail(
                     evidence_id="ev_1",
@@ -279,6 +287,18 @@ def test_cockpit_scans_synthetic_pdfs_and_raises_central_preview(
             rationale="The document contains invoice wording and a total.",
             evidence_count=2,
             metadata_count=1,
+            metadata_details=(
+                ClassificationMetadataDetail(
+                    name="supplier",
+                    value="ACME SRL",
+                    evidence_ids=("ev_1",),
+                ),
+                ClassificationMetadataDetail(
+                    name="invoice_number",
+                    value="INV-2026-004",
+                    evidence_ids=("ev_1",),
+                ),
+            ),
             evidence_details=(
                 ClassificationEvidenceDetail(
                     evidence_id="ev_1",
@@ -399,6 +419,18 @@ def test_cockpit_analysis_batch_preserves_progress_and_retries_ready_documents(
             rationale="The document contains invoice wording and a total.",
             evidence_count=1,
             metadata_count=1,
+            metadata_details=(
+                ClassificationMetadataDetail(
+                    name="supplier",
+                    value="ACME SRL",
+                    evidence_ids=("ev_1",),
+                ),
+                ClassificationMetadataDetail(
+                    name="invoice_number",
+                    value="INV-2026-004",
+                    evidence_ids=("ev_1",),
+                ),
+            ),
             evidence_details=(
                 ClassificationEvidenceDetail(
                     evidence_id="ev_1",

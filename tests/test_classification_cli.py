@@ -9,6 +9,7 @@ from docweave.analysis import (
     BedrockClassificationRun,
     BedrockRunProvenance,
     BedrockUsage,
+    CandidateMetadata,
     ClassificationProposal,
     EvidenceReference,
     RawClassificationSignals,
@@ -143,7 +144,13 @@ def test_command_result_includes_validated_evidence_details() -> None:
                         supports=("metadata",),
                     ),
                 ),
-                candidate_metadata=(),
+                candidate_metadata=(
+                    CandidateMetadata(
+                        name="supplier",
+                        value="ACME SRL",
+                        evidence_ids=("ev_2",),
+                    ),
+                ),
                 alternative_classes=(),
                 contradictions=(),
                 missing_expected_evidence=(),
@@ -182,6 +189,10 @@ def test_command_result_includes_validated_evidence_details() -> None:
         "Invoice heading and total are explicit."
     )
     assert result.evidence_details[1].page_number == 2
+    assert result.metadata_count == 1
+    assert result.metadata_details[0].name == "supplier"
+    assert result.metadata_details[0].value == "ACME SRL"
+    assert result.metadata_details[0].evidence_ids == ("ev_2",)
     assert result.retry_attempts == 1
 
 

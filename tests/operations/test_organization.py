@@ -55,6 +55,29 @@ def test_unknown_class_is_disclosed_as_unclassified(tmp_path: Path) -> None:
     assert proposal.plan.is_ready
 
 
+def test_uses_validated_metadata_for_more_meaningful_filename(
+    tmp_path: Path,
+) -> None:
+    source = tmp_path / "received_file_003.pdf"
+    write_file(source)
+
+    proposal = propose_safe_organization_copy(
+        source_path=source,
+        authorized_root=tmp_path,
+        proposed_class="invoice",
+        metadata={
+            "supplier": "ACME SRL",
+            "invoice_number": "INV-2026-004",
+            "ignored_field": "not used",
+        },
+    )
+
+    assert proposal.destination_relative_path == (
+        f"{ORGANIZED_ROOT_FOLDER}/Invoices/invoice_acme-srl_inv-2026-004.pdf"
+    )
+    assert proposal.plan.is_ready
+
+
 def test_sanitizes_dangerous_pdf_filename(tmp_path: Path) -> None:
     source = tmp_path / "invoice:ACME*Q1?.pdf"
     write_file(source)
