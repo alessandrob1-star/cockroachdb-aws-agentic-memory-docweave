@@ -560,13 +560,40 @@ class LeftScreen(ShapeWidget):
         self._documents = list(documents)
         self.table.setRowCount(len(self._documents))
         for row, doc in enumerate(self._documents):
-            for column, value in enumerate(
-                (doc.name, doc.category, doc.pages, doc.status)
-            ):
-                item = QTableWidgetItem(value)
-                if column == 3:
-                    item.setForeground(WARNING if doc.status == "ATTENTION" else ACCENT)
-                self.table.setItem(row, column, item)
+            self._set_document_row(row, doc)
+
+    def mark_document_for_review(self, row: int, *, proposed_class: str) -> None:
+        """Update one discovered PDF with a non-authoritative proposal."""
+        if not 0 <= row < len(self._documents):
+            return
+        current = self._documents[row]
+        updated = Document(
+            name=current.name,
+            category=proposed_class,
+            pages=current.pages,
+            status="REVIEW",
+            path=current.path,
+        )
+        self._documents[row] = updated
+        self._set_document_row(row, updated)
+
+    def _set_document_row(self, row: int, doc: Document) -> None:
+        for column, value in enumerate((doc.name, doc.category, doc.pages, doc.status)):
+            item = QTableWidgetItem(value)
+            if column == 3:
+                item.setForeground(
+                    WARNING if doc.status in {"ATTENTION", "REVIEW"} else ACCENT
+                )
+            self.table.setItem(row, column, item)
+
+    def count_status(self, status: str) -> int:
+        """Count current visible document states."""
+        return sum(1 for document in self._documents if document.status == status)
+
+    @property
+    def document_count(self) -> int:
+        """Return the current visible document count."""
+        return len(self._documents)
 
     def shape_path(self) -> QPainterPath:
         r = self.rect().adjusted(3, 3, -3, -3)
@@ -2193,15 +2220,44 @@ class CockpitWindow(QMainWindow):
         if not isinstance(raw_result, ClassificationCommandResult):
             self._handle_classification_failed("InvalidClassificationResult")
             return
+        row = self._selected_document_row
+        if row is not None:
+            self.left.mark_document_for_review(
+                row,
+                proposed_class=raw_result.proposed_class,
+            )
+            self.right.set_metrics(
+                self.left.document_count,
+                self.left.count_status("READY"),
+                self.left.count_status("REVIEW"),
+            )
         self._set_status(
             "Classification proposal persisted: "
             f"{raw_result.proposed_class}; "
             f"tokens {raw_result.total_tokens}."
         )
+        self.right.set_events(
+            [
+                ("CLASSIFIER", f"Proposed {raw_result.proposed_class}"),
+                ("TOKENS", f"Bedrock total {raw_result.total_tokens}"),
+                ("MEMORY", f"Proposal {raw_result.proposal_disposition}"),
+                ("REVIEW", "Human decision required"),
+                ("SECURITY", "No file mutation performed"),
+            ]
+        )
 
     @Slot(str)
     def _handle_classification_failed(self, error_category: str) -> None:
         self._set_status(f"Classification failed safely ({error_category}).")
+        self.right.set_events(
+            [
+                ("CLASSIFIER", "Failed closed"),
+                ("ERROR", error_category[:42]),
+                ("MEMORY", "No proposal accepted"),
+                ("REVIEW", "Manual inspection required"),
+                ("SECURITY", "No file mutation performed"),
+            ]
+        )
 
     @Slot()
     def _handle_classification_thread_finished(self) -> None:

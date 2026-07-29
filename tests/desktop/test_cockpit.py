@@ -156,5 +156,21 @@ def test_cockpit_scans_synthetic_pdfs_and_raises_central_preview(
     assert (
         "Classification proposal persisted: invoice" in window.console.log_text.text()
     )
+    proposed_class_item = window.left.table.item(0, 1)
+    review_status_item = window.left.table.item(0, 3)
+    assert proposed_class_item is not None
+    assert review_status_item is not None
+    assert proposed_class_item.text() == "invoice"
+    assert review_status_item.text() == "REVIEW"
+    ready_metric = cast(Any, window.right.metric_frames[1]).number
+    review_metric = cast(Any, window.right.metric_frames[2]).number
+    assert ready_metric.text() == "29"
+    assert review_metric.text() == "1"
+    assert cast(Any, window.right.event_rows[0]).event_text.text() == (
+        "Proposed invoice"
+    )
+    assert cast(Any, window.right.event_rows[3]).event_text.text() == (
+        "Human decision required"
+    )
 
     window.close()
