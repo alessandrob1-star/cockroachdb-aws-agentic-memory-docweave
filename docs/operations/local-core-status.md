@@ -198,6 +198,11 @@ token and persistence dispositions as non-authoritative review evidence. Its
 next increment must run that workflow against the approved live validation
 target without inventing CockroachDB persistence or user authorization.
 
+`docs/operations/runtime-configuration-runbook.md` records the current
+operator sequence for safe local runtime configuration, configuration-only
+preflight, explicit database preflight, controlled single-document
+classification, and desktop startup without committing secrets.
+
 AWS infrastructure should begin after the CockroachDB migration strategy and
 first local vertical slice are ready, so cloud work deploys real product
 behavior rather than scaffolding without evidence.

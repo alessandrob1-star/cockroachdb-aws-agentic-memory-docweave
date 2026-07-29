@@ -191,6 +191,7 @@ Approved architecture:
 - [CockroachDB classification persistence boundary](docs/architecture/cockroachdb-classification-persistence.md)
 - [Desktop discovery shell](docs/architecture/desktop-discovery-shell.md)
 - [Verified AWS and CockroachDB environment baseline](docs/operations/environment-baseline.md)
+- [Runtime configuration runbook](docs/operations/runtime-configuration-runbook.md)
 - [CockroachDB live validation evidence](docs/operations/cockroachdb-live-validation.md)
 - [Bedrock live classification validation](docs/operations/bedrock-live-validation.md)
 - [Delivery plan](docs/operations/delivery-plan.md)
