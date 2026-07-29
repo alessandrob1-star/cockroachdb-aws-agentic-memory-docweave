@@ -2263,12 +2263,30 @@ class CockpitWindow(QMainWindow):
             f"{raw_result.proposed_class}; "
             f"tokens {raw_result.total_tokens}."
         )
+        confidence_label = (
+            "n/a" if raw_result.raw_confidence is None else raw_result.raw_confidence
+        )
+        retry_label = (
+            "No validation retry"
+            if raw_result.retry_attempts == 0
+            else f"Validation retries {raw_result.retry_attempts}"
+        )
+        rationale = _compact_console_text(raw_result.rationale, maximum=96)
+        self.console.log_text.setText(
+            "Classification proposal persisted\n"
+            f"Class: {raw_result.proposed_class}\n"
+            f"Confidence: {confidence_label}\n"
+            f"Evidence items: {raw_result.evidence_count}; "
+            f"metadata fields: {raw_result.metadata_count}\n"
+            f"Rationale: {rationale}"
+        )
         self.right.set_events(
             [
                 ("CLASSIFIER", f"Proposed {raw_result.proposed_class}"),
-                ("TOKENS", f"Bedrock total {raw_result.total_tokens}"),
+                ("EVIDENCE", f"{raw_result.evidence_count} cited spans"),
+                ("CONFIDENCE", f"Raw {confidence_label}"),
                 ("MEMORY", f"Proposal {raw_result.proposal_disposition}"),
-                ("REVIEW", "Human decision required"),
+                ("BEDROCK", f"{raw_result.total_tokens} tokens; {retry_label}"),
                 ("SECURITY", "No file mutation performed"),
             ]
         )
@@ -2510,6 +2528,13 @@ def _classification_preflight_block(report: RuntimePreflightReport) -> str | Non
         return _compact_preflight_detail(bedrock_check.detail)
 
     return None
+
+
+def _compact_console_text(value: str, *, maximum: int) -> str:
+    normalized = " ".join(value.split())
+    if len(normalized) <= maximum:
+        return normalized
+    return normalized[: max(0, maximum - 1)].rstrip() + "…"
 
 
 def _preflight_check(
