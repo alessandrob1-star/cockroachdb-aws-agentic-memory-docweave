@@ -977,6 +977,9 @@ class CenterPreview(ShapeWidget):
         self.analysis_rationale = QLabel("", self.analysis_panel)
         self.analysis_rationale.setObjectName("muted")
         self.analysis_rationale.setWordWrap(True)
+        self.analysis_evidence = QLabel("", self.analysis_panel)
+        self.analysis_evidence.setObjectName("eventText")
+        self.analysis_evidence.setWordWrap(True)
 
         self._document = QPdfDocument(self)
         self.page = SecurePdfView(self)
@@ -1075,11 +1078,12 @@ class CenterPreview(ShapeWidget):
 
         # PDF uses almost the entire inner screen and remains fully opaque.
         if self.analysis_panel.isVisible():
-            self.analysis_panel.setGeometry(18, 112, w - 36, 86)
+            self.analysis_panel.setGeometry(18, 112, w - 36, 132)
             self.analysis_title.setGeometry(16, 8, 120, 20)
             self.analysis_summary.setGeometry(16, 28, w - 68, 24)
             self.analysis_rationale.setGeometry(16, 52, w - 68, 28)
-            self.page.setGeometry(18, 208, w - 36, h - 224)
+            self.analysis_evidence.setGeometry(16, 84, w - 68, 40)
+            self.page.setGeometry(18, 254, w - 36, h - 270)
         else:
             self.page.setGeometry(18, 112, w - 36, h - 128)
 
@@ -1136,6 +1140,7 @@ class CenterPreview(ShapeWidget):
         self.analysis_rationale.setText(
             _compact_console_text(result.rationale, maximum=150)
         )
+        self.analysis_evidence.setText(_classification_evidence_summary(result))
         self.analysis_panel.show()
         self.analysis_panel.raise_()
         self.resizeEvent(None)
@@ -2579,6 +2584,17 @@ def _compact_console_text(value: str, *, maximum: int) -> str:
     if len(normalized) <= maximum:
         return normalized
     return normalized[: max(0, maximum - 1)].rstrip() + "…"
+
+
+def _classification_evidence_summary(result: ClassificationCommandResult) -> str:
+    if not result.evidence_details:
+        return "Evidence details unavailable in this result."
+    parts = [
+        f"{item.evidence_id} p{item.page_number}: "
+        f"{_compact_console_text(item.quote, maximum=58)}"
+        for item in result.evidence_details[:3]
+    ]
+    return " | ".join(parts)
 
 
 def _preflight_check(
