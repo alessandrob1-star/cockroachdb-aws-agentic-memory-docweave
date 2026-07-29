@@ -174,6 +174,10 @@ def test_cockpit_blocks_analyze_when_runtime_preflight_failed(
         ]
     )
     window._selected_document_row = 0
+    window._set_busy(False)
+
+    assert not window.console.buttons[3].isEnabled()
+    assert "preflight" in window.console.buttons[3].toolTip().lower()
 
     window._analyze_selected_document()
 
