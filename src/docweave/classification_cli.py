@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from uuid import UUID, uuid5
 
+from docweave.analysis.confidence import compute_uncalibrated_confidence
 from docweave.application_runtime import (
     RuntimeConfigurationError,
     RuntimeEnvironmentConfig,
@@ -36,6 +37,15 @@ class ClassificationCommandResult:
     output_tokens: int
     total_tokens: int
     estimated_cost_usd: str | None
+    document_language: str = "und"
+    rationale: str = ""
+    evidence_count: int = 0
+    metadata_count: int = 0
+    alternative_class: str | None = None
+    raw_confidence: str | None = None
+    classification_confidence: str | None = None
+    metadata_confidence: str | None = None
+    retry_attempts: int = 0
 
 
 def build_content_addressed_identity(
@@ -164,10 +174,12 @@ def _command_result(
     persisted: PersistedClassificationRun,
 ) -> ClassificationCommandResult:
     provenance = persisted.model_run.provenance
+    proposal = persisted.model_run.proposal
     usage = provenance.usage
     estimated_cost = provenance.estimated_cost_usd
+    confidence = compute_uncalibrated_confidence(proposal, persisted.extraction)
     return ClassificationCommandResult(
-        proposed_class=persisted.model_run.proposal.proposed_class.value,
+        proposed_class=proposal.proposed_class.value,
         document_disposition=persisted.document_disposition.value,
         taxonomy_disposition=persisted.taxonomy_disposition.value,
         proposal_disposition=persisted.proposal_disposition.value,
@@ -175,6 +187,19 @@ def _command_result(
         output_tokens=usage.output_tokens,
         total_tokens=usage.total_tokens,
         estimated_cost_usd=str(estimated_cost) if estimated_cost is not None else None,
+        document_language=proposal.document_language,
+        rationale=proposal.rationale,
+        evidence_count=len(proposal.evidence),
+        metadata_count=len(proposal.candidate_metadata),
+        alternative_class=(
+            None
+            if not proposal.alternative_classes
+            else proposal.alternative_classes[0].class_code.value
+        ),
+        raw_confidence=str(confidence.raw),
+        classification_confidence=str(confidence.classification),
+        metadata_confidence=str(confidence.metadata),
+        retry_attempts=provenance.retry_attempts,
     )
 
 

@@ -72,6 +72,39 @@ def ready_runtime_preflight_report() -> RuntimePreflightReport:
     )
 
 
+def assert_visible_classification_proposal(window: CockpitWindow) -> None:
+    log_text = window.console.log_text.text()
+    assert "Classification proposal persisted" in log_text
+    assert "Class: invoice" in log_text
+    assert "Confidence: 0.80000" in log_text
+    assert "Evidence items: 2; metadata fields: 1" in log_text
+    assert "Rationale: The document contains invoice wording" in log_text
+
+    proposed_class_item = window.left.table.item(0, 1)
+    review_status_item = window.left.table.item(0, 3)
+    assert proposed_class_item is not None
+    assert review_status_item is not None
+    assert proposed_class_item.text() == "invoice"
+    assert review_status_item.text() == "REVIEW"
+
+    ready_metric = cast(Any, window.right.metric_frames[1]).number
+    review_metric = cast(Any, window.right.metric_frames[2]).number
+    assert ready_metric.text() == "29"
+    assert review_metric.text() == "1"
+    assert cast(Any, window.right.event_rows[0]).event_text.text() == (
+        "Proposed invoice"
+    )
+    assert cast(Any, window.right.event_rows[1]).event_text.text() == "2 cited spans"
+    assert cast(Any, window.right.event_rows[2]).event_text.text() == "Raw 0.80000"
+    assert cast(Any, window.right.event_rows[3]).event_text.text() == (
+        "Proposal applied"
+    )
+    assert (
+        "Validation retries 1"
+        in cast(Any, window.right.event_rows[4]).event_text.text()
+    )
+
+
 def test_cockpit_starts_with_definitive_local_surface(
     qt_application: object,
 ) -> None:
@@ -142,6 +175,13 @@ def test_cockpit_blocks_analyze_when_runtime_preflight_failed(
             output_tokens=5,
             total_tokens=15,
             estimated_cost_usd=None,
+            document_language="en",
+            rationale="The document contains invoice wording and a total.",
+            evidence_count=2,
+            metadata_count=1,
+            raw_confidence="0.80000",
+            classification_confidence="0.80000",
+            metadata_confidence="1.00000",
         )
 
     window = CockpitWindow(
@@ -213,6 +253,14 @@ def test_cockpit_scans_synthetic_pdfs_and_raises_central_preview(
             output_tokens=5,
             total_tokens=15,
             estimated_cost_usd=None,
+            document_language="en",
+            rationale="The document contains invoice wording and a total.",
+            evidence_count=2,
+            metadata_count=1,
+            raw_confidence="0.80000",
+            classification_confidence="0.80000",
+            metadata_confidence="1.00000",
+            retry_attempts=1,
         )
 
     window = CockpitWindow(
@@ -280,24 +328,6 @@ def test_cockpit_scans_synthetic_pdfs_and_raises_central_preview(
     wait_for_cockpit_classification(window)
 
     assert classified_paths == [(first_pdf, corpus)]
-    assert (
-        "Classification proposal persisted: invoice" in window.console.log_text.text()
-    )
-    proposed_class_item = window.left.table.item(0, 1)
-    review_status_item = window.left.table.item(0, 3)
-    assert proposed_class_item is not None
-    assert review_status_item is not None
-    assert proposed_class_item.text() == "invoice"
-    assert review_status_item.text() == "REVIEW"
-    ready_metric = cast(Any, window.right.metric_frames[1]).number
-    review_metric = cast(Any, window.right.metric_frames[2]).number
-    assert ready_metric.text() == "29"
-    assert review_metric.text() == "1"
-    assert cast(Any, window.right.event_rows[0]).event_text.text() == (
-        "Proposed invoice"
-    )
-    assert cast(Any, window.right.event_rows[3]).event_text.text() == (
-        "Human decision required"
-    )
+    assert_visible_classification_proposal(window)
 
     window.close()
