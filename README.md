@@ -147,6 +147,18 @@ variables and performs real extraction, Amazon Bedrock invocation, and
 CockroachDB writes only when invoked. It does not create cloud resources,
 schemas, migrations, or secrets.
 
+Runtime configuration can be checked before invoking classification with:
+
+```powershell
+docweave-runtime-preflight
+docweave-runtime-preflight --database
+```
+
+The default command validates configuration and Bedrock client construction
+without opening external services. The `--database` form opens the configured
+CockroachDB target and checks that the current non-vector DocWeave schema
+tables needed by classification are present.
+
 Mandatory governance:
 
 - [Project operating rules](PROJECT_RULES.md)

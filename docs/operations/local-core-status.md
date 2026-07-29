@@ -135,9 +135,12 @@ The batch executor remains a local primitive, but its optional lifecycle
 recorder and restart-aware ledger now connect execution ordering and state
 loading to the durable adapter contract. The application runtime boundary can
 now compose a CockroachDB SQLAlchemy engine and approved Bedrock gateway from
-explicit runtime configuration without opening either service. No live
-application invocation has loaded or written a CockroachDB row through this
-boundary, so the project does not yet claim persistent application behavior.
+explicit runtime configuration without opening either service. A runtime
+preflight command can now validate configuration without external I/O, or open
+the configured CockroachDB target on request and verify the required
+classification schema tables. No live application invocation has loaded or
+written a CockroachDB row through this boundary, so the project does not yet
+claim persistent application behavior.
 
 ## 5. Contract review findings
 
