@@ -43,12 +43,14 @@ preview, and confirmed and policy-validated delegation of eligible PDF
 hyperlinks to the user's default browser. The cockpit now displays sanitized
 runtime readiness for CockroachDB configuration and the approved Amazon Bedrock
 client without exposing connection values or performing startup I/O. The
-`ANALYZE` control dispatches the selected ready PDF to a background
-classification worker using the same configured runtime path; automated tests
-exercise that dispatch with an injected non-cloud function, and live desktop
-classification remains dependent on runtime configuration and a migrated
-database. Accepted proposals are surfaced as non-authoritative review items in
-the cockpit rather than silently changing canonical document state.
+`ANALYZE` control now builds a bounded batch from visible ready PDFs, validates
+each item under the authorized root, and dispatches the batch to a background
+classification worker using the same configured runtime path. Each accepted
+proposal moves its document into non-authoritative human review state in the
+cockpit, with progress and terminal batch status surfaced without changing any
+file. Automated tests exercise a 30-PDF cockpit batch with an injected
+non-cloud function, and live desktop classification remains dependent on
+runtime configuration and a migrated database.
 Document-controlled persistence values remain bound parameters rather than
 executable Structured Query Language.
 
@@ -163,7 +165,8 @@ The cockpit surfaces the same fail-closed runtime readiness categories in its
 connection-state panel at startup. This is still a configuration preflight only:
 the desktop does not open CockroachDB, invoke Bedrock, create cloud resources,
 or write application rows until the user starts an explicit analysis action
-with the required runtime values present.
+with the required runtime values present. That action may process multiple
+ready PDFs sequentially, bounded by the MVP processing-batch limit.
 
 Mandatory governance:
 
