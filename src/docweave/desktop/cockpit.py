@@ -964,6 +964,20 @@ class CenterPreview(ShapeWidget):
         self.counter = QLabel("1 / 1", self)
         self.counter.setObjectName("muted")
 
+        self.analysis_panel = QFrame(self)
+        self.analysis_panel.setObjectName("eventRow")
+        self.analysis_panel.hide()
+        self.analysis_title = QLabel("AI PROPOSAL", self.analysis_panel)
+        self.analysis_title.setObjectName("eventName")
+        self.analysis_summary = QLabel(
+            "No classification proposal yet.", self.analysis_panel
+        )
+        self.analysis_summary.setObjectName("eventText")
+        self.analysis_summary.setWordWrap(True)
+        self.analysis_rationale = QLabel("", self.analysis_panel)
+        self.analysis_rationale.setObjectName("muted")
+        self.analysis_rationale.setWordWrap(True)
+
         self._document = QPdfDocument(self)
         self.page = SecurePdfView(self)
         self.page.setObjectName("centralPdfView")
@@ -1060,7 +1074,14 @@ class CenterPreview(ShapeWidget):
         self.counter.setGeometry(w - 98, 75, 70, 25)
 
         # PDF uses almost the entire inner screen and remains fully opaque.
-        self.page.setGeometry(18, 112, w - 36, h - 128)
+        if self.analysis_panel.isVisible():
+            self.analysis_panel.setGeometry(18, 112, w - 36, 86)
+            self.analysis_title.setGeometry(16, 8, 120, 20)
+            self.analysis_summary.setGeometry(16, 28, w - 68, 24)
+            self.analysis_rationale.setGeometry(16, 52, w - 68, 28)
+            self.page.setGeometry(18, 208, w - 36, h - 224)
+        else:
+            self.page.setGeometry(18, 112, w - 36, h - 128)
 
     def set_target_rect(self, rect: QRect) -> None:
         self._target_rect = QRect(rect)
@@ -1083,6 +1104,8 @@ class CenterPreview(ShapeWidget):
         if self.width() <= 10 or self.height() <= 20:
             self.setGeometry(collapsed)
 
+        self.analysis_panel.hide()
+        self.resizeEvent(None)
         self.show()
 
         self._geometry_animation.stop()
@@ -1096,6 +1119,26 @@ class CenterPreview(ShapeWidget):
 
         self._geometry_animation.start()
         self.opacity_animation.start()
+
+    def show_classification_result(self, result: ClassificationCommandResult) -> None:
+        """Surface validated model proposal details without replacing the preview."""
+        confidence = "n/a" if result.raw_confidence is None else result.raw_confidence
+        retry_label = (
+            "no validation retry"
+            if result.retry_attempts == 0
+            else f"{result.retry_attempts} validation retry"
+        )
+        self.analysis_summary.setText(
+            f"{result.proposed_class} · confidence {confidence} · "
+            f"{result.evidence_count} evidence · {result.metadata_count} metadata · "
+            f"{retry_label}"
+        )
+        self.analysis_rationale.setText(
+            _compact_console_text(result.rationale, maximum=150)
+        )
+        self.analysis_panel.show()
+        self.analysis_panel.raise_()
+        self.resizeEvent(None)
 
     @Slot()
     def zoom_in_pdf(self) -> None:
@@ -2258,6 +2301,7 @@ class CockpitWindow(QMainWindow):
                 self.left.count_status("READY"),
                 self.left.count_status("REVIEW"),
             )
+        self.center.show_classification_result(raw_result)
         self._set_status(
             "Classification proposal persisted: "
             f"{raw_result.proposed_class}; "
