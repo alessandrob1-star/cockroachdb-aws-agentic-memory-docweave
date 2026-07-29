@@ -108,6 +108,12 @@ from docweave.desktop.workspace import (
 )
 from docweave.intake import IntakeStatus
 from docweave.persistence import ClassificationPipelineError
+from docweave.runtime_preflight import (
+    PreflightCheck,
+    PreflightState,
+    RuntimePreflightReport,
+    run_preflight,
+)
 
 
 SURFACE = QColor("#081E19")
@@ -131,6 +137,7 @@ class Document:
 
 DOCUMENTS: list[Document] = []
 ClassificationFunction = Callable[[Path, Path], ClassificationCommandResult]
+RuntimePreflightFunction = Callable[[], RuntimePreflightReport]
 
 
 def classify_pdf_for_cockpit(
@@ -1723,6 +1730,7 @@ class CockpitWindow(QMainWindow):
         scan_function: ScanFunction = scan_authorized_root,
         integration_snapshot: RuntimeIntegrationSnapshot | None = None,
         classification_function: ClassificationFunction = classify_pdf_for_cockpit,
+        runtime_preflight_function: RuntimePreflightFunction | None = None,
     ) -> None:
         super().__init__()
         self._scan_function = scan_function
@@ -1731,6 +1739,10 @@ class CockpitWindow(QMainWindow):
             integration_snapshot
             if integration_snapshot is not None
             else runtime_integration_snapshot()
+        )
+        self._runtime_preflight_report = _initial_runtime_preflight_report(
+            runtime_preflight_function,
+            integration_snapshot,
         )
         self._scan_thread: QThread | None = None
         self._scan_worker: ScanWorker | None = None
@@ -2278,13 +2290,18 @@ class CockpitWindow(QMainWindow):
 
     def _set_status(self, message: str) -> None:
         self.console.log_text.setText(message)
-        cockroachdb_status = self._integration_snapshot.cockroachdb_status
-        bedrock_status = self._integration_snapshot.bedrock_status
+        runtime_status = _runtime_config_status(self._runtime_preflight_report)
+        cockroachdb_status = _cockroachdb_status(
+            self._runtime_preflight_report,
+            self._integration_snapshot,
+        )
+        bedrock_status = _bedrock_status(self._runtime_preflight_report)
         self.console.status_text.setText(
             "● Local scan       "
             + ("Running" if self.scan_in_progress else "Ready")
             + "\n"
             "● PDF preview      Ready\n"
+            f"● Runtime config   {runtime_status}\n"
             f"● CockroachDB      {cockroachdb_status}\n"
             f"● Bedrock          {bedrock_status}"
         )
@@ -2292,6 +2309,7 @@ class CockpitWindow(QMainWindow):
             [
                 ("DISCOVERY", message[:42]),
                 ("PREVIEW", "Embedded PDF viewer ready"),
+                ("CONFIG", f"Runtime {runtime_status.lower()}"),
                 ("MEMORY", f"CockroachDB {cockroachdb_status.lower()}"),
                 ("BEDROCK", f"Bedrock {bedrock_status.lower()}"),
                 ("SECURITY", "Read-only local boundary"),
@@ -2375,6 +2393,95 @@ class CockpitWindow(QMainWindow):
         self.side_view.raise_()
         self.console.raise_()
         self.center.raise_()
+
+
+def _initial_runtime_preflight_report(
+    runtime_preflight_function: RuntimePreflightFunction | None,
+    integration_snapshot: RuntimeIntegrationSnapshot | None,
+) -> RuntimePreflightReport:
+    if runtime_preflight_function is not None:
+        return runtime_preflight_function()
+    if integration_snapshot is not None:
+        return _snapshot_preflight_report(integration_snapshot)
+    return run_preflight(check_database=False)
+
+
+def _snapshot_preflight_report(
+    integration_snapshot: RuntimeIntegrationSnapshot,
+) -> RuntimePreflightReport:
+    cockroach_state = (
+        PreflightState.SKIP
+        if integration_snapshot.cockroachdb_configured
+        else PreflightState.FAIL
+    )
+    cockroach_detail = (
+        "configured_not_connected"
+        if integration_snapshot.cockroachdb_configured
+        else "not_configured"
+    )
+    return RuntimePreflightReport(
+        checks=(
+            PreflightCheck("runtime_config", PreflightState.OK, "snapshot"),
+            PreflightCheck(
+                "bedrock_client",
+                PreflightState.OK,
+                f"{integration_snapshot.bedrock_region}:configured",
+            ),
+            PreflightCheck(
+                "cockroachdb_connection",
+                cockroach_state,
+                cockroach_detail,
+            ),
+        )
+    )
+
+
+def _runtime_config_status(report: RuntimePreflightReport) -> str:
+    check = _preflight_check(report, "runtime_config")
+    if check is None:
+        return "Unknown"
+    if check.state is PreflightState.OK:
+        return "Ready"
+    return f"Blocked ({_compact_preflight_detail(check.detail)})"
+
+
+def _cockroachdb_status(
+    report: RuntimePreflightReport,
+    integration_snapshot: RuntimeIntegrationSnapshot,
+) -> str:
+    check = _preflight_check(report, "cockroachdb_connection")
+    if check is None:
+        return integration_snapshot.cockroachdb_status
+    if check.state is PreflightState.OK:
+        return "Reachable"
+    if check.state is PreflightState.SKIP:
+        if integration_snapshot.cockroachdb_configured:
+            return "Configured, not connected"
+        return "Not configured"
+    return f"Blocked ({_compact_preflight_detail(check.detail)})"
+
+
+def _bedrock_status(report: RuntimePreflightReport) -> str:
+    check = _preflight_check(report, "bedrock_client")
+    if check is None:
+        return "Blocked by config"
+    if check.state is PreflightState.OK:
+        return "Client configured"
+    return f"Blocked ({_compact_preflight_detail(check.detail)})"
+
+
+def _preflight_check(
+    report: RuntimePreflightReport,
+    name: str,
+) -> PreflightCheck | None:
+    for check in report.checks:
+        if check.name == name:
+            return check
+    return None
+
+
+def _compact_preflight_detail(detail: str) -> str:
+    return detail.split(":", 1)[0].replace("_", " ")
 
 
 def main() -> int:

@@ -189,8 +189,10 @@ instead of waiting for the whole CockroachDB milestone to finish.
 
 The desktop cockpit now presents phase progress, cooperative cancellation,
 process-local workspace state, discovered PDF preview, guarded external-link
-delegation, sanitized CockroachDB/Bedrock runtime readiness, and a background
-Analyze dispatch for the selected ready PDF. Accepted proposals update the
+delegation, sanitized fail-closed CockroachDB/Bedrock runtime preflight
+readiness, and a background Analyze dispatch for the selected ready PDF. The
+startup preflight does not open CockroachDB or invoke Bedrock; it only exposes
+configuration and client-construction readiness. Accepted proposals update the
 visible document row to `REVIEW`, show the proposed class, and report Bedrock
 token and persistence dispositions as non-authoritative review evidence. Its
 next increment must run that workflow against the approved live validation

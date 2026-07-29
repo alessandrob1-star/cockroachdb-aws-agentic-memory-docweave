@@ -159,6 +159,12 @@ without opening external services. The `--database` form opens the configured
 CockroachDB target and checks that the current non-vector DocWeave schema
 tables needed by classification are present.
 
+The cockpit surfaces the same fail-closed runtime readiness categories in its
+connection-state panel at startup. This is still a configuration preflight only:
+the desktop does not open CockroachDB, invoke Bedrock, create cloud resources,
+or write application rows until the user starts an explicit analysis action
+with the required runtime values present.
+
 Mandatory governance:
 
 - [Project operating rules](PROJECT_RULES.md)
