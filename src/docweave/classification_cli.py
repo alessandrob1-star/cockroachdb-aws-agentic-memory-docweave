@@ -35,6 +35,15 @@ class ClassificationEvidenceDetail:
 
 
 @dataclass(frozen=True, slots=True)
+class ClassificationMetadataDetail:
+    """One validated metadata proposal safe for local UI review."""
+
+    name: str
+    value: str
+    evidence_ids: tuple[str, ...]
+
+
+@dataclass(frozen=True, slots=True)
 class ClassificationCommandResult:
     """Content-minimized result safe for terminal output."""
 
@@ -51,6 +60,7 @@ class ClassificationCommandResult:
     evidence_count: int = 0
     metadata_count: int = 0
     evidence_details: tuple[ClassificationEvidenceDetail, ...] = ()
+    metadata_details: tuple[ClassificationMetadataDetail, ...] = ()
     alternative_class: str | None = None
     raw_confidence: str | None = None
     classification_confidence: str | None = None
@@ -208,6 +218,14 @@ def _command_result(
                 quote=item.quote,
             )
             for item in proposal.evidence[:3]
+        ),
+        metadata_details=tuple(
+            ClassificationMetadataDetail(
+                name=item.name,
+                value=item.value,
+                evidence_ids=item.evidence_ids,
+            )
+            for item in proposal.candidate_metadata[:6]
         ),
         alternative_class=(
             None

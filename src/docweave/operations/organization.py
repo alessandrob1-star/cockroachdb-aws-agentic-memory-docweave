@@ -6,6 +6,7 @@ so the user can inspect a safe destination before any future approval or file
 mutation step.
 """
 
+from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
 from unicodedata import normalize
@@ -21,6 +22,7 @@ from docweave.operations.planning import (
 )
 
 ORGANIZED_ROOT_FOLDER = "DocWeave Organized"
+MAX_METADATA_FILENAME_PARTS = 4
 
 _CLASS_DESTINATION_FOLDERS = {
     TaxonomyClass.ACCEPTANCE_DOCUMENT: "Acceptance Documents",
@@ -38,6 +40,35 @@ _CLASS_DESTINATION_FOLDERS = {
 }
 
 _WINDOWS_FORBIDDEN_FILENAME_CHARS = frozenset('<>:"/\\|?*')
+_CLASS_FILENAME_PREFIXES = {
+    TaxonomyClass.ACCEPTANCE_DOCUMENT: "acceptance",
+    TaxonomyClass.BANK_CERTIFICATION: "bank-certification",
+    TaxonomyClass.BANK_STATEMENT: "bank-statement",
+    TaxonomyClass.CONTRACT: "contract",
+    TaxonomyClass.INVOICE: "invoice",
+    TaxonomyClass.OTHER: "document",
+    TaxonomyClass.PAYMENT_NOTICE: "payment-notice",
+    TaxonomyClass.PURCHASE_ORDER: "purchase-order",
+    TaxonomyClass.SUPPLIER_RECEIPT: "supplier-receipt",
+    TaxonomyClass.TECHNICAL_ATTACHMENT: "technical-attachment",
+    TaxonomyClass.TENDER_DOCUMENT: "tender-document",
+    TaxonomyClass.UNCLASSIFIED: "unclassified",
+}
+_FILENAME_METADATA_PRIORITY = (
+    "supplier",
+    "vendor",
+    "issuer",
+    "counterparty",
+    "invoice_number",
+    "invoice_id",
+    "order_number",
+    "purchase_order_number",
+    "contract_number",
+    "payment_reference",
+    "reference",
+    "date",
+    "due_date",
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -60,6 +91,7 @@ def propose_safe_organization_copy(
     source_path: Path,
     authorized_root: Path,
     proposed_class: str | TaxonomyClass,
+    metadata: Mapping[str, str] | None = None,
 ) -> OrganizationProposal:
     """Build a deterministic copy proposal without mutating the filesystem."""
     root = authorized_root.resolve(strict=True)
@@ -70,7 +102,11 @@ def propose_safe_organization_copy(
         (
             ORGANIZED_ROOT_FOLDER,
             _CLASS_DESTINATION_FOLDERS[taxonomy_class],
-            _safe_pdf_filename(source.name),
+            _proposal_filename(
+                taxonomy_class=taxonomy_class,
+                source_filename=source.name,
+                metadata={} if metadata is None else metadata,
+            ),
         )
     )
     plan = plan_file_operation(
@@ -119,3 +155,42 @@ def _safe_pdf_filename(filename: str) -> str:
     if stem.upper() in {"CON", "PRN", "AUX", "NUL", "CONIN$", "CONOUT$"}:
         stem = f"{stem}_document"
     return f"{stem}{suffix}"
+
+
+def _proposal_filename(
+    *,
+    taxonomy_class: TaxonomyClass,
+    source_filename: str,
+    metadata: Mapping[str, str],
+) -> str:
+    metadata_parts = _metadata_filename_parts(metadata)
+    if not metadata_parts:
+        return _safe_pdf_filename(source_filename)
+    stem = "_".join((_CLASS_FILENAME_PREFIXES[taxonomy_class], *metadata_parts))
+    return _safe_pdf_filename(f"{stem}.pdf")
+
+
+def _metadata_filename_parts(metadata: Mapping[str, str]) -> tuple[str, ...]:
+    normalized_metadata = {
+        _metadata_key(key): value for key, value in metadata.items() if value.strip()
+    }
+    parts: list[str] = []
+    for key in _FILENAME_METADATA_PRIORITY:
+        value = normalized_metadata.get(key)
+        if value is None:
+            continue
+        safe_part = _safe_filename_part(value)
+        if safe_part and safe_part not in parts:
+            parts.append(safe_part)
+        if len(parts) >= MAX_METADATA_FILENAME_PARTS:
+            break
+    return tuple(parts)
+
+
+def _metadata_key(value: str) -> str:
+    return "_".join(value.strip().casefold().replace("-", "_").split())
+
+
+def _safe_filename_part(value: str) -> str:
+    filename = _safe_pdf_filename(value)
+    return Path(filename).stem.casefold().replace(" ", "-")[:40].strip("-_ .")

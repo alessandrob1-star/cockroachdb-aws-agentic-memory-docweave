@@ -1825,6 +1825,7 @@ class ConsolePanel(ShapeWidget):
 
 class CockpitWindow(QMainWindow):
     scan_finished = Signal()
+    classification_finished = Signal()
 
     def __init__(
         self,
@@ -2475,6 +2476,7 @@ class CockpitWindow(QMainWindow):
         self._classification_thread = None
         self._classification_worker = None
         self._set_busy(False)
+        self.classification_finished.emit()
 
     def _set_busy(self, busy: bool) -> None:
         blocked = busy or self.scan_in_progress or self.classification_in_progress
@@ -2560,6 +2562,7 @@ class CockpitWindow(QMainWindow):
                 source_path=source_path,
                 authorized_root=root,
                 proposed_class=result.proposed_class,
+                metadata={item.name: item.value for item in result.metadata_details},
             )
         except (OSError, ValueError):
             return None
