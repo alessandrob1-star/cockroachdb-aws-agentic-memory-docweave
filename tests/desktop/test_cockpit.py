@@ -5,7 +5,10 @@ import pytest
 from PySide6.QtCore import QEventLoop, QTimer
 
 from docweave.application_runtime import RuntimeIntegrationSnapshot
-from docweave.classification_cli import ClassificationCommandResult
+from docweave.classification_cli import (
+    ClassificationCommandResult,
+    ClassificationEvidenceDetail,
+)
 from docweave.desktop.cockpit import CockpitWindow, Document
 from docweave.desktop.scan import DesktopScanResult
 from docweave.discovery import DiscoveredFile, DiscoveryResult, DiscoveryStatus
@@ -80,6 +83,12 @@ def assert_visible_classification_proposal(window: CockpitWindow) -> None:
     assert "1 validation retry" in window.center.analysis_summary.text()
     assert "The document contains invoice wording" in (
         window.center.analysis_rationale.text()
+    )
+    assert "ev_1 p1: Invoice heading and total are explicit" in (
+        window.center.analysis_evidence.text()
+    )
+    assert "ev_2 p1: Supplier name is visible" in (
+        window.center.analysis_evidence.text()
     )
 
     log_text = window.console.log_text.text()
@@ -188,6 +197,13 @@ def test_cockpit_blocks_analyze_when_runtime_preflight_failed(
             rationale="The document contains invoice wording and a total.",
             evidence_count=2,
             metadata_count=1,
+            evidence_details=(
+                ClassificationEvidenceDetail(
+                    evidence_id="ev_1",
+                    page_number=1,
+                    quote="Invoice heading and total are explicit.",
+                ),
+            ),
             raw_confidence="0.80000",
             classification_confidence="0.80000",
             metadata_confidence="1.00000",
@@ -266,6 +282,18 @@ def test_cockpit_scans_synthetic_pdfs_and_raises_central_preview(
             rationale="The document contains invoice wording and a total.",
             evidence_count=2,
             metadata_count=1,
+            evidence_details=(
+                ClassificationEvidenceDetail(
+                    evidence_id="ev_1",
+                    page_number=1,
+                    quote="Invoice heading and total are explicit.",
+                ),
+                ClassificationEvidenceDetail(
+                    evidence_id="ev_2",
+                    page_number=1,
+                    quote="Supplier name is visible.",
+                ),
+            ),
             raw_confidence="0.80000",
             classification_confidence="0.80000",
             metadata_confidence="1.00000",

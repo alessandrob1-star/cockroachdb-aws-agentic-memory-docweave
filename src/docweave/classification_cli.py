@@ -26,6 +26,15 @@ _IDENTITY_NAMESPACE = UUID("7f5461df-2c2f-4f8d-b504-83ddf8e0d00a")
 
 
 @dataclass(frozen=True, slots=True)
+class ClassificationEvidenceDetail:
+    """One validated evidence detail safe for local UI review."""
+
+    evidence_id: str
+    page_number: int
+    quote: str
+
+
+@dataclass(frozen=True, slots=True)
 class ClassificationCommandResult:
     """Content-minimized result safe for terminal output."""
 
@@ -41,6 +50,7 @@ class ClassificationCommandResult:
     rationale: str = ""
     evidence_count: int = 0
     metadata_count: int = 0
+    evidence_details: tuple[ClassificationEvidenceDetail, ...] = ()
     alternative_class: str | None = None
     raw_confidence: str | None = None
     classification_confidence: str | None = None
@@ -191,6 +201,14 @@ def _command_result(
         rationale=proposal.rationale,
         evidence_count=len(proposal.evidence),
         metadata_count=len(proposal.candidate_metadata),
+        evidence_details=tuple(
+            ClassificationEvidenceDetail(
+                evidence_id=item.evidence_id,
+                page_number=item.page_index + 1,
+                quote=item.quote,
+            )
+            for item in proposal.evidence[:3]
+        ),
         alternative_class=(
             None
             if not proposal.alternative_classes
