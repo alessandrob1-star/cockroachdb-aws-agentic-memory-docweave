@@ -154,7 +154,7 @@ def test_window_blocks_root_change_and_close_during_scan(
     QTimer.singleShot(3_000, loop.quit)
     loop.exec()
     assert not window.scan_in_progress
-    window.close()
+    window.deleteLater()
 
 
 def test_window_cancels_scan_and_discards_partial_results(
