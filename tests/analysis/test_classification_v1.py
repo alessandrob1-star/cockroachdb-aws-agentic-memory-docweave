@@ -152,6 +152,9 @@ def test_builds_bounded_converse_fields_with_untrusted_page_data() -> None:
     tool_spec = fields["toolConfig"]["tools"][0]["toolSpec"]
     assert tool_spec["name"] == "emit_classification"
     assert tool_spec["inputSchema"]["json"] == classification_v1_json_schema()
+    schema = tool_spec["inputSchema"]["json"]
+    assert schema["properties"]["rationale_evidence_ids"]["maxItems"] == 8
+    assert schema["properties"]["candidate_metadata"]["maxItems"] == 6
     assert fields["messages"][0]["role"] == "user"
     document_data = json.loads(fields["messages"][0]["content"][0]["text"])
     assert document_data["document_data_trust"] == "untrusted"
@@ -168,8 +171,11 @@ def test_builds_bounded_converse_fields_with_untrusted_page_data() -> None:
     assert "strict emission checklist" in system_text
     assert "Do not omit" in system_text
     assert "rationale_evidence_ids" in system_text
-    assert "Every evidence_id used anywhere" in system_text
+    assert "evidence_id used anywhere" in system_text
     assert "declared in that array" in system_text
+    assert "at most eight declared evidence_id values" in system_text
+    assert "ev_43 and above" in system_text
+    assert "do not enumerate every available segment" in system_text
 
 
 def test_splits_long_evidence_lines_into_bounded_exact_segments() -> None:

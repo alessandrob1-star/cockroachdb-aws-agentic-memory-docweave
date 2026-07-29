@@ -286,12 +286,16 @@ def test_window_blocks_changed_or_non_ready_pdf_and_reports_preview_failure(
     window._handle_document_activated(table.model().index(0, 0))
     assert "Only a document with Ready status" in status.text()
 
-    table.selectRow(1)
-    window.open_selected_document()
+    ready_row = next(
+        row
+        for row in range(table.model().rowCount())
+        if window._table_model.is_openable_at(row)
+    )
+    window._open_document_row(ready_row)
     assert "RuntimeError" in status.text()
 
     ready.write_bytes(b"changed after scan")
-    window.open_selected_document()
+    window._open_document_row(ready_row)
     assert "invalid_signature" in status.text()
     window.close()
 

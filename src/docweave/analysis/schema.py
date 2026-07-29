@@ -17,6 +17,11 @@ _EVIDENCE_SUPPORTS = [
     "contradiction",
 ]
 _EVIDENCE_IDS = [f"ev_{index}" for index in range(1, 51)]
+_MAXIMUM_RATIONALE_EVIDENCE_IDS = 8
+_MAXIMUM_CANDIDATE_METADATA = 6
+_MAXIMUM_ALTERNATIVES = 3
+_MAXIMUM_CONTRADICTIONS = 10
+_MAXIMUM_MISSING_EVIDENCE = 20
 
 _CLASSIFICATION_V1_JSON_SCHEMA: dict[str, Any] = {
     "type": "object",
@@ -37,9 +42,12 @@ _CLASSIFICATION_V1_JSON_SCHEMA: dict[str, Any] = {
             ),
             "items": {"type": "string", "enum": _EVIDENCE_IDS},
             "minItems": 1,
+            "maxItems": _MAXIMUM_RATIONALE_EVIDENCE_IDS,
         },
         "evidence": {
             "type": "array",
+            "minItems": 1,
+            "maxItems": len(_EVIDENCE_IDS),
             "items": {
                 "type": "object",
                 "properties": {
@@ -64,6 +72,7 @@ _CLASSIFICATION_V1_JSON_SCHEMA: dict[str, Any] = {
         },
         "candidate_metadata": {
             "type": "array",
+            "maxItems": _MAXIMUM_CANDIDATE_METADATA,
             "items": {
                 "type": "object",
                 "properties": {
@@ -75,6 +84,7 @@ _CLASSIFICATION_V1_JSON_SCHEMA: dict[str, Any] = {
                             "ev_N identifiers declared in evidence, never segment IDs."
                         ),
                         "items": {"type": "string", "enum": _EVIDENCE_IDS},
+                        "maxItems": _MAXIMUM_RATIONALE_EVIDENCE_IDS,
                     },
                 },
                 "required": ["name", "value", "evidence_ids"],
@@ -83,6 +93,7 @@ _CLASSIFICATION_V1_JSON_SCHEMA: dict[str, Any] = {
         },
         "alternative_classes": {
             "type": "array",
+            "maxItems": _MAXIMUM_ALTERNATIVES,
             "items": {
                 "type": "object",
                 "properties": {
@@ -94,6 +105,7 @@ _CLASSIFICATION_V1_JSON_SCHEMA: dict[str, Any] = {
                             "ev_N identifiers declared in evidence, never segment IDs."
                         ),
                         "items": {"type": "string", "enum": _EVIDENCE_IDS},
+                        "maxItems": _MAXIMUM_RATIONALE_EVIDENCE_IDS,
                     },
                 },
                 "required": ["class_code", "reason", "evidence_ids"],
@@ -102,6 +114,7 @@ _CLASSIFICATION_V1_JSON_SCHEMA: dict[str, Any] = {
         },
         "contradictions": {
             "type": "array",
+            "maxItems": _MAXIMUM_CONTRADICTIONS,
             "items": {
                 "type": "object",
                 "properties": {
@@ -113,6 +126,7 @@ _CLASSIFICATION_V1_JSON_SCHEMA: dict[str, Any] = {
                         ),
                         "items": {"type": "string", "enum": _EVIDENCE_IDS},
                         "minItems": 1,
+                        "maxItems": _MAXIMUM_RATIONALE_EVIDENCE_IDS,
                     },
                 },
                 "required": ["description", "evidence_ids"],
@@ -122,6 +136,7 @@ _CLASSIFICATION_V1_JSON_SCHEMA: dict[str, Any] = {
         "missing_expected_evidence": {
             "type": "array",
             "items": {"type": "string"},
+            "maxItems": _MAXIMUM_MISSING_EVIDENCE,
         },
         "raw_signals": {
             "type": "object",
