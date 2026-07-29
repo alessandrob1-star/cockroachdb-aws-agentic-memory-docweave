@@ -44,6 +44,11 @@ from docweave.operations.execution import (
     ExecutionStatus,
     execute_file_operation,
 )
+from docweave.operations.organization import (
+    ORGANIZED_ROOT_FOLDER,
+    OrganizationProposal,
+    propose_safe_organization_copy,
+)
 from docweave.operations.planning import (
     FileOperation,
     FileOperationPlan,
@@ -61,6 +66,7 @@ from docweave.operations.results import (
 
 __all__ = [
     "MAX_OPERATION_BATCH_ITEMS",
+    "ORGANIZED_ROOT_FOLDER",
     "AppendOnlyAuditTrail",
     "ApprovalValidation",
     "ApprovalValidationReason",
@@ -93,6 +99,7 @@ __all__ = [
     "OperationBatchItem",
     "OperationLifecycleRecorder",
     "OperationResultRecord",
+    "OrganizationProposal",
     "ResultDisposition",
     "approve_operation_batch",
     "approve_operation_plan",
@@ -104,6 +111,7 @@ __all__ = [
     "operation_execution_key",
     "operation_plan_fingerprint",
     "plan_file_operation",
+    "propose_safe_organization_copy",
     "summarize_batch",
     "validate_operation_approval",
 ]

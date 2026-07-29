@@ -108,6 +108,7 @@ from docweave.desktop.workspace import (
 )
 from docweave.intake import IntakeStatus
 from docweave.persistence import ClassificationPipelineError
+from docweave.operations import propose_safe_organization_copy
 from docweave.runtime_preflight import (
     PreflightCheck,
     PreflightState,
@@ -133,6 +134,7 @@ class Document:
     pages: str
     status: str
     path: Path | None = None
+    proposed_destination: str | None = None
 
 
 @dataclass(frozen=True)
@@ -612,7 +614,13 @@ class LeftScreen(ShapeWidget):
         for row, doc in enumerate(self._documents):
             self._set_document_row(row, doc)
 
-    def mark_document_for_review(self, row: int, *, proposed_class: str) -> None:
+    def mark_document_for_review(
+        self,
+        row: int,
+        *,
+        proposed_class: str,
+        proposed_destination: str | None = None,
+    ) -> None:
         """Update one discovered PDF with a non-authoritative proposal."""
         if not 0 <= row < len(self._documents):
             return
@@ -623,6 +631,7 @@ class LeftScreen(ShapeWidget):
             pages=current.pages,
             status="REVIEW",
             path=current.path,
+            proposed_destination=proposed_destination,
         )
         self._documents[row] = updated
         self._set_document_row(row, updated)
@@ -630,6 +639,8 @@ class LeftScreen(ShapeWidget):
     def _set_document_row(self, row: int, doc: Document) -> None:
         for column, value in enumerate((doc.name, doc.category, doc.pages, doc.status)):
             item = QTableWidgetItem(value)
+            if doc.proposed_destination is not None:
+                item.setToolTip(f"Proposed copy target: {doc.proposed_destination}")
             if column == 3:
                 item.setForeground(
                     WARNING if doc.status in {"ATTENTION", "REVIEW"} else ACCENT
@@ -2353,9 +2364,14 @@ class CockpitWindow(QMainWindow):
         self._classification_batch_completed = raw_progress.completed
         self._classification_batch_total = raw_progress.total
         result = raw_progress.result
+        proposed_destination = self._organization_destination_for(
+            raw_progress.source_path,
+            result,
+        )
         self.left.mark_document_for_review(
             raw_progress.row,
             proposed_class=result.proposed_class,
+            proposed_destination=proposed_destination,
         )
         self.right.set_metrics(
             self.left.document_count,
@@ -2382,6 +2398,7 @@ class CockpitWindow(QMainWindow):
             f"Document: {raw_progress.source_path.name}\n"
             f"Class: {result.proposed_class}\n"
             f"Confidence: {confidence_label}\n"
+            f"Proposed copy target: {proposed_destination or 'unavailable'}\n"
             f"Evidence items: {result.evidence_count}; "
             f"metadata fields: {result.metadata_count}\n"
             f"Rationale: {rationale}"
@@ -2396,6 +2413,12 @@ class CockpitWindow(QMainWindow):
                 ("EVIDENCE", f"{result.evidence_count} cited spans"),
                 ("CONFIDENCE", f"Raw {confidence_label}"),
                 ("MEMORY", f"Proposal {result.proposal_disposition}"),
+                (
+                    "OPERATION",
+                    "Copy plan ready"
+                    if proposed_destination is not None
+                    else "Copy plan unavailable",
+                ),
                 ("BEDROCK", f"{result.total_tokens} tokens; {retry_label}"),
                 ("SECURITY", "No file mutation performed"),
             ]
@@ -2523,6 +2546,26 @@ class CockpitWindow(QMainWindow):
             if len(items) >= 1000:
                 break
         return tuple(items)
+
+    def _organization_destination_for(
+        self,
+        source_path: Path,
+        result: ClassificationCommandResult,
+    ) -> str | None:
+        root = self.authorized_root
+        if root is None:
+            return None
+        try:
+            proposal = propose_safe_organization_copy(
+                source_path=source_path,
+                authorized_root=root,
+                proposed_class=result.proposed_class,
+            )
+        except (OSError, ValueError):
+            return None
+        if not proposal.is_ready:
+            return None
+        return proposal.destination_relative_path
 
     def resizeEvent(self, event) -> None:
         super().resizeEvent(event)
