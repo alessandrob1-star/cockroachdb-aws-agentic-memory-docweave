@@ -135,6 +135,33 @@ class Document:
     path: Path | None = None
 
 
+@dataclass(frozen=True)
+class ClassificationBatchItem:
+    """One ready PDF scheduled for user-initiated classification."""
+
+    row: int
+    source_path: Path
+
+
+@dataclass(frozen=True)
+class ClassificationBatchProgress:
+    """One completed classification item from a cockpit batch."""
+
+    row: int
+    source_path: Path
+    result: ClassificationCommandResult
+    completed: int
+    total: int
+
+
+@dataclass(frozen=True)
+class ClassificationBatchSummary:
+    """Terminal state for a cockpit classification batch."""
+
+    completed: int
+    total: int
+
+
 DOCUMENTS: list[Document] = []
 ClassificationFunction = Callable[[Path, Path], ClassificationCommandResult]
 RuntimePreflightFunction = Callable[[], RuntimePreflightReport]
@@ -149,42 +176,58 @@ def classify_pdf_for_cockpit(
 
 
 class ClassificationWorker(QObject):
-    """Run one configured classification outside the Qt user-interface thread."""
+    """Run a configured classification batch outside the Qt user-interface thread."""
 
+    progressed = Signal(object)
     completed = Signal(object)
     failed = Signal(str)
 
     def __init__(
         self,
-        source_path: Path,
+        items: tuple[ClassificationBatchItem, ...],
         authorized_root: Path,
         classification_function: ClassificationFunction,
     ) -> None:
         super().__init__()
-        self._source_path = source_path
+        self._items = items
         self._authorized_root = authorized_root
         self._classification_function = classification_function
 
     @Slot()
     def run(self) -> None:
-        """Emit a sanitized completion result or failure category."""
-        try:
-            result = self._classification_function(
-                self._source_path,
-                self._authorized_root,
+        """Emit sanitized per-item progress and one terminal summary."""
+        total = len(self._items)
+        completed = 0
+        for item in self._items:
+            try:
+                result = self._classification_function(
+                    item.source_path,
+                    self._authorized_root,
+                )
+            except RuntimeConfigurationError as error:
+                self.failed.emit(f"configuration:{error.code.value}")
+                return
+            except ClassificationPipelineError as error:
+                self.failed.emit(
+                    f"classification:{error.code.value}:{error.extraction_status.value}"
+                )
+                return
+            except Exception as error:
+                self.failed.emit(error.__class__.__name__)
+                return
+            completed += 1
+            self.progressed.emit(
+                ClassificationBatchProgress(
+                    row=item.row,
+                    source_path=item.source_path,
+                    result=result,
+                    completed=completed,
+                    total=total,
+                )
             )
-        except RuntimeConfigurationError as error:
-            self.failed.emit(f"configuration:{error.code.value}")
-            return
-        except ClassificationPipelineError as error:
-            self.failed.emit(
-                f"classification:{error.code.value}:{error.extraction_status.value}"
-            )
-            return
-        except Exception as error:
-            self.failed.emit(error.__class__.__name__)
-            return
-        self.completed.emit(result)
+        self.completed.emit(
+            ClassificationBatchSummary(completed=completed, total=total)
+        )
 
 
 class ShapeWidget(QWidget):
@@ -1854,7 +1897,7 @@ class CockpitWindow(QMainWindow):
         self.console.buttons[3].clicked.connect(self._analyze_selected_document)
         self.console.buttons[3].setEnabled(False)
         self.console.buttons[3].setToolTip(
-            "Preview a ready PDF, then run configured classification."
+            "Run configured classification for ready PDFs."
         )
 
         self.setStyleSheet(
@@ -2243,14 +2286,14 @@ class CockpitWindow(QMainWindow):
 
     @Slot()
     def _analyze_selected_document(self) -> None:
-        row = self._selected_document_row
         root = self.authorized_root
-        if row is None or root is None:
-            self._set_status("Preview a ready PDF before classification.")
+        if root is None:
+            self._set_status(
+                "Choose and scan an authorized folder before classification."
+            )
             return
-        document = self.left.document_at(row)
-        if document is None or document.path is None or document.status != "READY":
-            self._set_status("Only a ready previewed PDF can be classified.")
+        if self.left.document_count == 0:
+            self._set_status("Scan ready PDFs before classification.")
             return
         if self.scan_in_progress or self.classification_in_progress:
             return
@@ -2270,14 +2313,20 @@ class CockpitWindow(QMainWindow):
             )
             return
 
+        batch_items = self._classification_batch_items(root)
+        if not batch_items:
+            self._set_status("No ready PDFs are available for classification.")
+            return
+
         thread = QThread(self)
         worker = ClassificationWorker(
-            document.path,
+            batch_items,
             root,
             self._classification_function,
         )
         worker.moveToThread(thread)
         thread.started.connect(worker.run)
+        worker.progressed.connect(self._handle_classification_progress)
         worker.completed.connect(self._handle_classification_completed)
         worker.failed.connect(self._handle_classification_failed)
         worker.completed.connect(thread.quit)
@@ -2287,55 +2336,80 @@ class CockpitWindow(QMainWindow):
         self._classification_thread = thread
         self._classification_worker = worker
         self._set_busy(True)
-        self._set_status("Classifying selected PDF through configured runtime.")
+        self._set_status(
+            f"Classifying {len(batch_items)} ready PDF(s) through configured runtime."
+        )
         thread.start()
 
     @Slot(object)
-    def _handle_classification_completed(self, raw_result: object) -> None:
-        if not isinstance(raw_result, ClassificationCommandResult):
+    def _handle_classification_progress(self, raw_progress: object) -> None:
+        if not isinstance(raw_progress, ClassificationBatchProgress):
             self._handle_classification_failed("InvalidClassificationResult")
             return
-        row = self._selected_document_row
-        if row is not None:
-            self.left.mark_document_for_review(
-                row,
-                proposed_class=raw_result.proposed_class,
-            )
-            self.right.set_metrics(
-                self.left.document_count,
-                self.left.count_status("READY"),
-                self.left.count_status("REVIEW"),
-            )
-        self.center.show_classification_result(raw_result)
+        result = raw_progress.result
+        self.left.mark_document_for_review(
+            raw_progress.row,
+            proposed_class=result.proposed_class,
+        )
+        self.right.set_metrics(
+            self.left.document_count,
+            self.left.count_status("READY"),
+            self.left.count_status("REVIEW"),
+        )
+        self.center.show_classification_result(result)
         self._set_status(
-            "Classification proposal persisted: "
-            f"{raw_result.proposed_class}; "
-            f"tokens {raw_result.total_tokens}."
+            f"Classification {raw_progress.completed}/{raw_progress.total} persisted: "
+            f"{result.proposed_class}; "
+            f"tokens {result.total_tokens}."
         )
         confidence_label = (
-            "n/a" if raw_result.raw_confidence is None else raw_result.raw_confidence
+            "n/a" if result.raw_confidence is None else result.raw_confidence
         )
         retry_label = (
             "No validation retry"
-            if raw_result.retry_attempts == 0
-            else f"Validation retries {raw_result.retry_attempts}"
+            if result.retry_attempts == 0
+            else f"Validation retries {result.retry_attempts}"
         )
-        rationale = _compact_console_text(raw_result.rationale, maximum=96)
+        rationale = _compact_console_text(result.rationale, maximum=96)
         self.console.log_text.setText(
-            "Classification proposal persisted\n"
-            f"Class: {raw_result.proposed_class}\n"
+            f"Classification batch {raw_progress.completed}/{raw_progress.total}\n"
+            f"Document: {raw_progress.source_path.name}\n"
+            f"Class: {result.proposed_class}\n"
             f"Confidence: {confidence_label}\n"
-            f"Evidence items: {raw_result.evidence_count}; "
-            f"metadata fields: {raw_result.metadata_count}\n"
+            f"Evidence items: {result.evidence_count}; "
+            f"metadata fields: {result.metadata_count}\n"
             f"Rationale: {rationale}"
         )
         self.right.set_events(
             [
-                ("CLASSIFIER", f"Proposed {raw_result.proposed_class}"),
-                ("EVIDENCE", f"{raw_result.evidence_count} cited spans"),
+                (
+                    "CLASSIFIER",
+                    f"{raw_progress.completed}/{raw_progress.total} processed",
+                ),
+                ("PROPOSAL", f"Proposed {result.proposed_class}"),
+                ("EVIDENCE", f"{result.evidence_count} cited spans"),
                 ("CONFIDENCE", f"Raw {confidence_label}"),
-                ("MEMORY", f"Proposal {raw_result.proposal_disposition}"),
-                ("BEDROCK", f"{raw_result.total_tokens} tokens; {retry_label}"),
+                ("MEMORY", f"Proposal {result.proposal_disposition}"),
+                ("BEDROCK", f"{result.total_tokens} tokens; {retry_label}"),
+                ("SECURITY", "No file mutation performed"),
+            ]
+        )
+
+    @Slot(object)
+    def _handle_classification_completed(self, raw_summary: object) -> None:
+        if not isinstance(raw_summary, ClassificationBatchSummary):
+            self._handle_classification_failed("InvalidClassificationSummary")
+            return
+        self.console.log_text.setText(
+            f"Classification batch complete: {raw_summary.completed} of "
+            f"{raw_summary.total} proposal(s) persisted for human review."
+        )
+        self.right.set_events(
+            [
+                ("CLASSIFIER", f"{raw_summary.completed}/{raw_summary.total} complete"),
+                ("REVIEW", f"{self.left.count_status('REVIEW')} awaiting human review"),
+                ("READY", f"{self.left.count_status('READY')} ready remaining"),
+                ("MEMORY", "Proposals persisted"),
                 ("SECURITY", "No file mutation performed"),
             ]
         )
@@ -2370,11 +2444,11 @@ class CockpitWindow(QMainWindow):
         )
         self.console.buttons[2].setEnabled(self.scan_in_progress)
         self.console.buttons[3].setEnabled(
-            not blocked and self._selected_document_row is not None and analysis_ready
+            not blocked and self._ready_document_count() > 0 and analysis_ready
         )
         if analysis_ready:
             self.console.buttons[3].setToolTip(
-                "Preview a ready PDF, then run configured classification."
+                "Run configured classification for all visible ready PDFs."
             )
         else:
             self.console.buttons[3].setToolTip(
@@ -2408,6 +2482,27 @@ class CockpitWindow(QMainWindow):
                 ("SECURITY", "Read-only local boundary"),
             ]
         )
+
+    def _ready_document_count(self) -> int:
+        return self.left.count_status("READY")
+
+    def _classification_batch_items(
+        self,
+        authorized_root: Path,
+    ) -> tuple[ClassificationBatchItem, ...]:
+        items: list[ClassificationBatchItem] = []
+        for row in range(self.left.document_count):
+            document = self.left.document_at(row)
+            if document is None or document.path is None or document.status != "READY":
+                continue
+            try:
+                validated_path = validate_pdf_for_open(document.path, authorized_root)
+            except PdfOpenValidationError:
+                continue
+            items.append(ClassificationBatchItem(row=row, source_path=validated_path))
+            if len(items) >= 1000:
+                break
+        return tuple(items)
 
     def resizeEvent(self, event) -> None:
         super().resizeEvent(event)

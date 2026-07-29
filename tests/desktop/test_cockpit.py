@@ -92,11 +92,7 @@ def assert_visible_classification_proposal(window: CockpitWindow) -> None:
     )
 
     log_text = window.console.log_text.text()
-    assert "Classification proposal persisted" in log_text
-    assert "Class: invoice" in log_text
-    assert "Confidence: 0.80000" in log_text
-    assert "Evidence items: 2; metadata fields: 1" in log_text
-    assert "Rationale: The document contains invoice wording" in log_text
+    assert "Classification batch complete: 30 of 30" in log_text
 
     proposed_class_item = window.left.table.item(0, 1)
     review_status_item = window.left.table.item(0, 3)
@@ -107,19 +103,17 @@ def assert_visible_classification_proposal(window: CockpitWindow) -> None:
 
     ready_metric = cast(Any, window.right.metric_frames[1]).number
     review_metric = cast(Any, window.right.metric_frames[2]).number
-    assert ready_metric.text() == "29"
-    assert review_metric.text() == "1"
-    assert cast(Any, window.right.event_rows[0]).event_text.text() == (
-        "Proposed invoice"
+    assert ready_metric.text() == "0"
+    assert review_metric.text() == "30"
+    assert cast(Any, window.right.event_rows[0]).event_text.text() == ("30/30 complete")
+    assert cast(Any, window.right.event_rows[1]).event_text.text() == (
+        "30 awaiting human review"
     )
-    assert cast(Any, window.right.event_rows[1]).event_text.text() == "2 cited spans"
-    assert cast(Any, window.right.event_rows[2]).event_text.text() == "Raw 0.80000"
+    assert cast(Any, window.right.event_rows[2]).event_text.text() == (
+        "0 ready remaining"
+    )
     assert cast(Any, window.right.event_rows[3]).event_text.text() == (
-        "Proposal applied"
-    )
-    assert (
-        "Validation retries 1"
-        in cast(Any, window.right.event_rows[4]).event_text.text()
+        "Proposals persisted"
     )
 
 
@@ -364,7 +358,9 @@ def test_cockpit_scans_synthetic_pdfs_and_raises_central_preview(
     window._analyze_selected_document()
     wait_for_cockpit_classification(window)
 
-    assert classified_paths == [(first_pdf, corpus)]
+    expected_paths = sorted(corpus.glob("*.pdf"))
+    assert classified_paths == [(path, corpus) for path in expected_paths]
+    assert window.left.count_status("REVIEW") == 30
     assert_visible_classification_proposal(window)
 
     window.close()
