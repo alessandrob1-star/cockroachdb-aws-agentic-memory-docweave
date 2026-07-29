@@ -10,6 +10,11 @@ from docweave.desktop.cockpit import CockpitWindow
 from docweave.desktop.scan import DesktopScanResult
 from docweave.discovery import DiscoveredFile, DiscoveryResult, DiscoveryStatus
 from docweave.intake import IntakeRecord, IntakeResult, IntakeStatus
+from docweave.runtime_preflight import (
+    PreflightCheck,
+    PreflightState,
+    RuntimePreflightReport,
+)
 
 
 def wait_for_cockpit_scan(window: CockpitWindow) -> None:
@@ -64,6 +69,35 @@ def test_cockpit_starts_with_definitive_local_surface(
     assert window.left.table.rowCount() == 0
     assert "CockroachDB      Configured" in window.console.status_text.text()
     assert "Bedrock          Client configured" in window.console.status_text.text()
+
+    window.close()
+
+
+def test_cockpit_surfaces_runtime_preflight_fail_closed(
+    qt_application: object,
+) -> None:
+    window = CockpitWindow(
+        integration_snapshot=RuntimeIntegrationSnapshot(
+            cockroachdb_configured=False,
+            bedrock_region="eu-central-1",
+            bedrock_model_id="eu.amazon.nova-2-lite-v1:0",
+        ),
+        runtime_preflight_function=lambda: RuntimePreflightReport(
+            checks=(
+                PreflightCheck(
+                    "runtime_config",
+                    PreflightState.FAIL,
+                    "database_url_missing:DOCWEAVE_DATABASE_URL",
+                ),
+            )
+        ),
+    )
+
+    status = window.console.status_text.text()
+    assert "Runtime config   Blocked (database url missing)" in status
+    assert "CockroachDB      Not configured" in status
+    assert "Bedrock          Blocked by config" in status
+    assert "DOCWEAVE_DATABASE_URL" not in status
 
     window.close()
 
