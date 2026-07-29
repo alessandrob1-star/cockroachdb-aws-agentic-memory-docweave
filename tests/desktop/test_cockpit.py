@@ -2,7 +2,7 @@ from pathlib import Path
 from typing import Any, cast
 
 import pytest
-from PySide6.QtCore import QEventLoop, QTimer
+from PySide6.QtCore import QCoreApplication, QEventLoop, QTimer
 
 from docweave.application_runtime import RuntimeIntegrationSnapshot
 from docweave.classification_cli import (
@@ -50,6 +50,12 @@ def wait_for_cockpit_classification(window: CockpitWindow) -> None:
     QTimer.singleShot(3_000, mark_timeout)
     loop.exec()
     assert not timed_out
+
+
+def close_cockpit_window(window: CockpitWindow) -> None:
+    window.close()
+    window.deleteLater()
+    QCoreApplication.processEvents()
 
 
 def ready_runtime_preflight_report() -> RuntimePreflightReport:
@@ -132,7 +138,7 @@ def test_cockpit_starts_with_definitive_local_surface(
     assert "CockroachDB      Configured" in window.console.status_text.text()
     assert "Bedrock          Client configured" in window.console.status_text.text()
 
-    window.close()
+    close_cockpit_window(window)
 
 
 def test_cockpit_surfaces_runtime_preflight_fail_closed(
@@ -161,7 +167,7 @@ def test_cockpit_surfaces_runtime_preflight_fail_closed(
     assert "Bedrock          Blocked by config" in status
     assert "DOCWEAVE_DATABASE_URL" not in status
 
-    window.close()
+    close_cockpit_window(window)
 
 
 def test_cockpit_blocks_analyze_when_runtime_preflight_failed(
@@ -259,7 +265,7 @@ def test_cockpit_blocks_analyze_when_runtime_preflight_failed(
         "No model invocation"
     )
 
-    window.close()
+    close_cockpit_window(window)
 
 
 def test_cockpit_scans_synthetic_pdfs_and_raises_central_preview(
@@ -386,10 +392,10 @@ def test_cockpit_scans_synthetic_pdfs_and_raises_central_preview(
     assert window.left.count_status("REVIEW") == 30
     assert_visible_classification_proposal(window)
 
-    window.close()
+    close_cockpit_window(window)
 
 
-def test_cockpit_analysis_batch_preserves_progress_and_retries_ready_documents(
+def test_cockpit_analysis_batch_preserves_progress_after_failure(
     qt_application: object,
 ) -> None:
     corpus = Path("pdf_sintetici").resolve(strict=True)
@@ -495,13 +501,110 @@ def test_cockpit_analysis_batch_preserves_progress_and_retries_ready_documents(
     assert "2/3 proposal(s) persisted" in window.console.log_text.text()
     assert window.console.buttons[3].isEnabled()
 
-    fail_on_third_attempt = False
+    close_cockpit_window(window)
+
+
+def test_cockpit_analysis_retry_queues_only_ready_documents(
+    qt_application: object,
+) -> None:
+    corpus = Path("pdf_sintetici").resolve(strict=True)
+    batch_paths = tuple(sorted(corpus.glob("*.pdf"))[:3])
+    calls: list[Path] = []
+
+    def fake_classification(
+        source_path: Path,
+        authorized_root: Path,
+    ) -> ClassificationCommandResult:
+        assert authorized_root == corpus
+        calls.append(source_path)
+        return ClassificationCommandResult(
+            proposed_class="invoice",
+            document_disposition="applied",
+            taxonomy_disposition="applied",
+            proposal_disposition="applied",
+            input_tokens=10,
+            output_tokens=5,
+            total_tokens=15,
+            estimated_cost_usd=None,
+            document_language="en",
+            rationale="The document contains invoice wording and a total.",
+            evidence_count=1,
+            metadata_count=1,
+            metadata_details=(
+                ClassificationMetadataDetail(
+                    name="supplier",
+                    value="ACME SRL",
+                    evidence_ids=("ev_1",),
+                ),
+            ),
+            evidence_details=(
+                ClassificationEvidenceDetail(
+                    evidence_id="ev_1",
+                    page_number=1,
+                    quote="Invoice heading and total are explicit.",
+                ),
+            ),
+            raw_confidence="0.80000",
+            classification_confidence="0.80000",
+            metadata_confidence="1.00000",
+            retry_attempts=0,
+        )
+
+    window = CockpitWindow(
+        classification_function=fake_classification,
+        runtime_preflight_function=ready_runtime_preflight_report,
+    )
+    window.set_authorized_root(corpus)
+    discovered = tuple(
+        DiscoveredFile(
+            root=corpus,
+            absolute_path=path,
+            relative_path=path.name,
+            comparison_key=path.name.casefold(),
+            status=DiscoveryStatus.CANDIDATE,
+            byte_size=path.stat().st_size,
+        )
+        for path in batch_paths
+    )
+    records = tuple(
+        IntakeRecord(
+            discovered_file=file,
+            status=IntakeStatus.READY,
+            reason=None,
+            signature=None,
+            fingerprint=None,
+        )
+        for file in discovered
+    )
+    result = DesktopScanResult(
+        root=corpus,
+        discovery=DiscoveryResult(
+            files=discovered,
+            scanned_roots=(corpus,),
+            limit_reached=False,
+        ),
+        intake=IntakeResult(records=records),
+    )
+    window._workspace.start_scan()
+    window._handle_scan_completed(result)
+    window._set_busy(False)
+    window.left.mark_document_for_review(
+        0,
+        proposed_class="invoice",
+        proposed_destination=None,
+    )
+    window.left.mark_document_for_review(
+        1,
+        proposed_class="invoice",
+        proposed_destination=None,
+    )
+
     window._analyze_selected_document()
     wait_for_cockpit_classification(window)
 
-    assert calls == [*batch_paths, batch_paths[2]]
+    assert calls == [batch_paths[2]]
     assert window.left.count_status("REVIEW") == 3
     assert window.left.count_status("READY") == 0
     assert "Classification batch complete: 1 of 1" in window.console.log_text.text()
 
-    window.close()
+    close_cockpit_window(window)
