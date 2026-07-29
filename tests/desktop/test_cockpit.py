@@ -100,6 +100,9 @@ def assert_visible_classification_proposal(window: CockpitWindow) -> None:
     assert review_status_item is not None
     assert proposed_class_item.text() == "invoice"
     assert review_status_item.text() == "REVIEW"
+    assert "Proposed copy target: DocWeave Organized/Invoices/" in (
+        proposed_class_item.toolTip()
+    )
 
     ready_metric = cast(Any, window.right.metric_frames[1]).number
     review_metric = cast(Any, window.right.metric_frames[2]).number
