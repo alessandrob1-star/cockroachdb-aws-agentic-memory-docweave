@@ -1,7 +1,7 @@
 # ADR-0001: Amazon Bedrock Primary Model
 
 **Status:** Accepted
-**Decision date:** 2026-07-22; revised 2026-07-26
+**Decision date:** 2026-07-22; revised 2026-07-26; reviewed 2026-07-29
 **Decision owner:** Project owner
 **Implementation status:** In progress; temporary model validated on one
 bounded integration target
@@ -48,12 +48,10 @@ application default.
 ## Why this temporary model
 
 Nova 2 Lite provides the strongest currently usable AWS-native baseline found
-for the Free account plan:
+for the approved account state:
 
 - reasoning support for document processing and business automation;
 - text and image input support;
-- a one-million-token context window for substantial documents and grounded
-  context;
 - response streaming for interactive user experiences;
 - prompt caching support for reusable taxonomy and policy context; and
 - constrained tool input through Bedrock Runtime, reducing malformed
@@ -77,9 +75,11 @@ CockroachDB.
 
 ### Claude Sonnet 4.6
 
-Sonnet 4.6 remains a lower-cost alternative. The first bounded live slice
-produced no accepted result, so it is not the primary model. It may be
-re-evaluated later only through an explicit benchmark.
+Sonnet 4.6 remains a quality candidate. On 2026-07-29, the European inference
+profile was listed as active, but a live Converse request failed because
+Anthropic use-case details had not been submitted for the account. It is not
+currently usable by the runtime until that account-side requirement is
+completed and revalidated.
 
 ### Claude Opus 4.6
 
@@ -105,10 +105,10 @@ classification path.
 
 ### Amazon Nova 2 Lite
 
-Nova 2 Lite is the temporary selected model. AWS recommends it as the migration
-target from Nova Pro 1 for reasoning and document-processing workloads. Its
-quality still requires DocWeave-specific evaluation and must not be inferred
-from vendor claims.
+Nova 2 Lite remains the temporary selected model. A 2026-07-29 live
+desktop-runtime attempt returned invalid evidence references on one synthetic
+PDF and was rejected fail-closed by DocWeave. It remains selected only because
+the Anthropic profile is not yet usable under the current account state.
 
 ## Consequences
 

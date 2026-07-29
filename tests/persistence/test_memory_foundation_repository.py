@@ -255,3 +255,28 @@ def test_taxonomy_replay_requires_same_human_authority() -> None:
 
     with pytest.raises(PersistenceConflictError, match="different authority"):
         adapter.ensure_approved_taxonomy(taxonomy_command())
+
+
+def test_taxonomy_replay_allows_existing_approval_timestamp() -> None:
+    adapter, connection = repository(
+        [
+            FakeResult(scalar=None),
+            FakeResult(
+                mapping={
+                    "taxonomy_version_id": TAXONOMY_ID,
+                    "status": "active",
+                    "approved_by_actor_id": ACTOR_ID,
+                    "approved_at": datetime(2026, 7, 1, tzinfo=UTC),
+                }
+            ),
+            FakeResult(),
+            FakeResult(rows=taxonomy_rows()),
+        ]
+    )
+
+    assert (
+        adapter.ensure_approved_taxonomy(taxonomy_command())
+        is PersistenceDisposition.IDEMPOTENT_REPLAY
+    )
+    statements = "\n".join(statement for statement, _ in connection.calls)
+    assert "INSERT INTO docweave.taxonomy_classes" in statements
