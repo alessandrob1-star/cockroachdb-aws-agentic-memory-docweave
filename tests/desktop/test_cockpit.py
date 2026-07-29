@@ -6,7 +6,7 @@ from PySide6.QtCore import QEventLoop, QTimer
 
 from docweave.application_runtime import RuntimeIntegrationSnapshot
 from docweave.classification_cli import ClassificationCommandResult
-from docweave.desktop.cockpit import CockpitWindow
+from docweave.desktop.cockpit import CockpitWindow, Document
 from docweave.desktop.scan import DesktopScanResult
 from docweave.discovery import DiscoveredFile, DiscoveryResult, DiscoveryStatus
 from docweave.intake import IntakeRecord, IntakeResult, IntakeStatus
@@ -52,6 +52,24 @@ def wait_for_cockpit_classification(window: CockpitWindow) -> None:
     QTimer.singleShot(3_000, mark_timeout)
     loop.exec()
     assert not timed_out
+
+
+def ready_runtime_preflight_report() -> RuntimePreflightReport:
+    return RuntimePreflightReport(
+        checks=(
+            PreflightCheck("runtime_config", PreflightState.OK, "loaded"),
+            PreflightCheck(
+                "bedrock_client",
+                PreflightState.OK,
+                "eu-central-1:configured",
+            ),
+            PreflightCheck(
+                "cockroachdb_connection",
+                PreflightState.SKIP,
+                "not_requested",
+            ),
+        )
+    )
 
 
 def test_cockpit_starts_with_definitive_local_surface(
@@ -102,6 +120,74 @@ def test_cockpit_surfaces_runtime_preflight_fail_closed(
     window.close()
 
 
+def test_cockpit_blocks_analyze_when_runtime_preflight_failed(
+    qt_application: object,
+) -> None:
+    corpus = Path("pdf_sintetici").resolve(strict=True)
+    first_pdf = sorted(corpus.glob("*.pdf"))[0]
+    calls = 0
+
+    def unexpected_classification(
+        source_path: Path,
+        authorized_root: Path,
+    ) -> ClassificationCommandResult:
+        nonlocal calls
+        calls += 1
+        return ClassificationCommandResult(
+            proposed_class="invoice",
+            document_disposition="applied",
+            taxonomy_disposition="applied",
+            proposal_disposition="applied",
+            input_tokens=10,
+            output_tokens=5,
+            total_tokens=15,
+            estimated_cost_usd=None,
+        )
+
+    window = CockpitWindow(
+        integration_snapshot=RuntimeIntegrationSnapshot(
+            cockroachdb_configured=False,
+            bedrock_region="eu-central-1",
+            bedrock_model_id="eu.amazon.nova-2-lite-v1:0",
+        ),
+        classification_function=unexpected_classification,
+        runtime_preflight_function=lambda: RuntimePreflightReport(
+            checks=(
+                PreflightCheck(
+                    "runtime_config",
+                    PreflightState.FAIL,
+                    "database_url_missing:DOCWEAVE_DATABASE_URL",
+                ),
+            )
+        ),
+    )
+    window.set_authorized_root(corpus)
+    window.left.set_documents(
+        [
+            Document(
+                name=first_pdf.name,
+                category="PDF",
+                pages="-",
+                status="READY",
+                path=first_pdf,
+            )
+        ]
+    )
+    window._selected_document_row = 0
+
+    window._analyze_selected_document()
+
+    assert calls == 0
+    assert not window.classification_in_progress
+    assert "Runtime is not ready for classification" in window.console.log_text.text()
+    assert cast(Any, window.right.event_rows[0]).event_text.text() == "Not started"
+    assert cast(Any, window.right.event_rows[3]).event_text.text() == (
+        "No model invocation"
+    )
+
+    window.close()
+
+
 def test_cockpit_scans_synthetic_pdfs_and_raises_central_preview(
     qt_application: object,
     monkeypatch: pytest.MonkeyPatch,
@@ -125,7 +211,10 @@ def test_cockpit_scans_synthetic_pdfs_and_raises_central_preview(
             estimated_cost_usd=None,
         )
 
-    window = CockpitWindow(classification_function=fake_classification)
+    window = CockpitWindow(
+        classification_function=fake_classification,
+        runtime_preflight_function=ready_runtime_preflight_report,
+    )
     window.set_authorized_root(corpus)
 
     first_pdf = sorted(corpus.glob("*.pdf"))[0]

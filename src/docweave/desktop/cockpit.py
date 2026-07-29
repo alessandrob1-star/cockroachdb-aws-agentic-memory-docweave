@@ -2206,6 +2206,21 @@ class CockpitWindow(QMainWindow):
             return
         if self.scan_in_progress or self.classification_in_progress:
             return
+        runtime_block = _classification_preflight_block(self._runtime_preflight_report)
+        if runtime_block is not None:
+            self._set_status(
+                f"Runtime is not ready for classification ({runtime_block})."
+            )
+            self.right.set_events(
+                [
+                    ("CLASSIFIER", "Not started"),
+                    ("CONFIG", f"Blocked {runtime_block}"),
+                    ("MEMORY", "No proposal attempted"),
+                    ("BEDROCK", "No model invocation"),
+                    ("SECURITY", "No file mutation performed"),
+                ]
+            )
+            return
 
         thread = QThread(self)
         worker = ClassificationWorker(
@@ -2468,6 +2483,22 @@ def _bedrock_status(report: RuntimePreflightReport) -> str:
     if check.state is PreflightState.OK:
         return "Client configured"
     return f"Blocked ({_compact_preflight_detail(check.detail)})"
+
+
+def _classification_preflight_block(report: RuntimePreflightReport) -> str | None:
+    runtime_check = _preflight_check(report, "runtime_config")
+    if runtime_check is None:
+        return "runtime unknown"
+    if runtime_check.state is PreflightState.FAIL:
+        return _compact_preflight_detail(runtime_check.detail)
+
+    bedrock_check = _preflight_check(report, "bedrock_client")
+    if bedrock_check is None:
+        return "bedrock unavailable"
+    if bedrock_check.state is PreflightState.FAIL:
+        return _compact_preflight_detail(bedrock_check.detail)
+
+    return None
 
 
 def _preflight_check(
