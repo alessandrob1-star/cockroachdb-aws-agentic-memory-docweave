@@ -364,3 +364,109 @@ def test_cockpit_scans_synthetic_pdfs_and_raises_central_preview(
     assert_visible_classification_proposal(window)
 
     window.close()
+
+
+def test_cockpit_analysis_batch_preserves_progress_and_retries_ready_documents(
+    qt_application: object,
+) -> None:
+    corpus = Path("pdf_sintetici").resolve(strict=True)
+    batch_paths = tuple(sorted(corpus.glob("*.pdf"))[:3])
+    calls: list[Path] = []
+    fail_on_third_attempt = True
+
+    def fake_classification(
+        source_path: Path,
+        authorized_root: Path,
+    ) -> ClassificationCommandResult:
+        nonlocal fail_on_third_attempt
+        assert authorized_root == corpus
+        calls.append(source_path)
+        if fail_on_third_attempt and source_path == batch_paths[2]:
+            raise RuntimeError("synthetic failure")
+        return ClassificationCommandResult(
+            proposed_class="invoice",
+            document_disposition="applied",
+            taxonomy_disposition="applied",
+            proposal_disposition="applied",
+            input_tokens=10,
+            output_tokens=5,
+            total_tokens=15,
+            estimated_cost_usd=None,
+            document_language="en",
+            rationale="The document contains invoice wording and a total.",
+            evidence_count=1,
+            metadata_count=1,
+            evidence_details=(
+                ClassificationEvidenceDetail(
+                    evidence_id="ev_1",
+                    page_number=1,
+                    quote="Invoice heading and total are explicit.",
+                ),
+            ),
+            raw_confidence="0.80000",
+            classification_confidence="0.80000",
+            metadata_confidence="1.00000",
+            retry_attempts=0,
+        )
+
+    window = CockpitWindow(
+        classification_function=fake_classification,
+        runtime_preflight_function=ready_runtime_preflight_report,
+    )
+    window.set_authorized_root(corpus)
+    discovered = tuple(
+        DiscoveredFile(
+            root=corpus,
+            absolute_path=path,
+            relative_path=path.name,
+            comparison_key=path.name.casefold(),
+            status=DiscoveryStatus.CANDIDATE,
+            byte_size=path.stat().st_size,
+        )
+        for path in batch_paths
+    )
+    records = tuple(
+        IntakeRecord(
+            discovered_file=file,
+            status=IntakeStatus.READY,
+            reason=None,
+            signature=None,
+            fingerprint=None,
+        )
+        for file in discovered
+    )
+    result = DesktopScanResult(
+        root=corpus,
+        discovery=DiscoveryResult(
+            files=discovered,
+            scanned_roots=(corpus,),
+            limit_reached=False,
+        ),
+        intake=IntakeResult(records=records),
+    )
+    window._workspace.start_scan()
+    window._handle_scan_completed(result)
+    window._set_busy(False)
+
+    window._analyze_selected_document()
+    wait_for_cockpit_classification(window)
+
+    assert calls == list(batch_paths)
+    assert window.left.count_status("REVIEW") == 2
+    assert window.left.count_status("READY") == 1
+    assert "Classification batch failed safely (RuntimeError)." in (
+        window.console.log_text.text()
+    )
+    assert "2/3 proposal(s) persisted" in window.console.log_text.text()
+    assert window.console.buttons[3].isEnabled()
+
+    fail_on_third_attempt = False
+    window._analyze_selected_document()
+    wait_for_cockpit_classification(window)
+
+    assert calls == [*batch_paths, batch_paths[2]]
+    assert window.left.count_status("REVIEW") == 3
+    assert window.left.count_status("READY") == 0
+    assert "Classification batch complete: 1 of 1" in window.console.log_text.text()
+
+    window.close()
