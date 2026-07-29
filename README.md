@@ -47,7 +47,8 @@ client without exposing connection values or performing startup I/O. The
 classification worker using the same configured runtime path; automated tests
 exercise that dispatch with an injected non-cloud function, and live desktop
 classification remains dependent on runtime configuration and a migrated
-database.
+database. Accepted proposals are surfaced as non-authoritative review items in
+the cockpit rather than silently changing canonical document state.
 Document-controlled persistence values remain bound parameters rather than
 executable Structured Query Language.
 
