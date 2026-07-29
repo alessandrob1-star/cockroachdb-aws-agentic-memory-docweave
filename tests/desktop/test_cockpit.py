@@ -73,6 +73,15 @@ def ready_runtime_preflight_report() -> RuntimePreflightReport:
 
 
 def assert_visible_classification_proposal(window: CockpitWindow) -> None:
+    assert not window.center.analysis_panel.isHidden()
+    assert window.center.analysis_title.text() == "AI PROPOSAL"
+    assert "invoice · confidence 0.80000" in window.center.analysis_summary.text()
+    assert "2 evidence · 1 metadata" in window.center.analysis_summary.text()
+    assert "1 validation retry" in window.center.analysis_summary.text()
+    assert "The document contains invoice wording" in (
+        window.center.analysis_rationale.text()
+    )
+
     log_text = window.console.log_text.text()
     assert "Classification proposal persisted" in log_text
     assert "Class: invoice" in log_text
