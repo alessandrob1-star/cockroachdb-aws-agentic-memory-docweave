@@ -2294,14 +2294,25 @@ class CockpitWindow(QMainWindow):
 
     def _set_busy(self, busy: bool) -> None:
         blocked = busy or self.scan_in_progress or self.classification_in_progress
+        analysis_ready = (
+            _classification_preflight_block(self._runtime_preflight_report) is None
+        )
         self.console.buttons[0].setEnabled(not blocked)
         self.console.buttons[1].setEnabled(
             not blocked and self.authorized_root is not None
         )
         self.console.buttons[2].setEnabled(self.scan_in_progress)
         self.console.buttons[3].setEnabled(
-            not blocked and self._selected_document_row is not None
+            not blocked and self._selected_document_row is not None and analysis_ready
         )
+        if analysis_ready:
+            self.console.buttons[3].setToolTip(
+                "Preview a ready PDF, then run configured classification."
+            )
+        else:
+            self.console.buttons[3].setToolTip(
+                "Runtime configuration must pass preflight before classification."
+            )
 
     def _set_status(self, message: str) -> None:
         self.console.log_text.setText(message)
