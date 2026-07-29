@@ -92,12 +92,12 @@ is reproducible.
 | ID | Item | Current evidence | Status |
 | --- | --- | --- | --- |
 | ENV-001 | Local repository | `D:\repo\cockroachdb-aws-agentic-memory-docweave` | Verified |
-| ENV-002 | CockroachDB Cloud cluster | `docweave-memory`, CockroachDB Cloud Basic on AWS Frankfurt with free-resource limits | Verified environment with isolated initial validation schema, side-effect-free runtime engine composition, and a controlled single-PDF classification command; no live application transaction or production deployment |
+| ENV-002 | CockroachDB Cloud cluster | `docweave-memory`, CockroachDB Cloud Basic on AWS Frankfurt with free-resource limits | Verified environment with isolated initial validation schema, side-effect-free runtime engine composition, a controlled single-PDF classification command, and runtime preflight command; no live application transaction or production deployment |
 | ENV-003 | CockroachDB Managed Model Context Protocol connection | OAuth connection configured and previously queried | Verified environment only; product integration pending |
 | ENV-004 | AWS authentication | AWS Command-Line Interface login verified | Verified environment only |
 | ENV-005 | AWS Model Context Protocol | Proxy handshake and read-only region query succeeded | Verified environment only; product integration pending |
 | ENV-006 | AWS budget ceiling | AWS Free plan and `DocWeave-Total-Cost` custom total budget at 80 USD with actual and forecast alerts | Verified control; credits do not increase authorization |
-| ENV-007 | Amazon Bedrock primary profile | Temporary European Amazon Nova 2 Lite profile active in `eu-central-1` | One bounded synthetic classification validated, side-effect-free Bedrock client composition implemented, controlled single-PDF runtime command added, and desktop Analyze dispatch wired; live desktop runtime execution and corpus-quality evaluation pending |
+| ENV-007 | Amazon Bedrock primary profile | Temporary European Amazon Nova 2 Lite profile active in `eu-central-1` | One bounded synthetic classification validated, side-effect-free Bedrock client composition implemented, controlled single-PDF runtime command and runtime preflight added, and desktop Analyze dispatch wired; live desktop runtime execution and corpus-quality evaluation pending |
 | ENV-008 | Environment baseline | `docs/operations/environment-baseline.md` | Verified on 2026-07-23; re-verification required before deployment |
 
 ## 8. Product behavior
