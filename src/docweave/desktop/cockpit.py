@@ -1839,6 +1839,8 @@ class CockpitWindow(QMainWindow):
         self._scan_worker: ScanWorker | None = None
         self._classification_thread: QThread | None = None
         self._classification_worker: ClassificationWorker | None = None
+        self._classification_batch_completed = 0
+        self._classification_batch_total = 0
         self._selected_document_row: int | None = None
         self._workspace = DesktopWorkspaceSession()
 
@@ -2335,6 +2337,8 @@ class CockpitWindow(QMainWindow):
         thread.finished.connect(self._handle_classification_thread_finished)
         self._classification_thread = thread
         self._classification_worker = worker
+        self._classification_batch_completed = 0
+        self._classification_batch_total = len(batch_items)
         self._set_busy(True)
         self._set_status(
             f"Classifying {len(batch_items)} ready PDF(s) through configured runtime."
@@ -2346,6 +2350,8 @@ class CockpitWindow(QMainWindow):
         if not isinstance(raw_progress, ClassificationBatchProgress):
             self._handle_classification_failed("InvalidClassificationResult")
             return
+        self._classification_batch_completed = raw_progress.completed
+        self._classification_batch_total = raw_progress.total
         result = raw_progress.result
         self.left.mark_document_for_review(
             raw_progress.row,
@@ -2400,6 +2406,8 @@ class CockpitWindow(QMainWindow):
         if not isinstance(raw_summary, ClassificationBatchSummary):
             self._handle_classification_failed("InvalidClassificationSummary")
             return
+        self._classification_batch_completed = raw_summary.completed
+        self._classification_batch_total = raw_summary.total
         self.console.log_text.setText(
             f"Classification batch complete: {raw_summary.completed} of "
             f"{raw_summary.total} proposal(s) persisted for human review."
@@ -2416,13 +2424,25 @@ class CockpitWindow(QMainWindow):
 
     @Slot(str)
     def _handle_classification_failed(self, error_category: str) -> None:
-        self._set_status(f"Classification failed safely ({error_category}).")
+        batch_total = self._classification_batch_total
+        batch_completed = self._classification_batch_completed
+        progress_label = (
+            "No proposal persisted"
+            if batch_total == 0
+            else f"{batch_completed}/{batch_total} proposal(s) persisted"
+        )
+        self.console.log_text.setText(
+            f"Classification batch failed safely ({error_category}).\n"
+            f"{progress_label} before the failure.\n"
+            "Ready documents remain eligible for a later Analyze retry."
+        )
         self.right.set_events(
             [
                 ("CLASSIFIER", "Failed closed"),
                 ("ERROR", error_category[:42]),
-                ("MEMORY", "No proposal accepted"),
-                ("REVIEW", "Manual inspection required"),
+                ("MEMORY", progress_label),
+                ("REVIEW", f"{self.left.count_status('REVIEW')} awaiting review"),
+                ("READY", f"{self.left.count_status('READY')} ready to retry"),
                 ("SECURITY", "No file mutation performed"),
             ]
         )
