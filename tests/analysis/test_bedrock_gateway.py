@@ -110,9 +110,11 @@ class FakeConverseClient:
         self,
         *,
         response: dict[str, Any] | None = None,
+        responses: list[dict[str, Any]] | None = None,
         error: Exception | None = None,
     ) -> None:
         self.response = _response() if response is None else response
+        self.responses = list(responses or [])
         self.error = error
         self.calls: list[dict[str, Any]] = []
 
@@ -120,6 +122,8 @@ class FakeConverseClient:
         self.calls.append(kwargs)
         if self.error is not None:
             raise self.error
+        if self.responses:
+            return self.responses.pop(0)
         return self.response
 
 
@@ -309,6 +313,33 @@ def test_gateway_rejects_model_output_with_fabricated_evidence() -> None:
     )
     assert captured.value.service_error_code is None
     assert "Fabricated" not in str(captured.value)
+
+
+def test_gateway_retries_for_recoverable_model_validation_error() -> None:
+    invalid = json.loads(_proposal_json())
+    invalid["candidate_metadata"] = [
+        {
+            "name": "invoice_number",
+            "value": "INV-17",
+            "evidence_ids": ["ev_2"],
+        }
+    ]
+    first_response = _response(text=json.dumps(invalid))
+    second_response = _response()
+    client = FakeConverseClient(responses=[first_response, second_response])
+    clock = iter([20.0, 20.500]).__next__
+    gateway = BedrockClassificationGateway(client, clock=clock)
+
+    result = gateway.classify(PAGES)
+
+    assert result.proposal.proposed_class is TaxonomyClass.INVOICE
+    assert len(client.calls) == 2
+    assert "failed DocWeave validation" in client.calls[1]["system"][-1]["text"]
+    assert "evidence_reference_invalid" in client.calls[1]["system"][-1]["text"]
+    assert result.provenance.usage == BedrockUsage(1_000, 400, 1_400)
+    assert result.provenance.service_latency_ms == 642
+    assert result.provenance.retry_attempts == 5
+    assert result.provenance.observed_duration_ms == 500
 
 
 @pytest.mark.parametrize(

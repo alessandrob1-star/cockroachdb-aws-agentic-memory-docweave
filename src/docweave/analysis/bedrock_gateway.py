@@ -43,6 +43,14 @@ BEDROCK_CONNECT_TIMEOUT_SECONDS = 5
 BEDROCK_READ_TIMEOUT_SECONDS = 90
 BEDROCK_TOTAL_MAX_ATTEMPTS = 5
 _MAXIMUM_REQUEST_ID_CHARACTERS = 128
+_MAXIMUM_VALIDATION_RETRY_ATTEMPTS = 2
+_VALIDATION_RETRY_CODES = {
+    ClassificationValidationCode.ABSTENTION_INVALID,
+    ClassificationValidationCode.ALTERNATIVE_INVALID,
+    ClassificationValidationCode.EVIDENCE_REFERENCE_INVALID,
+    ClassificationValidationCode.METADATA_INVALID,
+    ClassificationValidationCode.SCHEMA_INVALID,
+}
 
 
 class ConverseClient(Protocol):
@@ -222,9 +230,76 @@ class BedrockClassificationGateway:
     ) -> BedrockClassificationRun:
         """Perform one bounded real model call through the injected client."""
         request = classification_v1_converse_fields(pages)
+        responses: list[dict[str, Any]] = []
+        validation_retry_attempts = 0
         started_at = self._clock()
+        while True:
+            response = self._converse(request)
+            responses.append(response)
+
+            stop_reason = _required_string(response, "stopReason")
+            _validate_stop_reason(stop_reason)
+            response_text = _response_text(response)
+            try:
+                proposal = decode_classification_v1(
+                    response_text,
+                    extracted_pages=pages,
+                )
+                break
+            except ClassificationValidationError as error:
+                if (
+                    validation_retry_attempts < _MAXIMUM_VALIDATION_RETRY_ATTEMPTS
+                    and error.code in _VALIDATION_RETRY_CODES
+                ):
+                    validation_retry_attempts += 1
+                    request = _with_validation_retry_instruction(
+                        request,
+                        validation_code=error.code,
+                    )
+                    continue
+                raise BedrockGatewayError(
+                    BedrockGatewayErrorCode.INVALID_MODEL_OUTPUT,
+                    validation_code=error.code,
+                ) from error
+        observed_duration_ms = max(
+            0,
+            round((self._clock() - started_at) * 1_000),
+        )
+
+        usage = _aggregate_usage(_decode_usage(item.get("usage")) for item in responses)
+        service_latency_ms = sum(
+            _service_latency(item.get("metrics")) for item in responses
+        )
+        request_id, retry_attempts = _response_metadata(
+            response.get("ResponseMetadata")
+        )
+        retry_attempts += validation_retry_attempts + sum(
+            _response_metadata(item.get("ResponseMetadata"))[1]
+            for item in responses[:-1]
+        )
+        estimated_cost = (
+            self._pricing.estimate_usd(usage) if self._pricing is not None else None
+        )
+        return BedrockClassificationRun(
+            proposal=proposal,
+            provenance=BedrockRunProvenance(
+                region_name=self._config.region_name,
+                model_id=self._config.model_id,
+                contract_version=CLASSIFICATION_CONTRACT_VERSION,
+                taxonomy_version=TAXONOMY_VERSION,
+                stop_reason=stop_reason,
+                usage=usage,
+                service_latency_ms=service_latency_ms,
+                observed_duration_ms=observed_duration_ms,
+                request_id=request_id,
+                retry_attempts=retry_attempts,
+                estimated_cost_usd=estimated_cost,
+            ),
+        )
+
+    def _converse(self, request: dict[str, Any]) -> dict[str, Any]:
         try:
-            response = self._client.converse(
+            return self._client.converse(
                 modelId=self._config.model_id,
                 **request,
             )
@@ -250,49 +325,45 @@ class BedrockClassificationGateway:
             raise BedrockGatewayError(
                 BedrockGatewayErrorCode.TRANSPORT_FAILED
             ) from error
-        observed_duration_ms = max(
-            0,
-            round((self._clock() - started_at) * 1_000),
-        )
 
-        stop_reason = _required_string(response, "stopReason")
-        _validate_stop_reason(stop_reason)
-        response_text = _response_text(response)
-        try:
-            proposal = decode_classification_v1(
-                response_text,
-                extracted_pages=pages,
+
+def _with_validation_retry_instruction(
+    request: dict[str, Any],
+    *,
+    validation_code: ClassificationValidationCode,
+) -> dict[str, Any]:
+    retry_request = dict(request)
+    retry_request["system"] = [
+        *request["system"],
+        {
+            "text": (
+                "The previous emit_classification tool input failed DocWeave "
+                f"validation with code {validation_code.value}. Re-read the "
+                "same untrusted document data and approved taxonomy, then emit "
+                "a fresh classification.v1 tool input. Do not reuse invalid "
+                "evidence references. Every evidence_id used in rationale, "
+                "metadata, alternatives, or contradictions must exist in the "
+                "evidence array you emit. Use a compact evidence array and "
+                "prefer only ev_1 through ev_8 for rationale_evidence_ids. If "
+                "proposed_class is not unclassified, abstention_reason must be "
+                "null."
             )
-        except ClassificationValidationError as error:
-            raise BedrockGatewayError(
-                BedrockGatewayErrorCode.INVALID_MODEL_OUTPUT,
-                validation_code=error.code,
-            ) from error
+        },
+    ]
+    return retry_request
 
-        usage = _decode_usage(response.get("usage"))
-        service_latency_ms = _service_latency(response.get("metrics"))
-        request_id, retry_attempts = _response_metadata(
-            response.get("ResponseMetadata")
-        )
-        estimated_cost = (
-            self._pricing.estimate_usd(usage) if self._pricing is not None else None
-        )
-        return BedrockClassificationRun(
-            proposal=proposal,
-            provenance=BedrockRunProvenance(
-                region_name=self._config.region_name,
-                model_id=self._config.model_id,
-                contract_version=CLASSIFICATION_CONTRACT_VERSION,
-                taxonomy_version=TAXONOMY_VERSION,
-                stop_reason=stop_reason,
-                usage=usage,
-                service_latency_ms=service_latency_ms,
-                observed_duration_ms=observed_duration_ms,
-                request_id=request_id,
-                retry_attempts=retry_attempts,
-                estimated_cost_usd=estimated_cost,
-            ),
-        )
+
+def _aggregate_usage(usages: Any) -> BedrockUsage:
+    items = tuple(usages)
+    if not items:
+        raise BedrockGatewayError(BedrockGatewayErrorCode.RESPONSE_INVALID)
+    return BedrockUsage(
+        input_tokens=sum(item.input_tokens for item in items),
+        output_tokens=sum(item.output_tokens for item in items),
+        total_tokens=sum(item.total_tokens for item in items),
+        cache_read_input_tokens=sum(item.cache_read_input_tokens for item in items),
+        cache_write_input_tokens=sum(item.cache_write_input_tokens for item in items),
+    )
 
 
 def _validate_stop_reason(stop_reason: str) -> None:
