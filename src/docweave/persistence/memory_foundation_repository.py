@@ -365,7 +365,7 @@ def _validate_taxonomy_version_replay(
         existing["taxonomy_version_id"] != command.taxonomy_version_id
         or existing["status"] != "active"
         or existing["approved_by_actor_id"] != command.approved_by_actor_id
-        or existing["approved_at"] != command.approved_at_utc
+        or existing["approved_at"] is None
     ):
         raise PersistenceConflictError(
             "approved taxonomy replay has different authority or identity"
