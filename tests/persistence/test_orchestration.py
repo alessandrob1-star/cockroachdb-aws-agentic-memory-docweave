@@ -40,6 +40,7 @@ from docweave.persistence import (
     CreateBatch,
     DurableExecutionLedger,
     DurableOperationLifecycleRecorder,
+    DurableRestoreAuditRecorder,
     OperationExecutionIdentity,
     PersistedOperationExecution,
     PersistenceConflictError,
@@ -199,6 +200,32 @@ def event(
     )
 
 
+def restore_event(
+    event_type: AuditEventType = AuditEventType.RESTORE_EXECUTION_SUCCEEDED,
+    *,
+    event_id: str = "00000000-0000-4000-8000-000000000031",
+) -> AuditEvent:
+    return AuditEvent(
+        event_id=event_id,
+        workspace_id=WORKSPACE_EXTERNAL_ID,
+        batch_id=BATCH_EXTERNAL_ID,
+        batch_item_id="item-001",
+        event_type=event_type,
+        actor_type=AuditActorType.SYSTEM,
+        actor_id="executor",
+        occurred_at_utc=NOW + timedelta(seconds=4),
+        correlation_id="restore-correlation-001",
+        idempotency_key="restore-batch-001:item-001:restore",
+        previous_state="approved",
+        new_state="succeeded",
+        reason="succeeded",
+        plan_fingerprint="cd" * 32,
+        approval_id="restore-approval-001",
+        source_relative_path="organized/invoice.pdf",
+        destination_relative_path="incoming/invoice.pdf",
+    )
+
+
 def successful_result(batch: OperationBatch) -> OperationResultRecord:
     item = batch.items[0]
     return OperationResultRecord(
@@ -287,6 +314,63 @@ def test_records_non_result_lifecycle_event(tmp_path: Path) -> None:
     assert repository.events[0][0].event_type is (
         AuditEventType.ITEM_EXECUTION_REPLAYED
     )
+
+
+def test_records_restore_audit_events_through_durable_boundary() -> None:
+    repository = RecordingRepository()
+    recorder = DurableRestoreAuditRecorder(
+        repository,
+        identities=identities(),
+        resolve_actor_identity=lambda external_id: ACTOR_ID,
+    )
+
+    recorder.record_events(
+        (
+            restore_event(
+                AuditEventType.RESTORE_APPROVED,
+                event_id="00000000-0000-4000-8000-000000000031",
+            ),
+            restore_event(
+                AuditEventType.RESTORE_EXECUTION_SUCCEEDED,
+                event_id="00000000-0000-4000-8000-000000000032",
+            ),
+        )
+    )
+
+    assert len(repository.events) == 1
+    assert [event.event_type for event in repository.events[0]] == [
+        AuditEventType.RESTORE_APPROVED,
+        AuditEventType.RESTORE_EXECUTION_SUCCEEDED,
+    ]
+    assert repository.events[0][0].workspace_id == WORKSPACE_ID
+    assert repository.events[0][0].operation_batch_id == BATCH_ID
+    assert repository.events[0][0].file_operation_id == OPERATION_ID
+    assert repository.events[0][1].actor_id == ACTOR_ID
+    assert repository.events[0][1].plan_sha256 == bytes.fromhex("cd" * 32)
+    assert (
+        repository.events[0][1].idempotency_key == "restore-batch-001:item-001:restore"
+    )
+
+
+def test_restore_audit_recorder_rejects_empty_and_non_restore_events(
+    tmp_path: Path,
+) -> None:
+    batch, _ = approved_batch(tmp_path)
+    repository = RecordingRepository()
+    restore_recorder = DurableRestoreAuditRecorder(
+        repository,
+        identities=identities(),
+        resolve_actor_identity=lambda external_id: ACTOR_ID,
+    )
+
+    with pytest.raises(ValueError, match="must not be empty"):
+        restore_recorder.record_events(())
+    with pytest.raises(ValueError, match="only restore events"):
+        restore_recorder.record_events(
+            (event(batch, AuditEventType.ITEM_EXECUTION_REPLAYED),)
+        )
+
+    assert repository.events == []
 
 
 def persisted_execution(

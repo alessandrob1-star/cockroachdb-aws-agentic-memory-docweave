@@ -54,6 +54,7 @@ from docweave.persistence.orchestration import (
     ActiveExecutionLeaseError,
     DurableExecutionLedger,
     DurableOperationLifecycleRecorder,
+    DurableRestoreAuditRecorder,
     PersistenceEvidenceError,
 )
 from docweave.persistence.review_repository import (
@@ -95,6 +96,7 @@ __all__ = [
     "DurableExecutionLedger",
     "DurableOperationLifecycleRecorder",
     "DurableOperationRuntime",
+    "DurableRestoreAuditRecorder",
     "DurableRuntimeOptions",
     "EnsureApprovedTaxonomy",
     "ExecutionIntentMapping",
