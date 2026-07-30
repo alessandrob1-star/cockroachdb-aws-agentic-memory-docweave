@@ -14,7 +14,10 @@ from docweave.operations.batch import (
 )
 from docweave.operations.execution import execute_file_operation
 from docweave.persistence.mappers import ActorIdentityResolver, PersistenceIdentityMap
-from docweave.persistence.operation_repository import CockroachOperationRepository
+from docweave.persistence.operation_repository import (
+    CockroachOperationRepository,
+    CockroachRestoreAuditRepository,
+)
 from docweave.persistence.orchestration import (
     DurableExecutionLedger,
     DurableOperationLifecycleRecorder,
@@ -34,6 +37,7 @@ class DurableOperationRuntime:
 
     transaction_runner: CockroachTransactionRunner
     repository: CockroachOperationRepository
+    restore_audit_repository: CockroachRestoreAuditRepository
     execution_ledger: DurableExecutionLedger
     lifecycle_recorder: DurableOperationLifecycleRecorder
     execution_hooks: BatchExecutionHooks
@@ -71,6 +75,7 @@ def build_durable_operation_runtime(
         hooks=runtime_options.retry_hooks,
     )
     repository = CockroachOperationRepository(transaction_runner)
+    restore_audit_repository = CockroachRestoreAuditRepository(transaction_runner)
     execution_ledger = DurableExecutionLedger(
         repository,
         batch=batch,
@@ -86,6 +91,7 @@ def build_durable_operation_runtime(
     return DurableOperationRuntime(
         transaction_runner=transaction_runner,
         repository=repository,
+        restore_audit_repository=restore_audit_repository,
         execution_ledger=execution_ledger,
         lifecycle_recorder=lifecycle_recorder,
         execution_hooks=BatchExecutionHooks(
