@@ -57,6 +57,13 @@ from docweave.operations.planning import (
     FileOperationStatus,
     plan_file_operation,
 )
+from docweave.operations.restore import (
+    RestoreOperation,
+    RestorePlan,
+    RestorePlanReason,
+    RestorePlanStatus,
+    plan_restore_operation,
+)
 from docweave.operations.results import (
     ExecutionLedger,
     InMemoryExecutionLedger,
@@ -117,6 +124,10 @@ __all__ = [
     "OrganizationProposal",
     "ProposalReviewDecision",
     "ProposalReviewDecisionRequest",
+    "RestoreOperation",
+    "RestorePlan",
+    "RestorePlanReason",
+    "RestorePlanStatus",
     "ResultDisposition",
     "ReviewDecisionAction",
     "ReviewDecisionValidation",
@@ -135,6 +146,7 @@ __all__ = [
     "operation_execution_key",
     "operation_plan_fingerprint",
     "plan_file_operation",
+    "plan_restore_operation",
     "propose_safe_organization_copy",
     "summarize_batch",
     "validate_operation_approval",
