@@ -132,9 +132,12 @@ Launch the cockpit from the configured shell:
 docweave-desktop
 ```
 
-The connection panel should show runtime readiness. If the runtime preflight is
-blocked, the Analyze control remains unavailable and no Bedrock or CockroachDB
-operation is attempted from the desktop.
+The connection panel should show runtime readiness. If the startup runtime
+preflight is blocked, the Analyze control remains available as an explicit
+retry affordance once ready PDFs exist. A user-triggered Analyze refreshes the
+same fail-closed preflight before any classification work starts. If the
+runtime is still blocked, the cockpit reports a sanitized category and no
+Bedrock or CockroachDB operation is attempted from the desktop.
 
 ## 8. Failure policy
 

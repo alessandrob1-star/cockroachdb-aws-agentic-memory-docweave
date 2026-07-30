@@ -261,7 +261,7 @@ def test_cockpit_blocks_analyze_when_runtime_preflight_failed(
     window._selected_document_row = 0
     window._set_busy(False)
 
-    assert not window.console.buttons[3].isEnabled()
+    assert window.console.buttons[3].isEnabled()
     assert "preflight" in window.console.buttons[3].toolTip().lower()
 
     window._analyze_selected_document()
@@ -273,6 +273,103 @@ def test_cockpit_blocks_analyze_when_runtime_preflight_failed(
     assert cast(Any, window.right.event_rows[3]).event_text.text() == (
         "No model invocation"
     )
+
+    close_cockpit_window(window)
+
+
+def test_cockpit_retries_runtime_preflight_before_analyze(
+    qt_application: object,
+) -> None:
+    corpus = Path("pdf_sintetici").resolve(strict=True)
+    first_pdf = sorted(corpus.glob("*.pdf"))[0]
+    calls = 0
+    preflight_calls = 0
+
+    def fake_classification(
+        source_path: Path,
+        authorized_root: Path,
+    ) -> ClassificationCommandResult:
+        nonlocal calls
+        calls += 1
+        return ClassificationCommandResult(
+            proposed_class="invoice",
+            document_disposition="applied",
+            taxonomy_disposition="applied",
+            proposal_disposition="applied",
+            input_tokens=10,
+            output_tokens=5,
+            total_tokens=15,
+            estimated_cost_usd=None,
+            document_language="en",
+            rationale="The document contains invoice wording and a total.",
+            evidence_count=2,
+            metadata_count=1,
+            metadata_details=(
+                ClassificationMetadataDetail(
+                    name="supplier",
+                    value="ACME SRL",
+                    evidence_ids=("ev_1",),
+                ),
+            ),
+            evidence_details=(
+                ClassificationEvidenceDetail(
+                    evidence_id="ev_1",
+                    page_number=1,
+                    quote="Invoice heading and total are explicit.",
+                ),
+            ),
+            raw_confidence="0.80000",
+            classification_confidence="0.80000",
+            metadata_confidence="1.00000",
+        )
+
+    def changing_preflight() -> RuntimePreflightReport:
+        nonlocal preflight_calls
+        preflight_calls += 1
+        if preflight_calls == 1:
+            return RuntimePreflightReport(
+                checks=(
+                    PreflightCheck(
+                        "runtime_config",
+                        PreflightState.FAIL,
+                        "database_url_missing:DOCWEAVE_DATABASE_URL",
+                    ),
+                )
+            )
+        return ready_runtime_preflight_report()
+
+    window = CockpitWindow(
+        integration_snapshot=RuntimeIntegrationSnapshot(
+            cockroachdb_configured=True,
+            bedrock_region="eu-central-1",
+            bedrock_model_id="eu.amazon.nova-2-lite-v1:0",
+        ),
+        classification_function=fake_classification,
+        runtime_preflight_function=changing_preflight,
+    )
+    window.set_authorized_root(corpus)
+    window.left.set_documents(
+        [
+            Document(
+                name=first_pdf.name,
+                category="PDF",
+                pages="-",
+                status="READY",
+                path=first_pdf,
+            )
+        ]
+    )
+    window._selected_document_row = 0
+    window._set_busy(False)
+
+    assert window.console.buttons[3].isEnabled()
+
+    window._analyze_selected_document()
+    wait_for_cockpit_classification(window)
+
+    assert preflight_calls == 2
+    assert calls == 1
+    assert "Classification batch complete: 1 of 1" in window.console.log_text.text()
 
     close_cockpit_window(window)
 
