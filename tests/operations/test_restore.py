@@ -1,6 +1,8 @@
 from datetime import UTC, datetime
 from pathlib import Path
 
+import pytest
+
 from docweave.core.fingerprints import compute_sha256_fingerprint
 from docweave.operations import (
     AppendOnlyAuditTrail,
@@ -13,6 +15,9 @@ from docweave.operations import (
     FileOperationRequest,
     OperationResultRecord,
     RestoreAuditContext,
+    RestoreBatchExecutionRequest,
+    RestoreBatchItemRequest,
+    RestoreBatchPlanningRequest,
     RestoreExecutionReason,
     RestoreExecutionStatus,
     RestoreOperation,
@@ -23,9 +28,12 @@ from docweave.operations import (
     append_restore_execution_audit_event,
     approve_restore_plan,
     execute_file_operation,
+    execute_restore_batch,
     execute_restore_operation,
     plan_file_operation,
+    plan_restore_batch,
     plan_restore_operation,
+    summarize_restore_batch,
 )
 from docweave.operations.approval import approve_operation_plan
 
@@ -372,3 +380,176 @@ def test_restore_execution_audit_records_blocked_reason(tmp_path: Path) -> None:
     assert event.event_type is AuditEventType.RESTORE_EXECUTION_BLOCKED
     assert event.error_category == RestoreExecutionReason.APPROVAL_EXPIRED.value
     assert event.reason == RestoreExecutionReason.APPROVAL_EXPIRED.value
+
+
+def test_executes_restore_batch_with_per_item_audit_events(tmp_path: Path) -> None:
+    copy_plan, copy_result = execute_original_operation(
+        tmp_path / "copy",
+        operation=FileOperation.COPY,
+    )
+    move_plan, move_result = execute_original_operation(
+        tmp_path / "move",
+        operation=FileOperation.MOVE,
+    )
+    trail = AppendOnlyAuditTrail()
+    batch = plan_restore_batch(
+        RestoreBatchPlanningRequest(
+            batch_id="restore-batch-001",
+            workspace_id="workspace-001",
+            planned_by_user_id="reviewer-001",
+            planned_at_utc=BASE_TIME.replace(minute=2),
+            correlation_id="restore-batch-correlation-001",
+            item_requests=(
+                RestoreBatchItemRequest("copy-item", copy_plan, copy_result),
+                RestoreBatchItemRequest("move-item", move_plan, move_result),
+            ),
+        )
+    )
+
+    report = execute_restore_batch(
+        batch,
+        request=RestoreBatchExecutionRequest(
+            approved_by_user_id="reviewer-001",
+            approved_at_utc=BASE_TIME.replace(minute=3),
+            expires_at_utc=BASE_TIME.replace(hour=13),
+            executed_by_actor_id="local-worker-001",
+            now_utc=BASE_TIME.replace(minute=4),
+        ),
+        audit_trail=trail,
+    )
+
+    assert report.summary.total == 2
+    assert report.summary.ready == 2
+    assert report.summary.succeeded == 2
+    assert report.summary.blocked == 0
+    assert all(
+        item.result is not None and item.result.succeeded for item in report.items
+    )
+    assert len(trail.events) == 4
+    assert [event.event_type for event in trail.events] == [
+        AuditEventType.RESTORE_APPROVED,
+        AuditEventType.RESTORE_APPROVED,
+        AuditEventType.RESTORE_EXECUTION_SUCCEEDED,
+        AuditEventType.RESTORE_EXECUTION_SUCCEEDED,
+    ]
+    assert trail.events[2].actor_id == "local-worker-001"
+    assert copy_plan.source_path is not None
+    assert copy_plan.destination_path is not None
+    assert move_plan.source_path is not None
+    assert move_plan.destination_path is not None
+    assert copy_plan.source_path.exists()
+    assert not copy_plan.destination_path.exists()
+    assert move_plan.source_path.exists()
+    assert not move_plan.destination_path.exists()
+
+
+def test_restore_batch_keeps_blocked_items_visible_and_executes_ready_items(
+    tmp_path: Path,
+) -> None:
+    ready_plan, ready_result = execute_original_operation(
+        tmp_path / "ready",
+        operation=FileOperation.COPY,
+    )
+    blocked_plan, blocked_result = execute_original_operation(
+        tmp_path / "blocked",
+        operation=FileOperation.COPY,
+    )
+    assert blocked_plan.destination_path is not None
+    blocked_plan.destination_path.write_bytes(b"%PDF-1.7\nchanged")
+    batch = plan_restore_batch(
+        RestoreBatchPlanningRequest(
+            batch_id="restore-batch-001",
+            workspace_id="workspace-001",
+            planned_by_user_id="reviewer-001",
+            planned_at_utc=BASE_TIME.replace(minute=2),
+            correlation_id="restore-batch-correlation-001",
+            item_requests=(
+                RestoreBatchItemRequest("ready-item", ready_plan, ready_result),
+                RestoreBatchItemRequest("blocked-item", blocked_plan, blocked_result),
+            ),
+        )
+    )
+    trail = AppendOnlyAuditTrail()
+
+    report = execute_restore_batch(
+        batch,
+        request=RestoreBatchExecutionRequest(
+            approved_by_user_id="reviewer-001",
+            approved_at_utc=BASE_TIME.replace(minute=3),
+            expires_at_utc=BASE_TIME.replace(hour=13),
+            executed_by_actor_id="local-worker-001",
+            now_utc=BASE_TIME.replace(minute=4),
+        ),
+        audit_trail=trail,
+    )
+
+    assert report.summary.total == 2
+    assert report.summary.ready == 1
+    assert report.summary.blocked == 1
+    assert report.summary.succeeded == 1
+    assert report.items[0].result is not None
+    assert report.items[0].result.succeeded is True
+    assert report.items[1].approval is None
+    assert report.items[1].result is None
+    assert report.items[1].plan.reason is RestorePlanReason.GENERATED_COPY_CHANGED
+    assert len(trail.events) == 2
+
+
+def test_restore_batch_rejects_empty_and_oversized_requests(
+    tmp_path: Path,
+) -> None:
+    plan, result = execute_original_operation(tmp_path, operation=FileOperation.COPY)
+
+    with pytest.raises(
+        ValueError,
+        match="restore batch must contain at least one item",
+    ):
+        plan_restore_batch(
+            RestoreBatchPlanningRequest(
+                batch_id="restore-batch-001",
+                workspace_id="workspace-001",
+                planned_by_user_id="reviewer-001",
+                planned_at_utc=BASE_TIME,
+                correlation_id="restore-batch-correlation-001",
+                item_requests=(),
+            )
+        )
+
+    oversized = tuple(
+        RestoreBatchItemRequest(f"item-{index}", plan, result) for index in range(1_001)
+    )
+    with pytest.raises(
+        ValueError,
+        match="restore batch cannot contain more than 1000 items",
+    ):
+        plan_restore_batch(
+            RestoreBatchPlanningRequest(
+                batch_id="restore-batch-001",
+                workspace_id="workspace-001",
+                planned_by_user_id="reviewer-001",
+                planned_at_utc=BASE_TIME,
+                correlation_id="restore-batch-correlation-001",
+                item_requests=oversized,
+            )
+        )
+
+
+def test_summarizes_restore_batch_before_execution(tmp_path: Path) -> None:
+    plan, result = execute_original_operation(tmp_path, operation=FileOperation.COPY)
+    batch = plan_restore_batch(
+        RestoreBatchPlanningRequest(
+            batch_id="restore-batch-001",
+            workspace_id="workspace-001",
+            planned_by_user_id="reviewer-001",
+            planned_at_utc=BASE_TIME,
+            correlation_id="restore-batch-correlation-001",
+            item_requests=(RestoreBatchItemRequest("item-001", plan, result),),
+        )
+    )
+
+    summary = summarize_restore_batch(batch)
+
+    assert summary.total == 1
+    assert summary.ready == 1
+    assert summary.blocked == 0
+    assert summary.succeeded == 0
