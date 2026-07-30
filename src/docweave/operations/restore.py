@@ -31,6 +31,8 @@ from docweave.operations.planning import (
 )
 from docweave.operations.results import OperationResultRecord
 
+MAX_RESTORE_BATCH_ITEMS = 1_000
+
 
 class RestoreOperation(StrEnum):
     """Supported restore operation previews."""
@@ -155,6 +157,89 @@ class RestoreAuditContext:
 
 
 @dataclass(frozen=True, slots=True)
+class RestoreBatchItemRequest:
+    """One original operation outcome selected for restore preview."""
+
+    item_id: str
+    original_plan: FileOperationPlan
+    original_result: OperationResultRecord
+
+
+@dataclass(frozen=True, slots=True)
+class RestoreBatchPlanningRequest:
+    """Validated command data for one restore batch preview."""
+
+    batch_id: str
+    workspace_id: str
+    planned_by_user_id: str
+    planned_at_utc: datetime
+    correlation_id: str
+    item_requests: tuple[RestoreBatchItemRequest, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class RestoreBatchPlanItem:
+    """One immutable restore preview inside a batch restore plan."""
+
+    item_id: str
+    plan: RestorePlan
+
+
+@dataclass(frozen=True, slots=True)
+class RestoreBatchPlan:
+    """Immutable local restore batch preview before human approval."""
+
+    batch_id: str
+    workspace_id: str
+    planned_by_user_id: str
+    planned_at_utc: datetime
+    correlation_id: str
+    items: tuple[RestoreBatchPlanItem, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class RestoreBatchExecutionItem:
+    """Per-item outcome for one restore batch execution."""
+
+    item_id: str
+    plan: RestorePlan
+    approval: RestoreApproval | None
+    result: RestoreExecutionResult | None
+
+
+@dataclass(frozen=True, slots=True)
+class RestoreBatchExecutionRequest:
+    """Human approval and system execution command data for restore batches."""
+
+    approved_by_user_id: str
+    approved_at_utc: datetime
+    expires_at_utc: datetime
+    executed_by_actor_id: str
+    now_utc: datetime
+
+
+@dataclass(frozen=True, slots=True)
+class RestoreBatchSummary:
+    """Aggregate restore batch counts that never hide per-item outcomes."""
+
+    total: int
+    ready: int
+    blocked: int
+    succeeded: int
+    failed: int
+    verification_failed: int
+
+
+@dataclass(frozen=True, slots=True)
+class RestoreBatchExecutionReport:
+    """Result of one bounded local restore batch execution request."""
+
+    batch: RestoreBatchPlan
+    summary: RestoreBatchSummary
+    items: tuple[RestoreBatchExecutionItem, ...]
+
+
+@dataclass(frozen=True, slots=True)
 class _RestoreBlockerContext:
     source_path: Path | None = None
     destination_path: Path | None = None
@@ -188,6 +273,31 @@ def plan_restore_operation(
         RestorePlanReason.UNSUPPORTED_ORIGINAL_OPERATION,
         original_plan,
         original_result,
+    )
+
+
+def plan_restore_batch(request: RestoreBatchPlanningRequest) -> RestoreBatchPlan:
+    """Plan a bounded restore batch without mutating the filesystem."""
+    if not request.item_requests:
+        raise ValueError("restore batch must contain at least one item")
+    if len(request.item_requests) > MAX_RESTORE_BATCH_ITEMS:
+        raise ValueError("restore batch cannot contain more than 1000 items")
+    return RestoreBatchPlan(
+        batch_id=request.batch_id,
+        workspace_id=request.workspace_id,
+        planned_by_user_id=request.planned_by_user_id,
+        planned_at_utc=_normalize_utc(request.planned_at_utc),
+        correlation_id=request.correlation_id,
+        items=tuple(
+            RestoreBatchPlanItem(
+                item_id=item.item_id,
+                plan=plan_restore_operation(
+                    item.original_plan,
+                    item.original_result,
+                ),
+            )
+            for item in request.item_requests
+        ),
     )
 
 
@@ -465,6 +575,130 @@ def execute_restore_operation(
     if plan.operation is RestoreOperation.REMOVE_GENERATED_COPY:
         return _execute_copy_restore(plan, approval, restore_id=restore_id)
     return _execute_move_restore(plan, approval, restore_id=restore_id, now_utc=now_utc)
+
+
+def execute_restore_batch(
+    batch: RestoreBatchPlan,
+    *,
+    request: RestoreBatchExecutionRequest,
+    audit_trail: AppendOnlyAuditTrail | None = None,
+) -> RestoreBatchExecutionReport:
+    """Approve and execute every ready item in a bounded restore batch."""
+    active_audit_trail = audit_trail or AppendOnlyAuditTrail()
+    approved_items: list[tuple[RestoreBatchPlanItem, RestoreApproval]] = []
+    for item in batch.items:
+        if not item.plan.is_ready:
+            continue
+
+        approval = approve_restore_plan(
+            item.plan,
+            approval_id=f"{batch.batch_id}:{item.item_id}:restore-approval",
+            approved_by_user_id=request.approved_by_user_id,
+            approved_at_utc=request.approved_at_utc,
+            expires_at_utc=request.expires_at_utc,
+        )
+        append_restore_approval_audit_event(
+            active_audit_trail,
+            item.plan,
+            approval,
+            RestoreAuditContext(
+                workspace_id=batch.workspace_id,
+                batch_id=batch.batch_id,
+                batch_item_id=item.item_id,
+                actor_id=request.approved_by_user_id,
+                correlation_id=batch.correlation_id,
+                occurred_at_utc=_normalize_utc(request.now_utc),
+            ),
+        )
+        approved_items.append((item, approval))
+
+    executed_by_item_id: dict[str, RestoreBatchExecutionItem] = {}
+    for item, approval in approved_items:
+        result = execute_restore_operation(
+            item.plan,
+            approval,
+            restore_id=f"{batch.batch_id}:{item.item_id}:restore",
+            now_utc=request.now_utc,
+        )
+        append_restore_execution_audit_event(
+            active_audit_trail,
+            item.plan,
+            result,
+            RestoreAuditContext(
+                workspace_id=batch.workspace_id,
+                batch_id=batch.batch_id,
+                batch_item_id=item.item_id,
+                actor_id=request.executed_by_actor_id,
+                correlation_id=batch.correlation_id,
+                occurred_at_utc=_normalize_utc(request.now_utc),
+            ),
+        )
+        executed_by_item_id[item.item_id] = RestoreBatchExecutionItem(
+            item_id=item.item_id,
+            plan=item.plan,
+            approval=approval,
+            result=result,
+        )
+
+    report_items = tuple(
+        executed_by_item_id.get(
+            item.item_id,
+            RestoreBatchExecutionItem(
+                item_id=item.item_id,
+                plan=item.plan,
+                approval=None,
+                result=None,
+            ),
+        )
+        for item in batch.items
+    )
+    return RestoreBatchExecutionReport(
+        batch=batch,
+        summary=summarize_restore_batch(batch, report_items),
+        items=report_items,
+    )
+
+
+def summarize_restore_batch(
+    batch: RestoreBatchPlan,
+    execution_items: tuple[RestoreBatchExecutionItem, ...] = (),
+) -> RestoreBatchSummary:
+    """Return aggregate restore batch counts without masking item details."""
+    total = len(batch.items)
+    ready = sum(1 for item in batch.items if item.plan.is_ready)
+    plan_blocked = total - ready
+    result_blocked = sum(
+        1
+        for item in execution_items
+        if item.result is not None
+        and item.result.status is RestoreExecutionStatus.BLOCKED
+    )
+    succeeded = sum(
+        1
+        for item in execution_items
+        if item.result is not None
+        and item.result.status is RestoreExecutionStatus.SUCCEEDED
+    )
+    failed = sum(
+        1
+        for item in execution_items
+        if item.result is not None
+        and item.result.status is RestoreExecutionStatus.FAILED
+    )
+    verification_failed = sum(
+        1
+        for item in execution_items
+        if item.result is not None
+        and item.result.status is RestoreExecutionStatus.VERIFICATION_FAILED
+    )
+    return RestoreBatchSummary(
+        total=total,
+        ready=ready,
+        blocked=plan_blocked + result_blocked,
+        succeeded=succeeded,
+        failed=failed,
+        verification_failed=verification_failed,
+    )
 
 
 def append_restore_approval_audit_event(
