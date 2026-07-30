@@ -42,6 +42,24 @@ $DesktopTestFiles = Get-ChildItem -LiteralPath $DesktopTestRoot -Filter "test_*.
 
 foreach ($DesktopTestFile in $DesktopTestFiles) {
     $RelativeTestPath = "tests/desktop/$($DesktopTestFile.Name)"
+    if ($DesktopTestFile.Name -eq "test_main_window.py") {
+        $CollectedTests = & $Python -m pytest --collect-only -q $RelativeTestPath
+        if ($LASTEXITCODE -ne 0) {
+            exit $LASTEXITCODE
+        }
+        $CollectedTests |
+            Where-Object { $_ -like "$RelativeTestPath::*" } |
+            ForEach-Object {
+                Invoke-Check -Command @(
+                    "-m",
+                    "pytest",
+                    "--cov-append",
+                    "--cov-report=",
+                    $_
+                )
+            }
+        continue
+    }
     Invoke-Check -Command @(
         "-m",
         "pytest",
