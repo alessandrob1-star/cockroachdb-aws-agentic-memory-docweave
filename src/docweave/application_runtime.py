@@ -27,6 +27,8 @@ from docweave.analysis import (
 )
 from docweave.persistence import (
     ClassificationRuntime,
+    CockroachReviewDecisionRepository,
+    CockroachTransactionRunner,
     build_classification_runtime,
 )
 from docweave.persistence.classification_runtime import ClassificationGateway
@@ -114,6 +116,16 @@ class ConfiguredClassificationRuntime:
     runtime: ClassificationRuntime
 
 
+@dataclass(frozen=True, slots=True)
+class ConfiguredReviewDecisionRuntime:
+    """Lazily composed runtime dependencies for durable review decisions."""
+
+    config: RuntimeEnvironmentConfig
+    engine: Engine
+    transaction_runner: CockroachTransactionRunner
+    repository: CockroachReviewDecisionRepository
+
+
 class SessionLike(Protocol):
     """Narrow boto3 session surface accepted by the Bedrock client factory."""
 
@@ -138,6 +150,23 @@ class RuntimeFactory(Protocol):
         gateway: ClassificationGateway,
     ) -> ClassificationRuntime:
         """Build a runtime around an engine and a validated gateway."""
+
+
+class TransactionRunnerFactory(Protocol):
+    """Narrow transaction runner factory used for deterministic tests."""
+
+    def __call__(self, engine: Engine) -> CockroachTransactionRunner:
+        """Create a serializable transaction runner."""
+
+
+class ReviewRepositoryFactory(Protocol):
+    """Narrow review repository factory used for deterministic tests."""
+
+    def __call__(
+        self,
+        transaction_runner: CockroachTransactionRunner,
+    ) -> CockroachReviewDecisionRepository:
+        """Create a review decision repository."""
 
 
 def runtime_integration_snapshot(
@@ -200,6 +229,30 @@ def build_configured_classification_runtime(
     )
 
 
+def build_configured_review_decision_runtime(
+    environment: Mapping[str, str] | None = None,
+    *,
+    engine_factory: EngineFactory = create_engine,
+    transaction_runner_factory: TransactionRunnerFactory = CockroachTransactionRunner,
+    repository_factory: ReviewRepositoryFactory = CockroachReviewDecisionRepository,
+) -> ConfiguredReviewDecisionRuntime:
+    """Compose CockroachDB review-decision dependencies without database I/O."""
+    config = load_runtime_environment_config(environment)
+    engine = engine_factory(
+        config.database_url,
+        pool_pre_ping=True,
+        future=True,
+    )
+    transaction_runner = transaction_runner_factory(engine)
+    repository = repository_factory(transaction_runner)
+    return ConfiguredReviewDecisionRuntime(
+        config=config,
+        engine=engine,
+        transaction_runner=transaction_runner,
+        repository=repository,
+    )
+
+
 def _required_secret_like_value(values: Mapping[str, str], variable_name: str) -> str:
     value = values.get(variable_name, "")
     if not value.strip():
@@ -233,11 +286,13 @@ __all__ = [
     "DOCWEAVE_TAXONOMY_VERSION_ID",
     "DOCWEAVE_WORKSPACE_ID",
     "ConfiguredClassificationRuntime",
+    "ConfiguredReviewDecisionRuntime",
     "RuntimeConfigurationError",
     "RuntimeConfigurationErrorCode",
     "RuntimeEnvironmentConfig",
     "RuntimeIntegrationSnapshot",
     "build_configured_classification_runtime",
+    "build_configured_review_decision_runtime",
     "load_runtime_environment_config",
     "runtime_integration_snapshot",
 ]

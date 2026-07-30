@@ -113,6 +113,11 @@ authorized root. It uses stable per-file idempotency keys, reports sanitized
 per-document success or failure, and never mutates source files. Live
 end-to-end database execution remains pending.
 
+The `docweave-review-proposal` command adds the first durable human-review
+runtime boundary. It persists one approved or rejected decision for an existing
+proposal using the retained proposal fingerprint and configured reviewer actor,
+without executing file operations.
+
 The local shared core now also defines an explicit classification runtime that
 keeps extraction, database transactions, and Bedrock invocation in separate
 failure boundaries. It can register a verified PDF document version, install
@@ -175,6 +180,12 @@ docweave-classify-batch <folder> --authorized-root <folder> --limit 1000
 
 Use `--json-report <path>` to write a sanitized machine-readable validation
 artifact. Existing report files are not overwritten.
+
+Durable review decisions for existing proposals are launched with:
+
+```powershell
+docweave-review-proposal --proposal-id <uuid> --action approve --proposal-fingerprint <sha256>
+```
 
 These commands require explicit runtime configuration through environment
 variables and perform real extraction, Amazon Bedrock invocation, and
