@@ -73,7 +73,9 @@ from docweave.operations.review import (
     ReviewDecisionValidationStatus,
     classification_proposal_fingerprint,
     create_proposal_review_decision,
+    create_proposal_review_decision_from_fingerprint,
     validate_proposal_review_decision,
+    validate_proposal_review_decision_fingerprint,
 )
 
 __all__ = [
@@ -125,6 +127,7 @@ __all__ = [
     "classification_proposal_fingerprint",
     "create_operation_batch",
     "create_proposal_review_decision",
+    "create_proposal_review_decision_from_fingerprint",
     "derive_batch_state",
     "execute_file_operation",
     "execute_operation_batch",
@@ -136,4 +139,5 @@ __all__ = [
     "summarize_batch",
     "validate_operation_approval",
     "validate_proposal_review_decision",
+    "validate_proposal_review_decision_fingerprint",
 ]

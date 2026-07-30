@@ -398,6 +398,80 @@ def test_cockpit_scans_synthetic_pdfs_and_raises_central_preview(
     close_cockpit_window(window)
 
 
+def test_cockpit_records_local_review_decision_without_file_mutation(
+    qt_application: object,
+) -> None:
+    corpus = Path("pdf_sintetici").resolve(strict=True)
+    first_pdf = sorted(corpus.glob("*.pdf"))[0]
+    window = CockpitWindow(runtime_preflight_function=ready_runtime_preflight_report)
+    window.set_authorized_root(corpus)
+    window.left.set_documents(
+        [
+            Document(
+                name=first_pdf.name,
+                category="invoice",
+                pages="2",
+                status="REVIEW",
+                path=first_pdf,
+                proposed_destination="DocWeave Organized/Invoices/invoice.pdf",
+                proposal_fingerprint="a" * 64,
+            )
+        ]
+    )
+
+    window._open_document_row(0)
+
+    assert window.console.buttons[4].isEnabled()
+    assert window.console.buttons[5].isEnabled()
+
+    window._approve_selected_review()
+
+    document = window.left.document_at(0)
+    assert document is not None
+    assert document.status == "APPROVED"
+    assert document.review_decision_id is not None
+    assert window.left.count_status("REVIEW") == 0
+    assert len(window._review_ledger.all_decisions()) == 1
+    assert "approved" in window.console.log_text.text()
+    assert cast(Any, window.right.event_rows[3]).event_text.text() == (
+        "No copy or move executed"
+    )
+
+    close_cockpit_window(window)
+
+
+def test_cockpit_blocks_review_decision_without_proposal_fingerprint(
+    qt_application: object,
+) -> None:
+    corpus = Path("pdf_sintetici").resolve(strict=True)
+    first_pdf = sorted(corpus.glob("*.pdf"))[0]
+    window = CockpitWindow(runtime_preflight_function=ready_runtime_preflight_report)
+    window.set_authorized_root(corpus)
+    window.left.set_documents(
+        [
+            Document(
+                name=first_pdf.name,
+                category="invoice",
+                pages="2",
+                status="REVIEW",
+                path=first_pdf,
+                proposed_destination="DocWeave Organized/Invoices/invoice.pdf",
+            )
+        ]
+    )
+    window._selected_document_row = 0
+
+    window._approve_selected_review()
+
+    document = window.left.document_at(0)
+    assert document is not None
+    assert document.status == "REVIEW"
+    assert len(window._review_ledger.all_decisions()) == 0
+    assert "no retained fingerprint" in window.console.log_text.text()
+
+    close_cockpit_window(window)
+
+
 def test_cockpit_analysis_batch_preserves_progress_after_failure(
     qt_application: object,
 ) -> None:

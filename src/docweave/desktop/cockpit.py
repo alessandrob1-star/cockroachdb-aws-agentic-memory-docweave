@@ -23,11 +23,13 @@ Requires:
 
 from __future__ import annotations
 
-import sys
 import math
+import sys
 from collections.abc import Callable
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from pathlib import Path
+from uuid import uuid4
 
 from PySide6.QtCore import (
     QEasingCurve,
@@ -108,7 +110,14 @@ from docweave.desktop.workspace import (
 )
 from docweave.intake import IntakeStatus
 from docweave.persistence import ClassificationPipelineError
-from docweave.operations import propose_safe_organization_copy
+from docweave.operations import (
+    InMemoryReviewDecisionLedger,
+    ProposalReviewDecisionRequest,
+    ReviewDecisionAction,
+    create_proposal_review_decision_from_fingerprint,
+    propose_safe_organization_copy,
+    validate_proposal_review_decision_fingerprint,
+)
 from docweave.runtime_preflight import (
     PreflightCheck,
     PreflightState,
@@ -135,6 +144,8 @@ class Document:
     status: str
     path: Path | None = None
     proposed_destination: str | None = None
+    proposal_fingerprint: str | None = None
+    review_decision_id: str | None = None
 
 
 @dataclass(frozen=True)
@@ -669,6 +680,7 @@ class LeftScreen(ShapeWidget):
         *,
         proposed_class: str,
         proposed_destination: str | None = None,
+        proposal_fingerprint: str | None = None,
     ) -> None:
         """Update one discovered PDF with a non-authoritative proposal."""
         if not 0 <= row < len(self._documents):
@@ -681,6 +693,32 @@ class LeftScreen(ShapeWidget):
             status="REVIEW",
             path=current.path,
             proposed_destination=proposed_destination,
+            proposal_fingerprint=proposal_fingerprint,
+            review_decision_id=None,
+        )
+        self._documents[row] = updated
+        self._set_document_row(row, updated)
+
+    def record_review_decision(
+        self,
+        row: int,
+        *,
+        status: str,
+        review_decision_id: str,
+    ) -> None:
+        """Update one proposal row after an append-only local review decision."""
+        if not 0 <= row < len(self._documents):
+            return
+        current = self._documents[row]
+        updated = Document(
+            name=current.name,
+            category=current.category,
+            pages=current.pages,
+            status=status,
+            path=current.path,
+            proposed_destination=current.proposed_destination,
+            proposal_fingerprint=current.proposal_fingerprint,
+            review_decision_id=review_decision_id,
         )
         self._documents[row] = updated
         self._set_document_row(row, updated)
@@ -690,9 +728,15 @@ class LeftScreen(ShapeWidget):
             item = QTableWidgetItem(value)
             if doc.proposed_destination is not None:
                 item.setToolTip(f"Proposed copy target: {doc.proposed_destination}")
+            if doc.review_decision_id is not None:
+                item.setToolTip(
+                    f"{item.toolTip()}\nReview decision: {doc.review_decision_id}"
+                )
             if column == 3:
                 item.setForeground(
-                    WARNING if doc.status in {"ATTENTION", "REVIEW"} else ACCENT
+                    WARNING
+                    if doc.status in {"ATTENTION", "REVIEW", "REJECTED"}
+                    else ACCENT
                 )
             self.table.setItem(row, column, item)
 
@@ -1693,6 +1737,8 @@ class ConsolePanel(ShapeWidget):
             ("SCAN", 0.0),
             ("CANCEL", 0.0),
             ("ANALYZE", 0.0),
+            ("APPROVE", 0.0),
+            ("REJECT", 0.0),
         )
 
         for text, angle in button_specs:
@@ -1816,9 +1862,9 @@ class ConsolePanel(ShapeWidget):
         w = self.width()
         h = self.height()
 
-        # Only NEW SCAN follows the first angled face.
-        # IMPORT, FILTER and ANALYZE sit on the long flat upper axis.
-        button_w = 132
+        # CHOOSE follows the first angled face.
+        # SCAN, CANCEL, ANALYZE, APPROVE and REJECT sit on the long flat axis.
+        button_w = 118
         button_h = 62
 
         first_x = int(w * 0.165)
@@ -1837,9 +1883,11 @@ class ConsolePanel(ShapeWidget):
 
         flat_y = int(h * 0.108)
         flat_xs = (
-            int(w * 0.255),
-            int(w * 0.345),
-            int(w * 0.435),
+            int(w * 0.248),
+            int(w * 0.328),
+            int(w * 0.408),
+            int(w * 0.488),
+            int(w * 0.568),
         )
 
         for button, x_pos in zip(self.buttons[1:], flat_xs):
@@ -1904,6 +1952,7 @@ class CockpitWindow(QMainWindow):
         self._classification_batch_failed = 0
         self._classification_batch_total = 0
         self._selected_document_row: int | None = None
+        self._review_ledger = InMemoryReviewDecisionLedger()
         self._workspace = DesktopWorkspaceSession()
 
         self.setWindowTitle("DocWeave Cockpit")
@@ -1959,9 +2008,19 @@ class CockpitWindow(QMainWindow):
         self.console.buttons[1].clicked.connect(self.start_scan)
         self.console.buttons[2].clicked.connect(self.cancel_scan)
         self.console.buttons[3].clicked.connect(self._analyze_selected_document)
+        self.console.buttons[4].clicked.connect(self._approve_selected_review)
+        self.console.buttons[5].clicked.connect(self._reject_selected_review)
         self.console.buttons[3].setEnabled(False)
         self.console.buttons[3].setToolTip(
             "Run configured classification for ready PDFs."
+        )
+        self.console.buttons[4].setEnabled(False)
+        self.console.buttons[4].setToolTip(
+            "Approve the selected review proposal without moving files."
+        )
+        self.console.buttons[5].setEnabled(False)
+        self.console.buttons[5].setToolTip(
+            "Reject the selected review proposal without moving files."
         )
 
         self.setStyleSheet(
@@ -2335,6 +2394,25 @@ class CockpitWindow(QMainWindow):
         if document is None or document.path is None or root is None:
             self._set_status("No ready PDF is available for preview.")
             return
+        self._selected_document_row = row
+        if document.status == "REVIEW":
+            self._set_busy(False)
+            self._set_status(
+                "Review proposal selected. Approve or reject without changing files."
+            )
+            self.right.set_events(
+                [
+                    ("REVIEW", f"Proposal for {document.category}"),
+                    (
+                        "TARGET",
+                        document.proposed_destination or "No copy target available",
+                    ),
+                    ("APPROVAL", "Human decision required"),
+                    ("MEMORY", "Local review ledger pending"),
+                    ("SECURITY", "No file mutation performed"),
+                ]
+            )
+            return
         if document.status != "READY":
             self._set_status("Only ready PDFs can be previewed safely.")
             return
@@ -2344,7 +2422,6 @@ class CockpitWindow(QMainWindow):
             self._set_status(f"PDF preview blocked safely ({error.category.value}).")
             return
         self.center.open_document(validated_path)
-        self._selected_document_row = row
         self._set_busy(False)
         self._set_status("PDF preview raised inside DocWeave. No files were changed.")
 
@@ -2423,6 +2500,7 @@ class CockpitWindow(QMainWindow):
             raw_progress.row,
             proposed_class=result.proposed_class,
             proposed_destination=proposed_destination,
+            proposal_fingerprint=result.proposal_fingerprint,
         )
         self.right.set_metrics(
             self.left.document_count,
@@ -2571,11 +2649,91 @@ class CockpitWindow(QMainWindow):
         self._set_busy(False)
         self.classification_finished.emit()
 
+    @Slot()
+    def _approve_selected_review(self) -> None:
+        self._record_selected_review_decision(ReviewDecisionAction.APPROVE)
+
+    @Slot()
+    def _reject_selected_review(self) -> None:
+        self._record_selected_review_decision(
+            ReviewDecisionAction.REJECT,
+            reason="Reviewer rejected the local proposal.",
+        )
+
+    def _record_selected_review_decision(
+        self,
+        action: ReviewDecisionAction,
+        *,
+        reason: str | None = None,
+    ) -> None:
+        row = self._selected_document_row
+        if row is None:
+            self._set_status("Select one review proposal before recording a decision.")
+            return
+        document = self.left.document_at(row)
+        if document is None or document.status != "REVIEW":
+            self._set_status("Only a document in REVIEW can receive a decision.")
+            return
+        if document.proposal_fingerprint is None:
+            self._set_status(
+                "Review blocked safely: selected proposal has no retained fingerprint."
+            )
+            return
+        review_decision_id = str(uuid4())
+        proposal_id = f"cockpit:{document.proposal_fingerprint[:16]}"
+        decision = create_proposal_review_decision_from_fingerprint(
+            document.proposal_fingerprint,
+            request=ProposalReviewDecisionRequest(
+                review_decision_id=review_decision_id,
+                proposal_id=proposal_id,
+                reviewer_actor_id="local-cockpit-reviewer",
+                decided_at_utc=datetime.now(UTC),
+                action=action,
+                reason=reason,
+            ),
+        )
+        validation = validate_proposal_review_decision_fingerprint(
+            document.proposal_fingerprint,
+            decision,
+        )
+        if not validation.is_valid:
+            self._set_status(f"Review decision blocked safely ({validation.reason}).")
+            return
+        self._review_ledger.append(decision)
+        next_status = (
+            "APPROVED" if action is ReviewDecisionAction.APPROVE else "REJECTED"
+        )
+        self.left.record_review_decision(
+            row,
+            status=next_status,
+            review_decision_id=review_decision_id,
+        )
+        self.right.set_metrics(
+            self.left.document_count,
+            self.left.count_status("READY"),
+            self.left.count_status("REVIEW"),
+        )
+        decision_count = len(
+            self._review_ledger.decisions_for_proposal(decision.proposal_id)
+        )
+        self._set_busy(False)
+        self._set_status(f"Review decision recorded locally: {next_status.lower()}.")
+        self.right.set_events(
+            [
+                ("REVIEW", next_status),
+                ("DECISION", review_decision_id[:8]),
+                ("HISTORY", f"{decision_count} append-only decision(s)"),
+                ("OPERATION", "No copy or move executed"),
+                ("SECURITY", "No file mutation performed"),
+            ]
+        )
+
     def _set_busy(self, busy: bool) -> None:
         blocked = busy or self.scan_in_progress or self.classification_in_progress
         analysis_ready = (
             _classification_preflight_block(self._runtime_preflight_report) is None
         )
+        review_ready = self._selected_review_document() is not None and not blocked
         self.console.buttons[0].setEnabled(not blocked)
         self.console.buttons[1].setEnabled(
             not blocked and self.authorized_root is not None
@@ -2592,6 +2750,8 @@ class CockpitWindow(QMainWindow):
             self.console.buttons[3].setToolTip(
                 "Runtime configuration must pass preflight before classification."
             )
+        self.console.buttons[4].setEnabled(review_ready)
+        self.console.buttons[5].setEnabled(review_ready)
 
     def _set_status(self, message: str) -> None:
         self.console.log_text.setText(message)
@@ -2623,6 +2783,19 @@ class CockpitWindow(QMainWindow):
 
     def _ready_document_count(self) -> int:
         return self.left.count_status("READY")
+
+    def _selected_review_document(self) -> Document | None:
+        row = self._selected_document_row
+        if row is None:
+            return None
+        document = self.left.document_at(row)
+        if (
+            document is None
+            or document.status != "REVIEW"
+            or document.proposal_fingerprint is None
+        ):
+            return None
+        return document
 
     def _classification_batch_items(
         self,

@@ -19,6 +19,7 @@ from docweave.application_runtime import (
 )
 from docweave.core.fingerprints import compute_sha256_fingerprint
 from docweave.extraction import PdfExtractionRequest
+from docweave.operations import classification_proposal_fingerprint
 from docweave.persistence import (
     ClassificationPipelineError,
     ClassificationRunIdentity,
@@ -71,6 +72,7 @@ class ClassificationCommandResult:
     raw_confidence: str | None = None
     classification_confidence: str | None = None
     metadata_confidence: str | None = None
+    proposal_fingerprint: str | None = None
     retry_attempts: int = 0
 
 
@@ -287,6 +289,7 @@ def _batch_item_to_report(
             "raw_confidence": item.result.raw_confidence,
             "classification_confidence": item.result.classification_confidence,
             "metadata_confidence": item.result.metadata_confidence,
+            "proposal_fingerprint": item.result.proposal_fingerprint,
             "retry_attempts": item.result.retry_attempts,
         }
     )
@@ -532,6 +535,7 @@ def _command_result(
         raw_confidence=str(confidence.raw),
         classification_confidence=str(confidence.classification),
         metadata_confidence=str(confidence.metadata),
+        proposal_fingerprint=classification_proposal_fingerprint(proposal),
         retry_attempts=provenance.retry_attempts,
     )
 

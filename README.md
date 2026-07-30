@@ -59,11 +59,13 @@ not free-form semantic Bedrock filename generation. The shared local operation
 core now includes explicit human review-decision contracts for non-authoritative
 classification proposals. Decisions are attributable, fingerprint-bound to the
 exact proposal and optional operation plan that was reviewed, and append-only in
-the local test ledger. These contracts do not yet persist review decisions in
-CockroachDB or expose final cockpit approval controls. Automated tests exercise a
-30-PDF cockpit batch with an injected non-cloud function, and live desktop
-classification remains dependent on runtime configuration and a migrated
-database.
+the local test ledger. The cockpit now exposes local APPROVE and REJECT controls
+for selected review rows, records the decision against the retained proposal
+fingerprint, and visibly confirms that no copy or move has been executed. These
+controls do not yet persist review decisions in CockroachDB or execute approved
+filesystem operations. Automated tests exercise a 30-PDF cockpit batch with an
+injected non-cloud function, and live desktop classification remains dependent
+on runtime configuration and a migrated database.
 Document-controlled persistence values remain bound parameters rather than
 executable Structured Query Language.
 
