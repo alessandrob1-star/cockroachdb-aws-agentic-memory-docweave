@@ -1,5 +1,6 @@
 from decimal import Decimal
 from pathlib import Path
+from types import SimpleNamespace
 from uuid import UUID
 
 import pytest
@@ -24,6 +25,7 @@ from docweave.application_runtime import (
 from docweave.classification_cli import (
     ClassificationCommandResult,
     build_content_addressed_identity,
+    discover_batch_pdfs,
 )
 from docweave.extraction import ExtractionStatus, PdfExtractionResult
 from docweave.persistence import PersistedClassificationRun
@@ -225,4 +227,124 @@ def test_main_reports_configuration_errors_without_secret_values(
     assert result == 2
     assert "database_url_missing" in captured.err
     assert "DOCWEAVE_DATABASE_URL" in captured.err
+    assert "secret" not in captured.err
+
+
+def test_discover_batch_pdfs_is_bounded_recursive_and_authorized(
+    tmp_path: Path,
+) -> None:
+    authorized = tmp_path / "authorized"
+    nested = authorized / "nested"
+    outside = tmp_path / "outside"
+    nested.mkdir(parents=True)
+    outside.mkdir()
+    first = authorized / "b.PDF"
+    second = nested / "a.pdf"
+    ignored = nested / "note.txt"
+    external = outside / "x.pdf"
+    for path in (first, second, ignored, external):
+        path.write_text("sample", encoding="utf-8")
+
+    discovered = discover_batch_pdfs(
+        authorized,
+        authorized_root=authorized,
+        limit=2,
+    )
+
+    assert discovered == (first.resolve(), second.resolve())
+    with pytest.raises(ValueError, match="source_root must be inside authorized_root"):
+        discover_batch_pdfs(outside, authorized_root=authorized)
+    with pytest.raises(ValueError, match="limit must be between 1 and 1000"):
+        discover_batch_pdfs(authorized, authorized_root=authorized, limit=1_001)
+
+
+def test_batch_main_continues_after_item_failure_without_secret_output(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    tmp_path: Path,
+) -> None:
+    authorized = tmp_path / "authorized"
+    authorized.mkdir()
+    first = authorized / "first.pdf"
+    second = authorized / "second.pdf"
+    first.write_text("first", encoding="utf-8")
+    second.write_text("second", encoding="utf-8")
+
+    calls: list[tuple[Path, str]] = []
+
+    def fake_build_configured_classification_runtime() -> object:
+        return SimpleNamespace(
+            config=RuntimeEnvironmentConfig(
+                database_url="cockroachdb://user:secret@example.test/docweave",
+                workspace_id=UUID("11111111-1111-4111-8111-111111111111"),
+                taxonomy_version_id=UUID("22222222-2222-4222-8222-222222222222"),
+                approved_by_actor_id=UUID("33333333-3333-4333-8333-333333333333"),
+            ),
+            runtime=object(),
+        )
+
+    def fake_compute_sha256_fingerprint(source_path: Path) -> object:
+        return SimpleNamespace(hex_digest=f"{source_path.stem:0<64}"[:64])
+
+    def fake_classify_pdf_once_with_runtime(
+        configured: object,
+        source_path: Path,
+        *,
+        authorized_root: Path,
+        idempotency_key: str | None = None,
+        source_sha256: str | None = None,
+    ) -> ClassificationCommandResult:
+        assert authorized_root == authorized.resolve()
+        assert idempotency_key is not None
+        assert source_sha256 is not None
+        calls.append((source_path, idempotency_key))
+        if source_path == second.resolve():
+            raise RuntimeError("secret model details")
+        return ClassificationCommandResult(
+            proposed_class="invoice",
+            document_disposition="applied",
+            taxonomy_disposition="applied",
+            proposal_disposition="applied",
+            input_tokens=10,
+            output_tokens=5,
+            total_tokens=15,
+            estimated_cost_usd=None,
+        )
+
+    monkeypatch.setattr(
+        classification_cli,
+        "build_configured_classification_runtime",
+        fake_build_configured_classification_runtime,
+    )
+    monkeypatch.setattr(
+        classification_cli,
+        "compute_sha256_fingerprint",
+        fake_compute_sha256_fingerprint,
+    )
+    monkeypatch.setattr(
+        classification_cli,
+        "_classify_pdf_once_with_runtime",
+        fake_classify_pdf_once_with_runtime,
+    )
+
+    result = classification_cli.batch_main(
+        [
+            str(authorized),
+            "--authorized-root",
+            str(authorized),
+            "--limit",
+            "2",
+        ]
+    )
+
+    captured = capsys.readouterr()
+    assert result == 1
+    assert calls[0][0] == first.resolve()
+    assert calls[1][0] == second.resolve()
+    assert "Discovered PDFs: 2" in captured.out
+    assert "Succeeded PDFs: 1" in captured.out
+    assert "Failed PDFs: 1" in captured.out
+    assert "[OK] first.pdf: class=invoice tokens=15" in captured.out
+    assert "[FAIL] second.pdf: RuntimeError" in captured.out
+    assert "secret" not in captured.out
     assert "secret" not in captured.err

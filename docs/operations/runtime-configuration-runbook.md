@@ -94,7 +94,25 @@ This command performs real extraction, a real Bedrock model invocation, and
 real CockroachDB writes. It should be used only against an approved validation
 target until the production workflow is explicitly approved.
 
-## 6. Desktop startup
+## 6. Controlled batch runtime check
+
+After the single-document path has passed, run a bounded recursive batch over
+an authorized validation folder:
+
+```powershell
+docweave-classify-batch .\pdf_sintetici --authorized-root .\pdf_sintetici --limit 30
+```
+
+This command uses the same extraction, Bedrock, and CockroachDB runtime path as
+the single-document command. It caps each invocation at 1,000 discovered PDFs,
+derives stable per-file idempotency keys for retry, continues after
+per-document failures by default, and prints only sanitized status fields. It
+does not rename, move, copy, delete, upload, or overwrite source files.
+
+Use `--stop-on-failure` only when investigating a specific document failure and
+wanting the first failure to terminate the batch.
+
+## 7. Desktop startup
 
 Launch the cockpit from the configured shell:
 
@@ -106,11 +124,13 @@ The connection panel should show runtime readiness. If the runtime preflight is
 blocked, the Analyze control remains unavailable and no Bedrock or CockroachDB
 operation is attempted from the desktop.
 
-## 7. Failure policy
+## 8. Failure policy
 
 - Missing runtime configuration blocks classification before external calls.
 - Database schema mismatch blocks the database preflight.
 - Bedrock or CockroachDB failures must be reported as sanitized categories.
+- Batch failures remain item-level observations unless `--stop-on-failure` is
+  used; failed items are not reported as successful and are safe to retry.
 - The application must not replace failed intelligence or persistence with
   hardcoded, simulated, or fabricated results.
 - Originals must not be moved, copied, renamed, or overwritten by this runtime
