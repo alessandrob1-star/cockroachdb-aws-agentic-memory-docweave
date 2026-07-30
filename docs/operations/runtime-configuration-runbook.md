@@ -109,6 +109,18 @@ derives stable per-file idempotency keys for retry, continues after
 per-document failures by default, and prints only sanitized status fields. It
 does not rename, move, copy, delete, upload, or overwrite source files.
 
+For reproducible validation evidence, write a sanitized JSON report:
+
+```powershell
+docweave-classify-batch .\pdf_sintetici --authorized-root .\pdf_sintetici --limit 30 --json-report .\artifacts\classification-batch-report.json
+```
+
+The report includes counts, relative paths, non-authoritative proposed classes,
+token observations, dispositions, confidence fields, and sanitized error
+categories. It excludes extracted document text, prompts, database URLs,
+credentials, and absolute local paths. Existing report files are not
+overwritten.
+
 Use `--stop-on-failure` only when investigating a specific document failure and
 wanting the first failure to terminate the batch.
 

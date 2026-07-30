@@ -1,3 +1,4 @@
+import json
 from decimal import Decimal
 from pathlib import Path
 from types import SimpleNamespace
@@ -348,3 +349,109 @@ def test_batch_main_continues_after_item_failure_without_secret_output(
     assert "[FAIL] second.pdf: RuntimeError" in captured.out
     assert "secret" not in captured.out
     assert "secret" not in captured.err
+
+
+def test_batch_main_writes_sanitized_json_report_without_overwrite(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    tmp_path: Path,
+) -> None:
+    authorized = tmp_path / "authorized"
+    authorized.mkdir()
+    source = authorized / "invoice.pdf"
+    source.write_text("first", encoding="utf-8")
+    report_path = tmp_path / "batch-report.json"
+
+    def fake_build_configured_classification_runtime() -> object:
+        return SimpleNamespace(
+            config=RuntimeEnvironmentConfig(
+                database_url="cockroachdb://user:secret@example.test/docweave",
+                workspace_id=UUID("11111111-1111-4111-8111-111111111111"),
+                taxonomy_version_id=UUID("22222222-2222-4222-8222-222222222222"),
+                approved_by_actor_id=UUID("33333333-3333-4333-8333-333333333333"),
+            ),
+            runtime=object(),
+        )
+
+    def fake_compute_sha256_fingerprint(_: Path) -> object:
+        return SimpleNamespace(hex_digest="ab" * 32)
+
+    def fake_classify_pdf_once_with_runtime(
+        configured: object,
+        source_path: Path,
+        *,
+        authorized_root: Path,
+        idempotency_key: str | None = None,
+        source_sha256: str | None = None,
+    ) -> ClassificationCommandResult:
+        assert configured is not None
+        assert source_path == source.resolve()
+        assert authorized_root == authorized.resolve()
+        assert idempotency_key is not None
+        assert source_sha256 == "ab" * 32
+        return ClassificationCommandResult(
+            proposed_class="invoice",
+            document_disposition="applied",
+            taxonomy_disposition="applied",
+            proposal_disposition="applied",
+            input_tokens=10,
+            output_tokens=5,
+            total_tokens=15,
+            estimated_cost_usd="0.00001",
+            evidence_count=2,
+            metadata_count=1,
+            raw_confidence="0.80000",
+            classification_confidence="0.80000",
+            metadata_confidence="0.70000",
+        )
+
+    monkeypatch.setattr(
+        classification_cli,
+        "build_configured_classification_runtime",
+        fake_build_configured_classification_runtime,
+    )
+    monkeypatch.setattr(
+        classification_cli,
+        "compute_sha256_fingerprint",
+        fake_compute_sha256_fingerprint,
+    )
+    monkeypatch.setattr(
+        classification_cli,
+        "_classify_pdf_once_with_runtime",
+        fake_classify_pdf_once_with_runtime,
+    )
+
+    result = classification_cli.batch_main(
+        [
+            str(authorized),
+            "--authorized-root",
+            str(authorized),
+            "--json-report",
+            str(report_path),
+        ]
+    )
+
+    captured = capsys.readouterr()
+    assert result == 0
+    assert f"JSON report: {report_path}" in captured.out
+    report = json.loads(report_path.read_text(encoding="utf-8"))
+    assert report["schema_version"] == "docweave.classification_batch_report.v1"
+    assert report["succeeded_count"] == 1
+    assert report["items"][0]["relative_path"] == "invoice.pdf"
+    assert report["items"][0]["proposed_class"] == "invoice"
+    assert report["items"][0]["total_tokens"] == 15
+    assert "secret" not in report_path.read_text(encoding="utf-8")
+
+    overwrite_result = classification_cli.batch_main(
+        [
+            str(authorized),
+            "--authorized-root",
+            str(authorized),
+            "--json-report",
+            str(report_path),
+        ]
+    )
+
+    overwrite_captured = capsys.readouterr()
+    assert overwrite_result == 2
+    assert "target already exists" in overwrite_captured.err
