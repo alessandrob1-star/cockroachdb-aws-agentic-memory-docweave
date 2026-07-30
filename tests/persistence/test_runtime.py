@@ -23,6 +23,7 @@ from docweave.operations import (
 )
 from docweave.persistence import (
     CockroachOperationRepository,
+    CockroachRestoreAuditRepository,
     CockroachTransactionRunner,
     DurableExecutionLedger,
     DurableOperationLifecycleRecorder,
@@ -123,6 +124,10 @@ def test_composes_one_coherent_runtime_without_database_io(tmp_path: Path) -> No
 
     assert isinstance(runtime.transaction_runner, CockroachTransactionRunner)
     assert isinstance(runtime.repository, CockroachOperationRepository)
+    assert isinstance(
+        runtime.restore_audit_repository,
+        CockroachRestoreAuditRepository,
+    )
     assert isinstance(runtime.execution_ledger, DurableExecutionLedger)
     assert isinstance(
         runtime.lifecycle_recorder,
