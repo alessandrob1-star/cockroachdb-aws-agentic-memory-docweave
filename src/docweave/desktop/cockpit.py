@@ -865,7 +865,21 @@ class RightScreen(ShapeWidget):
         self.stream_label = QLabel("AGENT EVENT STREAM", self)
         self.stream_label.setObjectName("sectionLabel")
 
-        for label in (self.title, self.online, self.section, self.stream_label):
+        self.restore_label = QLabel("RESTORE HISTORY", self)
+        self.restore_label.setObjectName("sectionLabel")
+
+        self.restore_text = QLabel("Read-only history waiting for runtime", self)
+        self.restore_text.setObjectName("eventText")
+        self.restore_text.setAccessibleName("Restore history status")
+        self.restore_text.setWordWrap(True)
+
+        for label in (
+            self.title,
+            self.online,
+            self.section,
+            self.stream_label,
+            self.restore_label,
+        ):
             glow = QGraphicsDropShadowEffect(label)
             glow.setBlurRadius(14)
             glow.setOffset(0, 0)
@@ -904,6 +918,9 @@ class RightScreen(ShapeWidget):
             name, text = event
             frame.event_name.setText(name)
             frame.event_text.setText(text)
+
+    def set_restore_history_status(self, text: str) -> None:
+        self.restore_text.setText(text)
 
     def shape_path(self) -> QPainterPath:
         r = self.rect().adjusted(3, 3, -3, -3)
@@ -955,9 +972,9 @@ class RightScreen(ShapeWidget):
             21,
         )
 
-        row_y = stream_top + 32
-        row_height = 58
-        row_gap = 10
+        row_y = stream_top + 30
+        row_height = 50
+        row_gap = 8
         for frame in self.event_rows:
             frame.setGeometry(
                 content_left,
@@ -968,6 +985,15 @@ class RightScreen(ShapeWidget):
             frame.event_name.setGeometry(12, 7, content_width - 24, 18)
             frame.event_text.setGeometry(12, 28, content_width - 24, 22)
             row_y += row_height + row_gap
+
+        restore_y = row_y + 4
+        self.restore_label.setGeometry(content_left, restore_y, content_width, 21)
+        self.restore_text.setGeometry(
+            content_left + 12,
+            restore_y + 24,
+            content_width - 24,
+            46,
+        )
 
 
 class PdfPageMock(QWidget):
@@ -2829,6 +2855,12 @@ class CockpitWindow(QMainWindow):
                 ("SECURITY", "Read-only local boundary"),
             ]
         )
+        self.right.set_restore_history_status(
+            _restore_history_status(
+                self._runtime_preflight_report,
+                self._integration_snapshot,
+            )
+        )
 
     def _refresh_runtime_preflight_report(self) -> None:
         """Refresh runtime readiness before a user-triggered classification run."""
@@ -3055,6 +3087,28 @@ def _bedrock_status(report: RuntimePreflightReport) -> str:
     if check.state is PreflightState.OK:
         return "Client configured"
     return f"Blocked ({_compact_preflight_detail(check.detail)})"
+
+
+def _restore_history_status(
+    report: RuntimePreflightReport,
+    integration_snapshot: RuntimeIntegrationSnapshot,
+) -> str:
+    runtime_check = _preflight_check(report, "runtime_config")
+    if runtime_check is None:
+        return "Restore history reader waiting for runtime configuration."
+    if runtime_check.state is PreflightState.FAIL:
+        return (
+            "Restore history reader blocked by runtime config: "
+            f"{_compact_preflight_detail(runtime_check.detail)}."
+        )
+
+    cockroachdb_status = _cockroachdb_status(report, integration_snapshot)
+    if cockroachdb_status in {"Reachable", "Configured, not connected", "Configured"}:
+        return (
+            "Read-only CockroachDB restore history reader is available; "
+            "no restore action is wired."
+        )
+    return f"Restore history reader blocked: CockroachDB {cockroachdb_status.lower()}."
 
 
 def _classification_preflight_block(report: RuntimePreflightReport) -> str | None:
