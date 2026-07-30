@@ -6,10 +6,12 @@ import argparse
 import sys
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Literal
 from uuid import UUID, uuid5
 
 from docweave.analysis.confidence import compute_uncalibrated_confidence
 from docweave.application_runtime import (
+    ConfiguredClassificationRuntime,
     RuntimeConfigurationError,
     RuntimeEnvironmentConfig,
     build_configured_classification_runtime,
@@ -23,6 +25,9 @@ from docweave.persistence import (
 )
 
 _IDENTITY_NAMESPACE = UUID("7f5461df-2c2f-4f8d-b504-83ddf8e0d00a")
+_MAX_BATCH_SIZE = 1_000
+
+BatchItemStatus = Literal["succeeded", "failed"]
 
 
 @dataclass(frozen=True, slots=True)
@@ -66,6 +71,32 @@ class ClassificationCommandResult:
     classification_confidence: str | None = None
     metadata_confidence: str | None = None
     retry_attempts: int = 0
+
+
+@dataclass(frozen=True, slots=True)
+class ClassificationBatchItemResult:
+    """One content-minimized batch item result safe for terminal output."""
+
+    source_path: Path
+    relative_path: str
+    status: BatchItemStatus
+    result: ClassificationCommandResult | None = None
+    error_category: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class ClassificationBatchCommandResult:
+    """Observed result of one bounded command-line classification batch."""
+
+    source_root: Path
+    authorized_root: Path
+    discovered_count: int
+    attempted_count: int
+    succeeded_count: int
+    failed_count: int
+    limit: int
+    stopped_on_failure: bool
+    items: tuple[ClassificationBatchItemResult, ...]
 
 
 def build_content_addressed_identity(
@@ -118,10 +149,134 @@ def classify_pdf_once(
 ) -> ClassificationCommandResult:
     """Run one configured extraction, Bedrock, and CockroachDB classification."""
     configured = build_configured_classification_runtime()
-    fingerprint = compute_sha256_fingerprint(source_path)
+    return _classify_pdf_once_with_runtime(
+        configured,
+        source_path,
+        authorized_root=authorized_root,
+        idempotency_key=idempotency_key,
+    )
+
+
+def classify_pdf_batch(
+    source_root: Path,
+    *,
+    authorized_root: Path,
+    limit: int = _MAX_BATCH_SIZE,
+    stop_on_failure: bool = False,
+    idempotency_prefix: str = "classification-batch.v1",
+) -> ClassificationBatchCommandResult:
+    """Run a bounded, resumable classification batch over authorized PDFs.
+
+    Resumability is provided by stable per-file idempotency keys derived from
+    the workspace, source content hash, relative path, and caller prefix. A
+    retry of the same batch reuses repository idempotency instead of
+    fabricating local success.
+    """
+    pdfs = discover_batch_pdfs(
+        source_root,
+        authorized_root=authorized_root,
+        limit=limit,
+    )
+    configured = build_configured_classification_runtime()
+    resolved_authorized_root = authorized_root.resolve(strict=True)
+    items: list[ClassificationBatchItemResult] = []
+    stopped_on_failure = False
+    for source_path in pdfs:
+        relative_path = source_path.relative_to(resolved_authorized_root).as_posix()
+        try:
+            fingerprint = compute_sha256_fingerprint(source_path)
+            result = _classify_pdf_once_with_runtime(
+                configured,
+                source_path,
+                authorized_root=resolved_authorized_root,
+                idempotency_key=(
+                    f"{idempotency_prefix}:"
+                    f"{configured.config.workspace_id}:"
+                    f"{fingerprint.hex_digest}:"
+                    f"{relative_path}"
+                ),
+                source_sha256=fingerprint.hex_digest,
+            )
+        except Exception as error:
+            items.append(
+                ClassificationBatchItemResult(
+                    source_path=source_path,
+                    relative_path=relative_path,
+                    status="failed",
+                    error_category=type(error).__name__,
+                )
+            )
+            if stop_on_failure:
+                stopped_on_failure = True
+                break
+            continue
+        items.append(
+            ClassificationBatchItemResult(
+                source_path=source_path,
+                relative_path=relative_path,
+                status="succeeded",
+                result=result,
+            )
+        )
+    succeeded_count = sum(1 for item in items if item.status == "succeeded")
+    failed_count = sum(1 for item in items if item.status == "failed")
+    return ClassificationBatchCommandResult(
+        source_root=source_root.resolve(strict=True),
+        authorized_root=resolved_authorized_root,
+        discovered_count=len(pdfs),
+        attempted_count=len(items),
+        succeeded_count=succeeded_count,
+        failed_count=failed_count,
+        limit=limit,
+        stopped_on_failure=stopped_on_failure,
+        items=tuple(items),
+    )
+
+
+def discover_batch_pdfs(
+    source_root: Path,
+    *,
+    authorized_root: Path,
+    limit: int = _MAX_BATCH_SIZE,
+) -> tuple[Path, ...]:
+    """Return deterministic PDF candidates within the authorized root."""
+    if not 0 < limit <= _MAX_BATCH_SIZE:
+        raise ValueError("limit must be between 1 and 1000")
+    resolved_source_root = source_root.resolve(strict=True)
+    resolved_authorized_root = authorized_root.resolve(strict=True)
+    if not resolved_source_root.is_dir():
+        raise ValueError("source_root must be a directory")
+    try:
+        resolved_source_root.relative_to(resolved_authorized_root)
+    except ValueError as error:
+        raise ValueError("source_root must be inside authorized_root") from error
+    candidates = (
+        path
+        for path in resolved_source_root.rglob("*")
+        if path.is_file() and path.suffix.casefold() == ".pdf"
+    )
+    return tuple(
+        sorted(candidates, key=lambda path: path.as_posix().casefold())[:limit]
+    )
+
+
+def _classify_pdf_once_with_runtime(
+    configured: ConfiguredClassificationRuntime,
+    source_path: Path,
+    *,
+    authorized_root: Path,
+    idempotency_key: str | None = None,
+    source_sha256: str | None = None,
+) -> ClassificationCommandResult:
+    """Run one classification through a caller-supplied configured runtime."""
+    fingerprint_hex = (
+        source_sha256
+        if source_sha256 is not None
+        else compute_sha256_fingerprint(source_path).hex_digest
+    )
     identity = build_content_addressed_identity(
         configured.config,
-        source_sha256=fingerprint.hex_digest,
+        source_sha256=fingerprint_hex,
         idempotency_key=idempotency_key,
     )
     persisted = configured.runtime.classify_and_persist(
@@ -188,6 +343,76 @@ def main(argv: list[str] | None = None) -> int:
     if result.estimated_cost_usd is not None:
         print(f"Estimated Bedrock cost USD: {result.estimated_cost_usd}")
     return 0
+
+
+def batch_main(argv: list[str] | None = None) -> int:
+    """Run a bounded batch command and print sanitized progress fields."""
+    parser = argparse.ArgumentParser(
+        description=(
+            "Classify a bounded PDF batch through the configured DocWeave "
+            "extraction, Amazon Bedrock, and CockroachDB runtime."
+        )
+    )
+    parser.add_argument("source_root", type=Path)
+    parser.add_argument(
+        "--authorized-root",
+        type=Path,
+        required=True,
+        help="Authorized folder containing the PDF batch.",
+    )
+    parser.add_argument(
+        "--limit",
+        type=int,
+        default=_MAX_BATCH_SIZE,
+        help="Maximum PDFs to attempt, capped at 1000.",
+    )
+    parser.add_argument(
+        "--idempotency-prefix",
+        default="classification-batch.v1",
+        help="Stable prefix used to derive per-file retry keys.",
+    )
+    parser.add_argument(
+        "--stop-on-failure",
+        action="store_true",
+        help="Stop after the first per-document failure.",
+    )
+    args = parser.parse_args(argv)
+
+    try:
+        result = classify_pdf_batch(
+            args.source_root,
+            authorized_root=args.authorized_root,
+            limit=args.limit,
+            stop_on_failure=args.stop_on_failure,
+            idempotency_prefix=args.idempotency_prefix,
+        )
+    except RuntimeConfigurationError as error:
+        print(
+            f"Configuration failed: {error.code.value} ({error.variable_name})",
+            file=sys.stderr,
+        )
+        return 2
+    except ValueError as error:
+        print(f"Batch validation failed: {error}", file=sys.stderr)
+        return 2
+
+    print(f"Discovered PDFs: {result.discovered_count}")
+    print(f"Attempted PDFs: {result.attempted_count}")
+    print(f"Succeeded PDFs: {result.succeeded_count}")
+    print(f"Failed PDFs: {result.failed_count}")
+    if result.stopped_on_failure:
+        print("Batch stopped after first failure.")
+    for item in result.items:
+        if item.status == "failed":
+            print(f"[FAIL] {item.relative_path}: {item.error_category}")
+            continue
+        assert item.result is not None
+        print(
+            f"[OK] {item.relative_path}: "
+            f"class={item.result.proposed_class} "
+            f"tokens={item.result.total_tokens}"
+        )
+    return 1 if result.failed_count else 0
 
 
 def _command_result(

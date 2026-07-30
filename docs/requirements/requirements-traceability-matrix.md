@@ -122,7 +122,7 @@ is reproducible.
 | --- | --- | ---: | --- | --- |
 | CAP-001 | Source-folder discovery | 10,000 files | Responsive discovery, restart, and reconciliation test | In progress |
 | CAP-002 | Active documents per MVP project | 5,000 files | Sorting, filtering, review, and persistence test | Planned |
-| CAP-003 | Maximum processing batch | 1,000 files | Checkpoint, interruption, resume, and duplicate-request test | In progress; local limit, interruption reconciliation, duplicate-request, durable restart-state tests, a bounded desktop classification batch queue, and tested UI retry from remaining ready documents after partial failure are implemented; persisted checkpoint/resume for live analysis batches remains pending |
+| CAP-003 | Maximum processing batch | 1,000 files | Checkpoint, interruption, resume, and duplicate-request test | In progress; local limit, interruption reconciliation, duplicate-request, durable restart-state tests, a bounded desktop classification batch queue, tested UI retry from remaining ready documents after partial failure, and a controlled `docweave-classify-batch` command with stable per-file idempotency and sanitized per-document outcomes are implemented; persisted checkpoint/resume for live desktop analysis batches remains pending |
 | CAP-004 | Primary demonstration and evaluation corpus | Approximately 300 PDFs | Curated corpus, reference labels, license manifest, and evaluation report | In progress; 30-PDF initial desktop test corpus is verified, while the representative 300-PDF corpus and evaluation report remain pending |
 
 ## 10. MVP acceptance baseline

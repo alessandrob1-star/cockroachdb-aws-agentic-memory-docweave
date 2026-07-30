@@ -22,6 +22,7 @@ dependencies = [
 ]
 
 [project.scripts]
+docweave-classify-batch = "docweave.classification_cli:batch_main"
 docweave-classify-pdf = "docweave.classification_cli:main"
 docweave-desktop = "docweave.desktop.application:main"
 docweave-runtime-preflight = "docweave.runtime_preflight:main"

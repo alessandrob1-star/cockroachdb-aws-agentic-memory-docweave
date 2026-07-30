@@ -94,7 +94,11 @@ explicit environment values without opening a database connection or invoking a
 model during startup. The `docweave-classify-pdf` command now exposes the first
 controlled single-PDF runtime slice for real extraction, Bedrock invocation,
 and CockroachDB persistence when those runtime values and a migrated database
-are supplied. Live end-to-end database execution remains pending.
+are supplied. The `docweave-classify-batch` command extends the same explicit
+runtime path to a bounded recursive PDF batch of up to 1,000 files under an
+authorized root. It uses stable per-file idempotency keys, reports sanitized
+per-document success or failure, and never mutates source files. Live
+end-to-end database execution remains pending.
 
 The local shared core now also defines an explicit classification runtime that
 keeps extraction, database transactions, and Bedrock invocation in separate
@@ -150,8 +154,14 @@ The first controlled classification runtime slice is launched with:
 docweave-classify-pdf <pdf-path> --authorized-root <folder>
 ```
 
-This command requires explicit runtime configuration through environment
-variables and performs real extraction, Amazon Bedrock invocation, and
+Bounded batch classification uses the same explicit runtime path:
+
+```powershell
+docweave-classify-batch <folder> --authorized-root <folder> --limit 1000
+```
+
+These commands require explicit runtime configuration through environment
+variables and perform real extraction, Amazon Bedrock invocation, and
 CockroachDB writes only when invoked. It does not create cloud resources,
 schemas, migrations, or secrets.
 
