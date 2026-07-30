@@ -221,8 +221,9 @@ also reject absolute, parent-traversal, empty, or Windows-style relative path
 values before repository calls are built. A bounded restore audit history reader
 can now load CockroachDB restore audit evidence by workspace, optional batch,
 and optional item filters, and the durable operation runtime now exposes that
-reader for future Activity History and restore UI views, but those views are
-not wired yet.
+reader for future Activity History and restore UI views. The application
+runtime also has a side-effect-free restore audit runtime builder for real
+configuration handoff, but those views are not wired yet.
 
 `docs/operations/runtime-configuration-runbook.md` records the current
 operator sequence for safe local runtime configuration, configuration-only
