@@ -29,6 +29,7 @@ from docweave.persistence import (
     ExecutionIntentMapping,
     OperationResultMapping,
     PersistenceIdentityMap,
+    map_audit_event,
     map_create_batch,
     map_execution_intent,
     map_operation_result,
@@ -90,7 +91,7 @@ def identities() -> PersistenceIdentityMap:
 def actor_identity(external_id: str) -> UUID:
     if external_id == "creator":
         return CREATOR_ID
-    if external_id in {"reviewer", "executor", "local-core"}:
+    if external_id in {"reviewer", "executor", "local-core", "local-worker"}:
         return EXECUTOR_ID
     raise ValueError("actor is not registered")
 
@@ -250,6 +251,47 @@ def test_maps_observed_result_paths_digest_and_size(tmp_path: Path) -> None:
     assert item.expected_source_digest is not None
     assert command.actual_sha256 == bytes.fromhex(item.expected_source_digest)
     assert command.actual_size == item.expected_source_byte_size
+
+
+def test_maps_restore_execution_audit_event_to_database_identities() -> None:
+    event = AuditEvent(
+        event_id=str(uuid4()),
+        workspace_id=WORKSPACE_EXTERNAL_ID,
+        batch_id=BATCH_EXTERNAL_ID,
+        batch_item_id="item-001",
+        event_type=AuditEventType.RESTORE_EXECUTION_SUCCEEDED,
+        actor_type=AuditActorType.SYSTEM,
+        actor_id="local-worker",
+        occurred_at_utc=NOW + timedelta(seconds=4),
+        correlation_id="restore-correlation-001",
+        idempotency_key="restore-batch-001:item-001:restore",
+        previous_state="approved",
+        new_state="succeeded",
+        reason="succeeded",
+        plan_fingerprint="cd" * 32,
+        approval_id="restore-approval-001",
+        source_relative_path="organized/invoice.pdf",
+        destination_relative_path="incoming/invoice.pdf",
+    )
+
+    command = map_audit_event(
+        event,
+        identities=identities(),
+        resolve_actor_identity=actor_identity,
+    )
+
+    assert command.workspace_id == WORKSPACE_ID
+    assert command.operation_batch_id == BATCH_ID
+    assert command.file_operation_id == OPERATION_ID
+    assert command.actor_id == EXECUTOR_ID
+    assert command.event_type is AuditEventType.RESTORE_EXECUTION_SUCCEEDED
+    assert command.subject_kind == "file_operation"
+    assert command.subject_id == "item-001"
+    assert command.plan_sha256 == bytes.fromhex("cd" * 32)
+    assert command.idempotency_key == "restore-batch-001:item-001:restore"
+    assert command.approval_id == "restore-approval-001"
+    assert command.source_relative_path == "organized/invoice.pdf"
+    assert command.destination_relative_path == "incoming/invoice.pdf"
 
 
 def test_requires_exact_item_identity_map(tmp_path: Path) -> None:
