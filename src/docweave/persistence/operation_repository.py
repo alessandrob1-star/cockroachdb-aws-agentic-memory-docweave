@@ -10,6 +10,7 @@ from uuid import UUID
 import sqlalchemy as sa
 from sqlalchemy.engine import Connection
 
+from docweave.operations.audit import AuditEventType
 from docweave.operations.batch import BatchItemState
 from docweave.operations.results import ResultDisposition
 from docweave.persistence.contracts import (
@@ -22,6 +23,8 @@ from docweave.persistence.contracts import (
     PersistenceDisposition,
     RecordExecutionIntent,
     RecordOperationResult,
+    RestoreAuditEventSnapshot,
+    RestoreAuditQuery,
 )
 from docweave.persistence.transactions import TransactionRun
 
@@ -125,6 +128,28 @@ _SELECT_OPERATION_EXECUTION = sa.text(
     WHERE workspace_id = :workspace_id
       AND operation_batch_id = :operation_batch_id
       AND file_operation_id = :file_operation_id
+    """
+)
+_SELECT_RESTORE_AUDIT_EVENTS = sa.text(
+    """
+    SELECT event_sequence, event_id, workspace_id, actor_id, correlation_id,
+           event_type, subject_kind, subject_id, operation_batch_id,
+           file_operation_id, idempotency_key, previous_state, new_state,
+           reason, plan_sha256, approval_id, source_relative_path,
+           destination_relative_path, error_class, error_category, occurred_at
+    FROM docweave.audit_events
+    WHERE workspace_id = :workspace_id
+      AND event_type IN (
+          'restore_approved',
+          'restore_execution_succeeded',
+          'restore_execution_blocked',
+          'restore_execution_failed',
+          'restore_verification_failed'
+      )
+      AND (:operation_batch_id IS NULL OR operation_batch_id = :operation_batch_id)
+      AND (:file_operation_id IS NULL OR file_operation_id = :file_operation_id)
+    ORDER BY occurred_at ASC, event_sequence ASC
+    LIMIT :limit
     """
 )
 _RECORD_EXECUTION_INTENT = sa.text(
@@ -378,6 +403,40 @@ class CockroachOperationRepository(OperationPersistenceRepository):
         return self._transactions.run(persist).value
 
 
+class CockroachRestoreAuditRepository:
+    """Read durable restore audit evidence for workspace-scoped history views."""
+
+    def __init__(self, transaction_runner: SerializableTransactionRunner) -> None:
+        self._transactions = transaction_runner
+
+    def load_restore_audit_events(
+        self,
+        query: RestoreAuditQuery,
+    ) -> tuple[RestoreAuditEventSnapshot, ...]:
+        """Load restore audit events with bounded, parameterized filters."""
+
+        def load(connection: Connection) -> tuple[RestoreAuditEventSnapshot, ...]:
+            rows = (
+                connection.execute(
+                    _SELECT_RESTORE_AUDIT_EVENTS,
+                    {
+                        "workspace_id": query.workspace_id,
+                        "operation_batch_id": query.operation_batch_id,
+                        "file_operation_id": query.file_operation_id,
+                        "limit": query.limit,
+                    },
+                )
+                .mappings()
+                .all()
+            )
+            return tuple(
+                _map_restore_audit_event(cast(Mapping[str, object], row))
+                for row in rows
+            )
+
+        return self._transactions.run(load).value
+
+
 def _batch_parameters(command: CreateBatch) -> dict[str, object]:
     return {
         "operation_batch_id": command.operation_batch_id,
@@ -605,6 +664,48 @@ def _is_same_terminal_result(
         and current["source_exists_after"] == command.source_exists_after
         and current["destination_exists_after"] == command.destination_exists_after
     )
+
+
+def _map_restore_audit_event(
+    row: Mapping[str, object],
+) -> RestoreAuditEventSnapshot:
+    try:
+        event_type = AuditEventType(str(row["event_type"]))
+    except ValueError as error:
+        raise PersistenceConflictError("restore audit event type is invalid") from error
+    try:
+        return RestoreAuditEventSnapshot(
+            event_sequence=cast(int, row["event_sequence"]),
+            event_id=cast(UUID, row["event_id"]),
+            workspace_id=cast(UUID, row["workspace_id"]),
+            actor_id=cast(UUID, row["actor_id"]),
+            correlation_id=cast(str, row["correlation_id"]),
+            event_type=event_type,
+            subject_kind=cast(str, row["subject_kind"]),
+            subject_id=cast(str, row["subject_id"]),
+            occurred_at_utc=cast(datetime, row["occurred_at"]),
+            operation_batch_id=cast(UUID | None, row["operation_batch_id"]),
+            file_operation_id=cast(UUID | None, row["file_operation_id"]),
+            idempotency_key=cast(str | None, row["idempotency_key"]),
+            previous_state=cast(str | None, row["previous_state"]),
+            new_state=cast(str | None, row["new_state"]),
+            reason=cast(str | None, row["reason"]),
+            plan_sha256=(
+                None
+                if row["plan_sha256"] is None
+                else bytes(cast(bytes, row["plan_sha256"]))
+            ),
+            approval_id=cast(str | None, row["approval_id"]),
+            source_relative_path=cast(str | None, row["source_relative_path"]),
+            destination_relative_path=cast(
+                str | None,
+                row["destination_relative_path"],
+            ),
+            error_class=cast(str | None, row["error_class"]),
+            error_category=cast(str | None, row["error_category"]),
+        )
+    except ValueError as error:
+        raise PersistenceConflictError("restore audit row is invalid") from error
 
 
 def append_audit_events_to_connection(
