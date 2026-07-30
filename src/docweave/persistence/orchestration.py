@@ -3,9 +3,10 @@
 from collections.abc import Callable
 from datetime import datetime, timedelta
 from pathlib import Path
+from typing import ClassVar
 from uuid import UUID, uuid4
 
-from docweave.operations.audit import AuditEvent, normalize_utc
+from docweave.operations.audit import AuditEvent, AuditEventType, normalize_utc
 from docweave.operations.batch import (
     BatchItemState,
     OperationBatch,
@@ -332,6 +333,45 @@ class DurableOperationLifecycleRecorder(OperationLifecycleRecorder):
             resolve_actor_identity=self._resolve_actor_identity,
         )
         self._repository.append_audit_events((mapped,))
+
+
+class DurableRestoreAuditRecorder:
+    """Bridge local restore audit events to the durable repository boundary."""
+
+    _RESTORE_EVENT_TYPES: ClassVar[set[AuditEventType]] = {
+        AuditEventType.RESTORE_APPROVED,
+        AuditEventType.RESTORE_EXECUTION_SUCCEEDED,
+        AuditEventType.RESTORE_EXECUTION_BLOCKED,
+        AuditEventType.RESTORE_EXECUTION_FAILED,
+        AuditEventType.RESTORE_VERIFICATION_FAILED,
+    }
+
+    def __init__(
+        self,
+        repository: OperationPersistenceRepository,
+        *,
+        identities: PersistenceIdentityMap,
+        resolve_actor_identity: ActorIdentityResolver,
+    ) -> None:
+        self._repository = repository
+        self._identities = identities
+        self._resolve_actor_identity = resolve_actor_identity
+
+    def record_events(self, events: tuple[AuditEvent, ...]) -> None:
+        """Persist restore approval and execution events as append-only evidence."""
+        if not events:
+            raise ValueError("restore audit events must not be empty")
+        if any(event.event_type not in self._RESTORE_EVENT_TYPES for event in events):
+            raise ValueError("restore audit recorder accepts only restore events")
+        mapped = tuple(
+            map_audit_event(
+                event,
+                identities=self._identities,
+                resolve_actor_identity=self._resolve_actor_identity,
+            )
+            for event in events
+        )
+        self._repository.append_audit_events(mapped)
 
 
 def _observed_destination_size(

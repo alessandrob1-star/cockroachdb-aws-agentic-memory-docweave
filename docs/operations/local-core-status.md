@@ -159,7 +159,7 @@ must be closed before production-grade batch execution:
 | No live application bootstrap execution | The composed restart path is not yet a live application integration | Run the configured runtime against the approved validation target |
 | Audit adapter has no live runtime evidence | Activity History cannot yet survive restart | Run approved integration and restart tests against CockroachDB |
 | Lease renewal and execution fencing are not implemented | A worker that outlives its lease is not yet safe for concurrent production execution | Add renewal or fencing before enabling multiple workers |
-| Restore persistence not wired | Move and copy outcomes now have tested restore-preview, approved local restore-execution, explicit local restore audit events, bounded local batch restore orchestration, and CockroachDB-ready restore audit mapping/append evidence, but no durable restore workflow is wired yet | Add CockroachDB-backed restore history and UI controls |
+| Restore persistence not wired | Move and copy outcomes now have tested restore-preview, approved local restore-execution, explicit local restore audit events, bounded local batch restore orchestration, CockroachDB-ready restore audit mapping/append evidence, and a durable restore audit recorder boundary, but no end-to-end durable restore workflow is wired yet | Add CockroachDB-backed restore history and UI controls |
 | No workspace/user authorization model | Approval uses user identifiers but no role policy yet | Add authorization contract before user interface or cloud execution |
 
 ## 6. Completed live validation boundary
