@@ -148,6 +148,14 @@ class AuditAppend:
         ):
             _require_text(field_name, value)
         _require_optional_digest("plan_sha256", self.plan_sha256)
+        _require_optional_relative_path(
+            "source_relative_path",
+            self.source_relative_path,
+        )
+        _require_optional_relative_path(
+            "destination_relative_path",
+            self.destination_relative_path,
+        )
         object.__setattr__(self, "occurred_at_utc", normalize_utc(self.occurred_at_utc))
 
 
@@ -500,3 +508,8 @@ def _require_relative_path(field_name: str, value: str) -> None:
         or path.as_posix() != value
     ):
         raise ValueError(f"{field_name} must be a normalized relative path")
+
+
+def _require_optional_relative_path(field_name: str, value: str | None) -> None:
+    if value is not None:
+        _require_relative_path(field_name, value)

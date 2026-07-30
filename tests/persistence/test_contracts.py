@@ -149,6 +149,29 @@ def test_rejects_cross_workspace_audit_event() -> None:
         )
 
 
+@pytest.mark.parametrize(
+    "relative_path",
+    [
+        "",
+        "/absolute/invoice.pdf",
+        "../invoice.pdf",
+        "incoming/../invoice.pdf",
+        "incoming\\invoice.pdf",
+    ],
+)
+def test_rejects_unsafe_audit_relative_paths(relative_path: str) -> None:
+    with pytest.raises(ValueError, match="normalized relative path"):
+        replace(
+            audit_event(AuditEventType.ITEM_PLANNED),
+            source_relative_path=relative_path,
+        )
+    with pytest.raises(ValueError, match="normalized relative path"):
+        replace(
+            audit_event(AuditEventType.ITEM_PLANNED),
+            destination_relative_path=relative_path,
+        )
+
+
 def test_terminal_item_requires_completion_time() -> None:
     with pytest.raises(ValueError, match="completed_at"):
         replace(item(), state=BatchItemState.BLOCKED)

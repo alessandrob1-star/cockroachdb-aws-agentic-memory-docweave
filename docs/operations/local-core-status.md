@@ -216,7 +216,9 @@ executes ready items independently, and reports partial outcomes without hiding
 per-item status. Restore audit events also have persistence-mapper and
 repository tests showing that restore event type, attribution, fingerprint,
 approval id, idempotency key, and relative paths are carried as bound SQL
-parameters instead of interpolated SQL text.
+parameters instead of interpolated SQL text. Durable audit append contracts now
+also reject absolute, parent-traversal, empty, or Windows-style relative path
+values before repository calls are built.
 
 `docs/operations/runtime-configuration-runbook.md` records the current
 operator sequence for safe local runtime configuration, configuration-only
