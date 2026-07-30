@@ -62,6 +62,7 @@ class ClassificationCommandResult:
     output_tokens: int
     total_tokens: int
     estimated_cost_usd: str | None
+    proposal_id: UUID | None = None
     document_language: str = "und"
     rationale: str = ""
     evidence_count: int = 0
@@ -280,6 +281,11 @@ def _batch_item_to_report(
             "document_disposition": item.result.document_disposition,
             "taxonomy_disposition": item.result.taxonomy_disposition,
             "proposal_disposition": item.result.proposal_disposition,
+            "proposal_id": (
+                None
+                if item.result.proposal_id is None
+                else str(item.result.proposal_id)
+            ),
             "input_tokens": item.result.input_tokens,
             "output_tokens": item.result.output_tokens,
             "total_tokens": item.result.total_tokens,
@@ -349,7 +355,7 @@ def _classify_pdf_once_with_runtime(
         ),
         identity=identity,
     )
-    return _command_result(persisted)
+    return _command_result(persisted, proposal_id=identity.proposal_id)
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -492,6 +498,8 @@ def batch_main(argv: list[str] | None = None) -> int:
 
 def _command_result(
     persisted: PersistedClassificationRun,
+    *,
+    proposal_id: UUID | None = None,
 ) -> ClassificationCommandResult:
     provenance = persisted.model_run.provenance
     proposal = persisted.model_run.proposal
@@ -507,6 +515,7 @@ def _command_result(
         output_tokens=usage.output_tokens,
         total_tokens=usage.total_tokens,
         estimated_cost_usd=str(estimated_cost) if estimated_cost is not None else None,
+        proposal_id=proposal_id,
         document_language=proposal.document_language,
         rationale=proposal.rationale,
         evidence_count=len(proposal.evidence),

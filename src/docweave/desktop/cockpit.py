@@ -29,7 +29,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 from PySide6.QtCore import (
     QEasingCurve,
@@ -110,6 +110,11 @@ from docweave.desktop.workspace import (
 )
 from docweave.intake import IntakeStatus
 from docweave.persistence import ClassificationPipelineError
+from docweave.review_cli import (
+    ReviewDecisionCommandInput,
+    ReviewDecisionCommandResult,
+    persist_review_decision,
+)
 from docweave.operations import (
     InMemoryReviewDecisionLedger,
     ProposalReviewDecisionRequest,
@@ -144,6 +149,7 @@ class Document:
     status: str
     path: Path | None = None
     proposed_destination: str | None = None
+    proposal_id: str | None = None
     proposal_fingerprint: str | None = None
     review_decision_id: str | None = None
 
@@ -191,6 +197,10 @@ class ClassificationBatchSummary:
 
 DOCUMENTS: list[Document] = []
 ClassificationFunction = Callable[[Path, Path], ClassificationCommandResult]
+ReviewDecisionFunction = Callable[
+    [ReviewDecisionCommandInput],
+    ReviewDecisionCommandResult,
+]
 RuntimePreflightFunction = Callable[[], RuntimePreflightReport]
 
 
@@ -680,6 +690,7 @@ class LeftScreen(ShapeWidget):
         *,
         proposed_class: str,
         proposed_destination: str | None = None,
+        proposal_id: str | None = None,
         proposal_fingerprint: str | None = None,
     ) -> None:
         """Update one discovered PDF with a non-authoritative proposal."""
@@ -693,6 +704,7 @@ class LeftScreen(ShapeWidget):
             status="REVIEW",
             path=current.path,
             proposed_destination=proposed_destination,
+            proposal_id=proposal_id,
             proposal_fingerprint=proposal_fingerprint,
             review_decision_id=None,
         )
@@ -717,6 +729,7 @@ class LeftScreen(ShapeWidget):
             status=status,
             path=current.path,
             proposed_destination=current.proposed_destination,
+            proposal_id=current.proposal_id,
             proposal_fingerprint=current.proposal_fingerprint,
             review_decision_id=review_decision_id,
         )
@@ -1930,11 +1943,13 @@ class CockpitWindow(QMainWindow):
         scan_function: ScanFunction = scan_authorized_root,
         integration_snapshot: RuntimeIntegrationSnapshot | None = None,
         classification_function: ClassificationFunction = classify_pdf_for_cockpit,
+        review_decision_function: ReviewDecisionFunction = persist_review_decision,
         runtime_preflight_function: RuntimePreflightFunction | None = None,
     ) -> None:
         super().__init__()
         self._scan_function = scan_function
         self._classification_function = classification_function
+        self._review_decision_function = review_decision_function
         self._integration_snapshot = (
             integration_snapshot
             if integration_snapshot is not None
@@ -2500,6 +2515,7 @@ class CockpitWindow(QMainWindow):
             raw_progress.row,
             proposed_class=result.proposed_class,
             proposed_destination=proposed_destination,
+            proposal_id=None if result.proposal_id is None else str(result.proposal_id),
             proposal_fingerprint=result.proposal_fingerprint,
         )
         self.right.set_metrics(
@@ -2680,7 +2696,9 @@ class CockpitWindow(QMainWindow):
             )
             return
         review_decision_id = str(uuid4())
-        proposal_id = f"cockpit:{document.proposal_fingerprint[:16]}"
+        proposal_id = (
+            document.proposal_id or f"cockpit:{document.proposal_fingerprint[:16]}"
+        )
         decision = create_proposal_review_decision_from_fingerprint(
             document.proposal_fingerprint,
             request=ProposalReviewDecisionRequest(
@@ -2699,6 +2717,25 @@ class CockpitWindow(QMainWindow):
         if not validation.is_valid:
             self._set_status(f"Review decision blocked safely ({validation.reason}).")
             return
+        durable_result = None
+        if document.proposal_id is not None:
+            try:
+                durable_result = self._review_decision_function(
+                    ReviewDecisionCommandInput(
+                        proposal_id=UUID(document.proposal_id),
+                        action=action,
+                        proposal_fingerprint=document.proposal_fingerprint,
+                        reason=reason,
+                        review_decision_id=UUID(review_decision_id),
+                        decided_at_utc=decision.decided_at_utc,
+                    )
+                )
+            except (RuntimeConfigurationError, ValueError) as error:
+                self._set_status(
+                    "Review decision blocked safely before durable memory "
+                    f"({error.__class__.__name__})."
+                )
+                return
         self._review_ledger.append(decision)
         next_status = (
             "APPROVED" if action is ReviewDecisionAction.APPROVE else "REJECTED"
@@ -2717,12 +2754,22 @@ class CockpitWindow(QMainWindow):
             self._review_ledger.decisions_for_proposal(decision.proposal_id)
         )
         self._set_busy(False)
-        self._set_status(f"Review decision recorded locally: {next_status.lower()}.")
+        memory_label = (
+            "Local review ledger"
+            if durable_result is None
+            else f"CockroachDB {durable_result.disposition.value}"
+        )
+        self._set_status(
+            "Review decision recorded "
+            f"{'locally' if durable_result is None else 'durably'}: "
+            f"{next_status.lower()}."
+        )
         self.right.set_events(
             [
                 ("REVIEW", next_status),
                 ("DECISION", review_decision_id[:8]),
                 ("HISTORY", f"{decision_count} append-only decision(s)"),
+                ("MEMORY", memory_label),
                 ("OPERATION", "No copy or move executed"),
                 ("SECURITY", "No file mutation performed"),
             ]
