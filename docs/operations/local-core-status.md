@@ -159,7 +159,7 @@ must be closed before production-grade batch execution:
 | No live application bootstrap execution | The composed restart path is not yet a live application integration | Run the configured runtime against the approved validation target |
 | Audit adapter has no live runtime evidence | Activity History cannot yet survive restart | Run approved integration and restart tests against CockroachDB |
 | Lease renewal and execution fencing are not implemented | A worker that outlives its lease is not yet safe for concurrent production execution | Add renewal or fencing before enabling multiple workers |
-| Restore execution not wired | Move and copy outcomes now have tested restore-preview semantics, but no approved restore executor or durable restore audit path is wired yet | Add approved restore execution and CockroachDB-backed restore history |
+| Restore persistence not wired | Move and copy outcomes now have tested restore-preview and approved local restore-execution semantics, but no durable restore audit path is wired yet | Add CockroachDB-backed restore history and UI controls |
 | No workspace/user authorization model | Approval uses user identifiers but no role policy yet | Add authorization contract before user interface or cloud execution |
 
 ## 6. Completed live validation boundary
@@ -201,11 +201,13 @@ evidence. Its next increment must run that workflow against the approved live
 validation target without inventing CockroachDB persistence or user
 authorization.
 
-The local core also has a restore-preview contract for prior successful copy
-and move results. It blocks changed generated copies, changed moved files,
+The local core also has a restore contract for prior successful copy and move
+results. Restore planning blocks changed generated copies, changed moved files,
 missing files, non-succeeded source results, and original-location collisions.
-This is not yet restore execution, user-interface restore, or durable restore
-history.
+Approved restore execution is bound to the exact restore preview fingerprint,
+rechecks the preview before mutation, removes only a verified generated copy,
+or moves a verified moved file back without overwrite. This is not yet
+user-interface restore or durable restore history.
 
 `docs/operations/runtime-configuration-runbook.md` records the current
 operator sequence for safe local runtime configuration, configuration-only
