@@ -152,6 +152,7 @@ def _database_checks(engine: Engine) -> tuple[PreflightCheck, ...]:
         "proposals",
         "classification_proposals",
         "proposal_evidence",
+        "review_decisions",
     }
     missing = sorted(required_tables - existing_tables)
     checks = [PreflightCheck("cockroachdb_connection", PreflightState.OK, "reachable")]
