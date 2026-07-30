@@ -20,8 +20,10 @@ from docweave.operations import (
     ReviewDecisionValidationStatus,
     classification_proposal_fingerprint,
     create_proposal_review_decision,
+    create_proposal_review_decision_from_fingerprint,
     plan_file_operation,
     validate_proposal_review_decision,
+    validate_proposal_review_decision_fingerprint,
 )
 from docweave.operations.planning import FileOperationPlan
 
@@ -225,3 +227,25 @@ def test_review_ledger_is_append_only_for_repeated_decisions() -> None:
 
     assert ledger.decisions_for_proposal("proposal-001") == (first, second)
     assert ledger.all_decisions() == (first, second)
+
+
+def test_validates_review_decision_from_retained_fingerprint() -> None:
+    fingerprint = "b" * 64
+    decision = create_proposal_review_decision_from_fingerprint(
+        fingerprint,
+        request=ProposalReviewDecisionRequest(
+            review_decision_id="review-001",
+            proposal_id="proposal-001",
+            reviewer_actor_id="reviewer-001",
+            decided_at_utc=NOW,
+            action=ReviewDecisionAction.APPROVE,
+        ),
+    )
+
+    validation = validate_proposal_review_decision_fingerprint(
+        fingerprint,
+        decision,
+    )
+
+    assert validation.status is ReviewDecisionValidationStatus.VALID
+    assert validation.proposal_fingerprint == fingerprint

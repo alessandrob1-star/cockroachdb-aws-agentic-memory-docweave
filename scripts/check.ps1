@@ -38,35 +38,36 @@ Invoke-Check -Command @(
 
 $DesktopTestRoot = Join-Path $RepoRoot "tests/desktop"
 $DesktopTestFiles = Get-ChildItem -LiteralPath $DesktopTestRoot -Filter "test_*.py" |
-    Sort-Object -Property Name
+    Sort-Object -Property @{
+        Expression = {
+            if ($_.Name -eq "test_main_window.py") {
+                "0_$($_.Name)"
+            } else {
+                "1_$($_.Name)"
+            }
+        }
+    }
 
 foreach ($DesktopTestFile in $DesktopTestFiles) {
     $RelativeTestPath = "tests/desktop/$($DesktopTestFile.Name)"
     if ($DesktopTestFile.Name -eq "test_main_window.py") {
         # The legacy QWidget main-window suite is retained for local Windows
-        # regression coverage, but PySide6 can segfault after successful
-        # single-test execution on Linux CI. The definitive cockpit UI remains
-        # exercised on Linux, and this avoids failing the whole gate after a
-        # passed legacy test process tears down native Qt state.
+        # regression coverage, but PySide6 can segfault when this module is
+        # split across repeated interpreter start/teardown cycles. Keep it in
+        # one clean process on Windows. On Linux CI, PySide6 can still segfault
+        # after successful execution during native Qt teardown, so the
+        # definitive cockpit UI remains the cross-platform desktop gate there.
         if ($IsLinux) {
             Write-Host "Skipping $RelativeTestPath on Linux CI due PySide6 teardown instability."
             continue
         }
-        $CollectedTests = & $Python -m pytest --collect-only -q $RelativeTestPath
-        if ($LASTEXITCODE -ne 0) {
-            exit $LASTEXITCODE
-        }
-        $CollectedTests |
-            Where-Object { $_ -like "$RelativeTestPath::*" } |
-            ForEach-Object {
-                Invoke-Check -Command @(
-                    "-m",
-                    "pytest",
-                    "--cov-append",
-                    "--cov-report=",
-                    $_
-                )
-            }
+        Invoke-Check -Command @(
+            "-m",
+            "pytest",
+            "--cov-append",
+            "--cov-report=",
+            $RelativeTestPath
+        )
         continue
     }
     Invoke-Check -Command @(
