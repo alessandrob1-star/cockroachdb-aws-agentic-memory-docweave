@@ -55,7 +55,12 @@ proposal from the model-proposed class, validated candidate metadata when
 available, and a sanitized original filename fallback, then binds it to the
 existing safe file-operation planner so collisions and unsafe paths remain
 blocked before any future approval. This is still a transparent planning layer,
-not free-form semantic Bedrock filename generation. Automated tests exercise a
+not free-form semantic Bedrock filename generation. The shared local operation
+core now includes explicit human review-decision contracts for non-authoritative
+classification proposals. Decisions are attributable, fingerprint-bound to the
+exact proposal and optional operation plan that was reviewed, and append-only in
+the local test ledger. These contracts do not yet persist review decisions in
+CockroachDB or expose final cockpit approval controls. Automated tests exercise a
 30-PDF cockpit batch with an injected non-cloud function, and live desktop
 classification remains dependent on runtime configuration and a migrated
 database.
