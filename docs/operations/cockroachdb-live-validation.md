@@ -1,4 +1,4 @@
-# CockroachDB Initial Live Validation Evidence
+# CockroachDB Live Validation Evidence
 
 **Project:** DocWeave
 **Validation date:** 2026-07-24
@@ -7,10 +7,9 @@
 
 ## 1. Scope
 
-This record preserves sanitized evidence for the first live acceptance of the
-DocWeave operational migration. It contains no cluster identifier, account
-identifier, endpoint, connection URL, password, payment detail, or private
-identity value.
+This record preserves sanitized evidence for the first live acceptance of a
+DocWeave migration. It contains no cluster identifier, account identifier,
+endpoint, connection URL, password, payment detail, or private identity value.
 
 The validation used:
 
@@ -86,9 +85,9 @@ The required tables are:
 - `file_operations`; and
 - `audit_events`.
 
-This proves live acceptance of the initial schema shape. It does not prove the
-remaining physical model, vector indexing, Row-Level Security, runtime roles,
-or application integration.
+This proves live acceptance of the initial schema shape. It does not prove
+revisions `0002_classification_memory` or `0003_review_decision_memory`, vector
+indexing, Row-Level Security, runtime roles, or application integration.
 
 ## 5. Invalid-state evidence
 
@@ -132,3 +131,14 @@ This validation does not prove:
 
 Each future live migration still requires a target, cost, identity, recovery,
 and explicit approval gate.
+
+## 8. Current head status as of 2026-07-30
+
+The current repository migration head is `0003_review_decision_memory`. Offline
+rendering from an empty database to `head` was verified locally, including all
+three ordered revisions. Live acceptance of revisions `0002` and `0003` remains
+pending.
+
+The runtime preflight command fails closed when `DOCWEAVE_DATABASE_URL` is not
+present. That is the expected safe behavior and proves no live database
+operation occurred from an unconfigured process.
