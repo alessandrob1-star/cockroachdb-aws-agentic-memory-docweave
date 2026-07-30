@@ -48,7 +48,9 @@ each item under the authorized root, and dispatches the batch to a background
 classification worker using the same configured runtime path. Each accepted
 proposal moves its document into non-authoritative human review state in the
 cockpit, with progress and terminal batch status surfaced without changing any
-file. The cockpit also prepares a deterministic, non-mutating copy destination
+file. Per-item classification failures are reported without stopping the
+remaining visible ready documents, and failed items remain ready for a later
+explicit retry. The cockpit also prepares a deterministic, non-mutating copy destination
 proposal from the model-proposed class, validated candidate metadata when
 available, and a sanitized original filename fallback, then binds it to the
 existing safe file-operation planner so collisions and unsafe paths remain

@@ -157,10 +157,24 @@ class ClassificationBatchProgress:
 
 
 @dataclass(frozen=True)
+class ClassificationBatchFailure:
+    """One failed classification item from a cockpit batch."""
+
+    row: int
+    source_path: Path
+    error_category: str
+    attempted: int
+    completed: int
+    failed: int
+    total: int
+
+
+@dataclass(frozen=True)
 class ClassificationBatchSummary:
     """Terminal state for a cockpit classification batch."""
 
     completed: int
+    failed: int
     total: int
 
 
@@ -181,8 +195,8 @@ class ClassificationWorker(QObject):
     """Run a configured classification batch outside the Qt user-interface thread."""
 
     progressed = Signal(object)
+    item_failed = Signal(object)
     completed = Signal(object)
-    failed = Signal(str)
 
     def __init__(
         self,
@@ -200,23 +214,58 @@ class ClassificationWorker(QObject):
         """Emit sanitized per-item progress and one terminal summary."""
         total = len(self._items)
         completed = 0
-        for item in self._items:
+        failed = 0
+        for attempted, item in enumerate(self._items, start=1):
             try:
                 result = self._classification_function(
                     item.source_path,
                     self._authorized_root,
                 )
             except RuntimeConfigurationError as error:
-                self.failed.emit(f"configuration:{error.code.value}")
-                return
-            except ClassificationPipelineError as error:
-                self.failed.emit(
-                    f"classification:{error.code.value}:{error.extraction_status.value}"
+                failed += 1
+                self.item_failed.emit(
+                    ClassificationBatchFailure(
+                        row=item.row,
+                        source_path=item.source_path,
+                        error_category=f"configuration:{error.code.value}",
+                        attempted=attempted,
+                        completed=completed,
+                        failed=failed,
+                        total=total,
+                    )
                 )
-                return
+                continue
+            except ClassificationPipelineError as error:
+                failed += 1
+                self.item_failed.emit(
+                    ClassificationBatchFailure(
+                        row=item.row,
+                        source_path=item.source_path,
+                        error_category=(
+                            "classification:"
+                            f"{error.code.value}:{error.extraction_status.value}"
+                        ),
+                        attempted=attempted,
+                        completed=completed,
+                        failed=failed,
+                        total=total,
+                    )
+                )
+                continue
             except Exception as error:
-                self.failed.emit(error.__class__.__name__)
-                return
+                failed += 1
+                self.item_failed.emit(
+                    ClassificationBatchFailure(
+                        row=item.row,
+                        source_path=item.source_path,
+                        error_category=error.__class__.__name__,
+                        attempted=attempted,
+                        completed=completed,
+                        failed=failed,
+                        total=total,
+                    )
+                )
+                continue
             completed += 1
             self.progressed.emit(
                 ClassificationBatchProgress(
@@ -228,7 +277,7 @@ class ClassificationWorker(QObject):
                 )
             )
         self.completed.emit(
-            ClassificationBatchSummary(completed=completed, total=total)
+            ClassificationBatchSummary(completed=completed, failed=failed, total=total)
         )
 
 
@@ -1852,6 +1901,7 @@ class CockpitWindow(QMainWindow):
         self._classification_thread: QThread | None = None
         self._classification_worker: ClassificationWorker | None = None
         self._classification_batch_completed = 0
+        self._classification_batch_failed = 0
         self._classification_batch_total = 0
         self._selected_document_row: int | None = None
         self._workspace = DesktopWorkspaceSession()
@@ -2341,15 +2391,15 @@ class CockpitWindow(QMainWindow):
         worker.moveToThread(thread)
         thread.started.connect(worker.run)
         worker.progressed.connect(self._handle_classification_progress)
+        worker.item_failed.connect(self._handle_classification_item_failed)
         worker.completed.connect(self._handle_classification_completed)
-        worker.failed.connect(self._handle_classification_failed)
         worker.completed.connect(thread.quit)
-        worker.failed.connect(thread.quit)
         thread.finished.connect(worker.deleteLater)
         thread.finished.connect(self._handle_classification_thread_finished)
         self._classification_thread = thread
         self._classification_worker = worker
         self._classification_batch_completed = 0
+        self._classification_batch_failed = 0
         self._classification_batch_total = len(batch_items)
         self._set_busy(True)
         self._set_status(
@@ -2381,7 +2431,8 @@ class CockpitWindow(QMainWindow):
         )
         self.center.show_classification_result(result)
         self._set_status(
-            f"Classification {raw_progress.completed}/{raw_progress.total} persisted: "
+            f"Classification {raw_progress.completed}/{raw_progress.total} persisted "
+            f"with {self._classification_batch_failed} failed: "
             f"{result.proposed_class}; "
             f"tokens {result.total_tokens}."
         )
@@ -2396,6 +2447,7 @@ class CockpitWindow(QMainWindow):
         rationale = _compact_console_text(result.rationale, maximum=96)
         self.console.log_text.setText(
             f"Classification batch {raw_progress.completed}/{raw_progress.total}\n"
+            f"Failed so far: {self._classification_batch_failed}\n"
             f"Document: {raw_progress.source_path.name}\n"
             f"Class: {result.proposed_class}\n"
             f"Confidence: {confidence_label}\n"
@@ -2408,7 +2460,7 @@ class CockpitWindow(QMainWindow):
             [
                 (
                     "CLASSIFIER",
-                    f"{raw_progress.completed}/{raw_progress.total} processed",
+                    f"{raw_progress.completed}/{raw_progress.total} persisted",
                 ),
                 ("PROPOSAL", f"Proposed {result.proposed_class}"),
                 ("EVIDENCE", f"{result.evidence_count} cited spans"),
@@ -2426,19 +2478,60 @@ class CockpitWindow(QMainWindow):
         )
 
     @Slot(object)
+    def _handle_classification_item_failed(self, raw_failure: object) -> None:
+        if not isinstance(raw_failure, ClassificationBatchFailure):
+            self._handle_classification_failed("InvalidClassificationFailure")
+            return
+        self._classification_batch_completed = raw_failure.completed
+        self._classification_batch_failed = raw_failure.failed
+        self._classification_batch_total = raw_failure.total
+        self._set_status(
+            f"Classification item failed safely ({raw_failure.error_category}). "
+            f"{raw_failure.completed} persisted, {raw_failure.failed} failed, "
+            f"{raw_failure.total - raw_failure.attempted} queued."
+        )
+        self.console.log_text.setText(
+            "Classification item failed safely.\n"
+            f"Document: {raw_failure.source_path.name}\n"
+            f"Error: {raw_failure.error_category}\n"
+            f"Persisted: {raw_failure.completed}/{raw_failure.total}; "
+            f"failed: {raw_failure.failed}\n"
+            "The failed document remains READY for a later Analyze retry."
+        )
+        self.right.set_events(
+            [
+                (
+                    "CLASSIFIER",
+                    f"{raw_failure.completed} persisted; {raw_failure.failed} failed",
+                ),
+                ("ERROR", raw_failure.error_category[:42]),
+                ("RETRY", "Failed item remains ready"),
+                ("READY", f"{self.left.count_status('READY')} ready remaining"),
+                ("SECURITY", "No file mutation performed"),
+            ]
+        )
+
+    @Slot(object)
     def _handle_classification_completed(self, raw_summary: object) -> None:
         if not isinstance(raw_summary, ClassificationBatchSummary):
             self._handle_classification_failed("InvalidClassificationSummary")
             return
         self._classification_batch_completed = raw_summary.completed
+        self._classification_batch_failed = raw_summary.failed
         self._classification_batch_total = raw_summary.total
         self.console.log_text.setText(
             f"Classification batch complete: {raw_summary.completed} of "
-            f"{raw_summary.total} proposal(s) persisted for human review."
+            f"{raw_summary.total} proposal(s) persisted for human review.\n"
+            f"Failed item(s): {raw_summary.failed}; "
+            "ready documents remain eligible for retry."
         )
         self.right.set_events(
             [
-                ("CLASSIFIER", f"{raw_summary.completed}/{raw_summary.total} complete"),
+                (
+                    "CLASSIFIER",
+                    f"{raw_summary.completed}/{raw_summary.total} persisted",
+                ),
+                ("FAILED", f"{raw_summary.failed} item(s)"),
                 ("REVIEW", f"{self.left.count_status('REVIEW')} awaiting human review"),
                 ("READY", f"{self.left.count_status('READY')} ready remaining"),
                 ("MEMORY", "Proposals persisted"),
