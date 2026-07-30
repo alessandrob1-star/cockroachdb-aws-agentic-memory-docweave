@@ -1,7 +1,7 @@
 # CockroachDB Review Decision Persistence Boundary
 
-**Status:** Implemented adapter, migration, and command-line runtime wiring;
-desktop button wiring pending
+**Status:** Implemented adapter, migration, command-line runtime wiring, and
+cockpit wiring when a persisted proposal ID is available
 **Revision:** `0003_review_decision_memory`
 
 ## Purpose
@@ -27,6 +27,12 @@ runtime configuration, and an explicit approve or reject action. It creates a
 durable command with bound SQL parameters through the repository instead of
 embedding document names, PDF content, or fingerprints into SQL text.
 
+The cockpit carries the persisted proposal UUID returned by classification into
+the REVIEW row. Its approve and reject controls still perform fingerprint
+validation first; when the row contains a real proposal UUID they invoke the
+same durable review boundary, and when it does not they stay on the local
+append-only ledger.
+
 ## Integrity boundaries
 
 - Every proposal lookup is workspace scoped and locked before mutation.
@@ -43,9 +49,9 @@ embedding document names, PDF content, or fingerprints into SQL text.
 
 ## Current limitations
 
-- The cockpit still records review decisions locally and is not wired to this
-  durable repository.
-- The migration is validated offline by the local quality gate; isolated live
-  validation remains pending.
+- Cockpit rows without a persisted proposal UUID still record review decisions
+  locally only.
+- The migration and cockpit wiring are validated offline by the local quality
+  gate; isolated live validation remains pending.
 - Canonical document classification promotion remains pending.
 - No audit-event bridge for review decisions is implemented yet.

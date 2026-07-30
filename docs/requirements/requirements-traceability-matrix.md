@@ -130,7 +130,7 @@ is reproducible.
 | ID | Acceptance area | Specification | Required evidence | Status |
 | --- | --- | --- | --- | --- |
 | MVP-001 | Repeated scan and safe resume | AC-001, AC-002 | Automated end-to-end and fault-injection evidence | Planned |
-| MVP-002 | Confidence review and quality sampling | AC-003, AC-004 | User-flow tests and calibration evidence | In progress; local proposal review-decision contracts, append-only review history tests, cockpit review controls, offline durable review-decision persistence, and command-line runtime wiring exist, while quality sampling, calibration evidence, and desktop durable wiring remain pending |
+| MVP-002 | Confidence review and quality sampling | AC-003, AC-004 | User-flow tests and calibration evidence | In progress; local proposal review-decision contracts, append-only review history tests, cockpit review controls, offline durable review-decision persistence, command-line runtime wiring, and cockpit durable wiring for persisted proposal IDs exist, while quality sampling, calibration evidence, and isolated live validation remain pending |
 | MVP-003 | Identity-safe move and copy | AC-005, AC-006 | Filesystem execution and persistence integrity tests | In progress |
 | MVP-004 | Collision and individual restore | AC-007–AC-009 | Cross-platform operation tests | In progress |
 | MVP-005 | Batch restore and accountability | AC-010, AC-011 | Role, audit, and partial-failure tests | In progress; local batch accountability and partial-failure tests implemented, roles, persistence, and restore pending |

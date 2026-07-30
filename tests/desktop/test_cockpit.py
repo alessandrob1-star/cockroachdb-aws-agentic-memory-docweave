@@ -1,5 +1,6 @@
 from pathlib import Path
 from typing import Any, cast
+from uuid import UUID
 
 import pytest
 from PySide6.QtCore import QCoreApplication, QEventLoop, QTimer
@@ -14,6 +15,11 @@ from docweave.desktop.cockpit import CockpitWindow, Document
 from docweave.desktop.scan import DesktopScanResult
 from docweave.discovery import DiscoveredFile, DiscoveryResult, DiscoveryStatus
 from docweave.intake import IntakeRecord, IntakeResult, IntakeStatus
+from docweave.persistence.contracts import PersistenceDisposition
+from docweave.review_cli import (
+    ReviewDecisionCommandInput,
+    ReviewDecisionCommandResult,
+)
 from docweave.runtime_preflight import (
     PreflightCheck,
     PreflightState,
@@ -434,7 +440,69 @@ def test_cockpit_records_local_review_decision_without_file_mutation(
     assert len(window._review_ledger.all_decisions()) == 1
     assert "approved" in window.console.log_text.text()
     assert cast(Any, window.right.event_rows[3]).event_text.text() == (
+        "Local review ledger"
+    )
+    assert cast(Any, window.right.event_rows[4]).event_text.text() == (
         "No copy or move executed"
+    )
+
+    close_cockpit_window(window)
+
+
+def test_cockpit_records_durable_review_decision_when_proposal_id_is_available(
+    qt_application: object,
+) -> None:
+    corpus = Path("pdf_sintetici").resolve(strict=True)
+    first_pdf = sorted(corpus.glob("*.pdf"))[0]
+    proposal_id = UUID("44444444-4444-4444-8444-444444444444")
+    calls: list[ReviewDecisionCommandInput] = []
+
+    def fake_review_decision_function(
+        command_input: ReviewDecisionCommandInput,
+    ) -> ReviewDecisionCommandResult:
+        calls.append(command_input)
+        assert command_input.proposal_id == proposal_id
+        assert command_input.proposal_fingerprint == "a" * 64
+        assert command_input.review_decision_id is not None
+        return ReviewDecisionCommandResult(
+            action=command_input.action.value,
+            proposal_id=command_input.proposal_id,
+            review_decision_id=command_input.review_decision_id,
+            disposition=PersistenceDisposition.APPLIED,
+        )
+
+    window = CockpitWindow(
+        runtime_preflight_function=ready_runtime_preflight_report,
+        review_decision_function=fake_review_decision_function,
+    )
+    window.set_authorized_root(corpus)
+    window.left.set_documents(
+        [
+            Document(
+                name=first_pdf.name,
+                category="invoice",
+                pages="2",
+                status="REVIEW",
+                path=first_pdf,
+                proposed_destination="DocWeave Organized/Invoices/invoice.pdf",
+                proposal_id=str(proposal_id),
+                proposal_fingerprint="a" * 64,
+            )
+        ]
+    )
+
+    window._open_document_row(0)
+    window._approve_selected_review()
+
+    document = window.left.document_at(0)
+    assert document is not None
+    assert document.status == "APPROVED"
+    assert len(calls) == 1
+    assert len(window._review_ledger.all_decisions()) == 1
+    assert window._review_ledger.all_decisions()[0].proposal_id == str(proposal_id)
+    assert "durably" in window.console.log_text.text()
+    assert cast(Any, window.right.event_rows[3]).event_text.text() == (
+        "CockroachDB applied"
     )
 
     close_cockpit_window(window)

@@ -183,8 +183,11 @@ def test_command_result_includes_validated_evidence_details() -> None:
         proposal_disposition=PersistenceDisposition.APPLIED,
     )
 
-    result = classification_cli._command_result(persisted)
+    proposal_id = UUID("44444444-4444-4444-8444-444444444444")
 
+    result = classification_cli._command_result(persisted, proposal_id=proposal_id)
+
+    assert result.proposal_id == proposal_id
     assert result.evidence_count == 2
     assert result.evidence_details[0].evidence_id == "ev_1"
     assert result.evidence_details[0].page_number == 1
@@ -398,6 +401,7 @@ def test_batch_main_writes_sanitized_json_report_without_overwrite(
             output_tokens=5,
             total_tokens=15,
             estimated_cost_usd="0.00001",
+            proposal_id=UUID("44444444-4444-4444-8444-444444444444"),
             evidence_count=2,
             metadata_count=1,
             raw_confidence="0.80000",
@@ -439,6 +443,7 @@ def test_batch_main_writes_sanitized_json_report_without_overwrite(
     assert report["succeeded_count"] == 1
     assert report["items"][0]["relative_path"] == "invoice.pdf"
     assert report["items"][0]["proposed_class"] == "invoice"
+    assert report["items"][0]["proposal_id"] == "44444444-4444-4444-8444-444444444444"
     assert report["items"][0]["total_tokens"] == 15
     assert "secret" not in report_path.read_text(encoding="utf-8")
 
