@@ -30,6 +30,8 @@ from docweave.persistence.contracts import (
     PersistenceDisposition,
     RecordExecutionIntent,
     RecordOperationResult,
+    RestoreAuditEventSnapshot,
+    RestoreAuditQuery,
 )
 from docweave.persistence.mappers import (
     ExecutionIntentMapping,
@@ -47,6 +49,7 @@ from docweave.persistence.memory_foundation_repository import (
 )
 from docweave.persistence.operation_repository import (
     CockroachOperationRepository,
+    CockroachRestoreAuditRepository,
     PersistenceConflictError,
     PersistenceNotFoundError,
 )
@@ -90,6 +93,7 @@ __all__ = [
     "CockroachClassificationRepository",
     "CockroachMemoryFoundationRepository",
     "CockroachOperationRepository",
+    "CockroachRestoreAuditRepository",
     "CockroachReviewDecisionRepository",
     "CockroachTransactionRunner",
     "CreateBatch",
@@ -115,6 +119,8 @@ __all__ = [
     "RecordExecutionIntent",
     "RecordOperationResult",
     "RegisterDocumentVersion",
+    "RestoreAuditEventSnapshot",
+    "RestoreAuditQuery",
     "TransactionExecutionError",
     "TransactionRetry",
     "TransactionRetryHooks",

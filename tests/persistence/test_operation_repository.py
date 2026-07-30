@@ -23,6 +23,7 @@ from docweave.persistence import (
     AuditAppend,
     BatchItemSnapshot,
     CockroachOperationRepository,
+    CockroachRestoreAuditRepository,
     CreateBatch,
     OperationExecutionIdentity,
     PersistenceConflictError,
@@ -30,6 +31,7 @@ from docweave.persistence import (
     PersistenceNotFoundError,
     RecordExecutionIntent,
     RecordOperationResult,
+    RestoreAuditQuery,
     TransactionRun,
 )
 
@@ -50,10 +52,13 @@ class FakeResult:
         *,
         scalar: object | None = None,
         mapping: Mapping[str, object] | None = None,
+        rows: Sequence[Mapping[str, object]] | None = None,
         rowcount: int = 1,
     ) -> None:
         self._scalar = scalar
-        self._mapping = mapping
+        self._rows = (
+            list(rows) if rows is not None else ([] if mapping is None else [mapping])
+        )
         self.rowcount = rowcount
 
     def scalar_one_or_none(self) -> object | None:
@@ -63,7 +68,12 @@ class FakeResult:
         return self
 
     def one_or_none(self) -> Mapping[str, object] | None:
-        return self._mapping
+        if len(self._rows) > 1:
+            raise AssertionError("expected at most one row")
+        return self._rows[0] if self._rows else None
+
+    def all(self) -> list[Mapping[str, object]]:
+        return self._rows.copy()
 
 
 class FakeConnection:
@@ -207,6 +217,13 @@ def repository(
 ) -> tuple[CockroachOperationRepository, FakeTransactionRunner]:
     transaction_runner = FakeTransactionRunner(FakeConnection(responses))
     return CockroachOperationRepository(transaction_runner), transaction_runner
+
+
+def restore_audit_repository(
+    responses: Sequence[FakeResult],
+) -> tuple[CockroachRestoreAuditRepository, FakeTransactionRunner]:
+    transaction_runner = FakeTransactionRunner(FakeConnection(responses))
+    return CockroachRestoreAuditRepository(transaction_runner), transaction_runner
 
 
 def test_creates_batch_items_and_hash_chained_audit_atomically() -> None:
@@ -630,6 +647,34 @@ def persisted_execution_row(**overrides: object) -> dict[str, object]:
     return row
 
 
+def restore_audit_row(**overrides: object) -> dict[str, object]:
+    row: dict[str, object] = {
+        "event_sequence": 41,
+        "event_id": EVENT_ID,
+        "workspace_id": WORKSPACE_ID,
+        "actor_id": ACTOR_ID,
+        "correlation_id": "restore-correlation-001",
+        "event_type": "restore_execution_succeeded",
+        "subject_kind": "file_operation",
+        "subject_id": "item-001",
+        "operation_batch_id": BATCH_ID,
+        "file_operation_id": OPERATION_ID,
+        "idempotency_key": "restore-batch-001:item-001:restore",
+        "previous_state": "approved",
+        "new_state": "succeeded",
+        "reason": "succeeded",
+        "plan_sha256": DIGEST,
+        "approval_id": "restore-approval-001",
+        "source_relative_path": "organized/invoice.pdf",
+        "destination_relative_path": "incoming/invoice.pdf",
+        "error_class": None,
+        "error_category": None,
+        "occurred_at": NOW + timedelta(seconds=4),
+    }
+    row.update(overrides)
+    return row
+
+
 def test_loads_workspace_scoped_operation_execution_state() -> None:
     adapter, transaction_runner = repository(
         [FakeResult(mapping=persisted_execution_row())]
@@ -667,6 +712,81 @@ def test_invalid_persisted_operation_state_fails_closed() -> None:
 
     with pytest.raises(PersistenceConflictError, match="state is invalid"):
         adapter.load_operation_execution(execution_identity())
+
+
+def test_loads_bounded_restore_audit_history_with_bound_filters() -> None:
+    adapter, transaction_runner = restore_audit_repository(
+        [
+            FakeResult(
+                rows=[
+                    restore_audit_row(
+                        event_sequence=40,
+                        event_id=EVENT_ID,
+                        event_type="restore_approved",
+                        occurred_at=NOW + timedelta(seconds=3),
+                    ),
+                    restore_audit_row(
+                        event_sequence=41,
+                        event_id=SECOND_EVENT_ID,
+                        event_type="restore_execution_succeeded",
+                        occurred_at=NOW + timedelta(seconds=4),
+                    ),
+                ]
+            )
+        ]
+    )
+
+    loaded = adapter.load_restore_audit_events(
+        RestoreAuditQuery(
+            workspace_id=WORKSPACE_ID,
+            operation_batch_id=BATCH_ID,
+            file_operation_id=OPERATION_ID,
+            limit=50,
+        )
+    )
+
+    assert [event.event_type for event in loaded] == [
+        AuditEventType.RESTORE_APPROVED,
+        AuditEventType.RESTORE_EXECUTION_SUCCEEDED,
+    ]
+    assert loaded[1].event_id == SECOND_EVENT_ID
+    assert loaded[1].plan_sha256 == DIGEST
+    assert loaded[1].source_relative_path == "organized/invoice.pdf"
+    assert loaded[1].destination_relative_path == "incoming/invoice.pdf"
+    query, raw_parameters = transaction_runner.connection.calls[0]
+    parameters = cast(Mapping[str, object], raw_parameters)
+    assert "event_type IN" in query
+    assert "ORDER BY occurred_at ASC, event_sequence ASC" in query
+    assert parameters == {
+        "workspace_id": WORKSPACE_ID,
+        "operation_batch_id": BATCH_ID,
+        "file_operation_id": OPERATION_ID,
+        "limit": 50,
+    }
+
+
+def test_restore_audit_query_and_rows_fail_closed() -> None:
+    with pytest.raises(ValueError, match="file_operation_id requires"):
+        RestoreAuditQuery(
+            workspace_id=WORKSPACE_ID,
+            file_operation_id=OPERATION_ID,
+        )
+    with pytest.raises(ValueError, match="limit"):
+        RestoreAuditQuery(workspace_id=WORKSPACE_ID, limit=1_001)
+
+    adapter, _ = restore_audit_repository(
+        [
+            FakeResult(
+                rows=[
+                    restore_audit_row(
+                        event_type="item_execution_succeeded",
+                    )
+                ]
+            )
+        ]
+    )
+    with pytest.raises(PersistenceConflictError, match="restore audit row is invalid"):
+        adapter.load_restore_audit_events(RestoreAuditQuery(workspace_id=WORKSPACE_ID))
 
 
 def test_incomplete_persisted_success_fails_closed() -> None:

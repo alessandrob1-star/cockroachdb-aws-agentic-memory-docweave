@@ -159,7 +159,7 @@ must be closed before production-grade batch execution:
 | No live application bootstrap execution | The composed restart path is not yet a live application integration | Run the configured runtime against the approved validation target |
 | Audit adapter has no live runtime evidence | Activity History cannot yet survive restart | Run approved integration and restart tests against CockroachDB |
 | Lease renewal and execution fencing are not implemented | A worker that outlives its lease is not yet safe for concurrent production execution | Add renewal or fencing before enabling multiple workers |
-| Restore persistence not wired | Move and copy outcomes now have tested restore-preview, approved local restore-execution, explicit local restore audit events, bounded local batch restore orchestration, CockroachDB-ready restore audit mapping/append evidence, and a durable restore audit recorder boundary, but no end-to-end durable restore workflow is wired yet | Add CockroachDB-backed restore history and UI controls |
+| Restore persistence not wired | Move and copy outcomes now have tested restore-preview, approved local restore-execution, explicit local restore audit events, bounded local batch restore orchestration, CockroachDB-ready restore audit mapping/append evidence, a durable restore audit recorder boundary, and a bounded restore audit history reader, but no end-to-end durable restore workflow is wired yet | Add UI restore controls and connect them to CockroachDB-backed restore history |
 | No workspace/user authorization model | Approval uses user identifiers but no role policy yet | Add authorization contract before user interface or cloud execution |
 
 ## 6. Completed live validation boundary
@@ -218,7 +218,10 @@ repository tests showing that restore event type, attribution, fingerprint,
 approval id, idempotency key, and relative paths are carried as bound SQL
 parameters instead of interpolated SQL text. Durable audit append contracts now
 also reject absolute, parent-traversal, empty, or Windows-style relative path
-values before repository calls are built.
+values before repository calls are built. A bounded restore audit history reader
+can now load CockroachDB restore audit evidence by workspace, optional batch,
+and optional item filters for future Activity History and restore UI views, but
+those views are not wired yet.
 
 `docs/operations/runtime-configuration-runbook.md` records the current
 operator sequence for safe local runtime configuration, configuration-only

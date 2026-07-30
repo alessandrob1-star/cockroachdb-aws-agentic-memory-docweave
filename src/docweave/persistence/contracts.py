@@ -15,6 +15,15 @@ from docweave.operations.results import ResultDisposition
 
 _SHA256_BYTES = 32
 _MAX_BATCH_ITEMS = 1_000
+_RESTORE_EVENT_TYPES = frozenset(
+    {
+        AuditEventType.RESTORE_APPROVED,
+        AuditEventType.RESTORE_EXECUTION_SUCCEEDED,
+        AuditEventType.RESTORE_EXECUTION_BLOCKED,
+        AuditEventType.RESTORE_EXECUTION_FAILED,
+        AuditEventType.RESTORE_VERIFICATION_FAILED,
+    }
+)
 
 
 class PersistenceDisposition(StrEnum):
@@ -141,6 +150,71 @@ class AuditAppend:
     error_category: str | None = None
 
     def __post_init__(self) -> None:
+        for field_name, value in (
+            ("correlation_id", self.correlation_id),
+            ("subject_kind", self.subject_kind),
+            ("subject_id", self.subject_id),
+        ):
+            _require_text(field_name, value)
+        _require_optional_digest("plan_sha256", self.plan_sha256)
+        _require_optional_relative_path(
+            "source_relative_path",
+            self.source_relative_path,
+        )
+        _require_optional_relative_path(
+            "destination_relative_path",
+            self.destination_relative_path,
+        )
+        object.__setattr__(self, "occurred_at_utc", normalize_utc(self.occurred_at_utc))
+
+
+@dataclass(frozen=True, slots=True)
+class RestoreAuditQuery:
+    """Bounded read query for durable restore audit evidence."""
+
+    workspace_id: UUID
+    operation_batch_id: UUID | None = None
+    file_operation_id: UUID | None = None
+    limit: int = 100
+
+    def __post_init__(self) -> None:
+        if not 1 <= self.limit <= _MAX_BATCH_ITEMS:
+            raise ValueError("limit must be between 1 and 1000")
+        if self.file_operation_id is not None and self.operation_batch_id is None:
+            raise ValueError("file_operation_id requires operation_batch_id")
+
+
+@dataclass(frozen=True, slots=True)
+class RestoreAuditEventSnapshot:
+    """One durable restore audit event loaded from append-only history."""
+
+    event_sequence: int
+    event_id: UUID
+    workspace_id: UUID
+    actor_id: UUID
+    correlation_id: str
+    event_type: AuditEventType
+    subject_kind: str
+    subject_id: str
+    occurred_at_utc: datetime
+    operation_batch_id: UUID | None = None
+    file_operation_id: UUID | None = None
+    idempotency_key: str | None = None
+    previous_state: str | None = None
+    new_state: str | None = None
+    reason: str | None = None
+    plan_sha256: bytes | None = None
+    approval_id: str | None = None
+    source_relative_path: str | None = None
+    destination_relative_path: str | None = None
+    error_class: str | None = None
+    error_category: str | None = None
+
+    def __post_init__(self) -> None:
+        if self.event_sequence < 1:
+            raise ValueError("event_sequence must be positive")
+        if self.event_type not in _RESTORE_EVENT_TYPES:
+            raise ValueError("restore audit snapshot requires restore event type")
         for field_name, value in (
             ("correlation_id", self.correlation_id),
             ("subject_kind", self.subject_kind),
