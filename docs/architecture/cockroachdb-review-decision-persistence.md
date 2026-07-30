@@ -1,6 +1,7 @@
 # CockroachDB Review Decision Persistence Boundary
 
-**Status:** Implemented adapter and migration; runtime wiring pending
+**Status:** Implemented adapter, migration, and command-line runtime wiring;
+desktop button wiring pending
 **Revision:** `0003_review_decision_memory`
 
 ## Purpose
@@ -19,6 +20,12 @@ One serializable transaction:
 An exact replay returns `idempotent_replay`. A reused proposal decision with
 different reviewer, action, fingerprint, reason, timestamp, or operation-plan
 binding fails closed.
+
+The `docweave-review-proposal` command is the first runtime boundary for this
+capability. It accepts the retained proposal fingerprint, reviewer identity from
+runtime configuration, and an explicit approve or reject action. It creates a
+durable command with bound SQL parameters through the repository instead of
+embedding document names, PDF content, or fingerprints into SQL text.
 
 ## Integrity boundaries
 
