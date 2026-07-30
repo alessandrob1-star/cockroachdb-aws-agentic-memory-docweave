@@ -11,7 +11,9 @@ from sqlalchemy.engine import Connection
 from sqlalchemy.sql import Executable
 
 from docweave.operations import ReviewDecisionAction
+from docweave.operations.audit import AuditActorType, AuditEventType
 from docweave.persistence import (
+    AuditAppend,
     CockroachReviewDecisionRepository,
     PersistenceConflictError,
     PersistenceDisposition,
@@ -26,6 +28,7 @@ REVIEW_DECISION_ID = UUID("00000000-0000-4000-8000-000000000003")
 REVIEWER_ID = UUID("00000000-0000-4000-8000-000000000004")
 PROPOSAL_FINGERPRINT = "ab" * 32
 PLAN_FINGERPRINT = "cd" * 32
+AUDIT_EVENT_ID = UUID("00000000-0000-4000-8000-000000000005")
 
 
 class FakeResult:
@@ -92,6 +95,23 @@ def command() -> PersistReviewDecision:
     )
 
 
+def audit_event() -> AuditAppend:
+    return AuditAppend(
+        event_id=AUDIT_EVENT_ID,
+        workspace_id=WORKSPACE_ID,
+        actor_id=REVIEWER_ID,
+        actor_type=AuditActorType.HUMAN,
+        correlation_id=f"review-decision:{REVIEW_DECISION_ID}",
+        event_type=AuditEventType.REVIEW_DECISION_RECORDED,
+        subject_kind="classification_proposal",
+        subject_id=str(PROPOSAL_ID),
+        occurred_at_utc=NOW,
+        previous_state="needs_review",
+        new_state="approved",
+        plan_sha256=bytes.fromhex(PLAN_FINGERPRINT),
+    )
+
+
 def repository(
     responses: Sequence[FakeResult],
 ) -> tuple[CockroachReviewDecisionRepository, FakeTransactionRunner]:
@@ -126,6 +146,38 @@ def test_persists_review_decision_and_updates_proposal_atomically() -> None:
     assert first_parameters["proposal_sha256"] == bytes.fromhex(PROPOSAL_FINGERPRINT)
     assert first_parameters["operation_plan_sha256"] == bytes.fromhex(PLAN_FINGERPRINT)
     assert PROPOSAL_FINGERPRINT not in runner.connection.calls[1][0]
+
+
+def test_persists_review_decision_and_audit_event_in_one_transaction() -> None:
+    adapter, runner = repository(
+        [
+            FakeResult(
+                mapping={
+                    "proposal_id": PROPOSAL_ID,
+                    "proposal_status": "needs_review",
+                }
+            ),
+            FakeResult(scalar=REVIEW_DECISION_ID),
+            FakeResult(scalar=PROPOSAL_ID),
+            FakeResult(scalar=WORKSPACE_ID),
+            FakeResult(mapping=None),
+            FakeResult(),
+        ]
+    )
+
+    result = adapter.persist(replace(command(), audit_event=audit_event()))
+
+    assert result is PersistenceDisposition.APPLIED
+    assert runner.run_count == 1
+    assert runner.connection.responses == []
+    statements = "\n".join(statement for statement, _ in runner.connection.calls)
+    assert "INSERT INTO docweave.review_decisions" in statements
+    assert "INSERT INTO docweave.audit_events" in statements
+    audit_parameters = cast(Mapping[str, object], runner.connection.calls[5][1])
+    assert audit_parameters["event_type"] == "review_decision_recorded"
+    assert audit_parameters["subject_kind"] == "classification_proposal"
+    assert audit_parameters["subject_id"] == str(PROPOSAL_ID)
+    assert len(cast(bytes, audit_parameters["event_sha256"])) == 32
 
 
 def test_exact_idempotent_replay_does_not_update_proposal_again() -> None:
@@ -220,3 +272,9 @@ def test_contract_blocks_unsupported_actions_and_bad_fingerprints() -> None:
 
     with pytest.raises(ValueError, match="lowercase sha256"):
         replace(command(), proposal_fingerprint="AB")
+
+    with pytest.raises(ValueError, match="subject"):
+        replace(
+            command(),
+            audit_event=replace(audit_event(), subject_id=str(REVIEW_DECISION_ID)),
+        )

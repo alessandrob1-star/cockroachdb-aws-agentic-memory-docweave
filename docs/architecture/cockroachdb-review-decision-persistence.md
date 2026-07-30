@@ -1,7 +1,7 @@
 # CockroachDB Review Decision Persistence Boundary
 
-**Status:** Implemented adapter, migration, command-line runtime wiring, and
-cockpit wiring when a persisted proposal ID is available
+**Status:** Implemented adapter, migration, command-line runtime wiring, cockpit
+wiring for persisted proposal IDs, and same-transaction audit event recording
 **Revision:** `0003_review_decision_memory`
 
 ## Purpose
@@ -33,6 +33,11 @@ validation first; when the row contains a real proposal UUID they invoke the
 same durable review boundary, and when it does not they stay on the local
 append-only ledger.
 
+When a durable decision is newly applied, the repository can append a
+`review_decision_recorded` audit event in the same serializable transaction. The
+audit event is workspace scoped, human attributed, hash chained through the
+existing `audit_events` table, and bound to the classification proposal subject.
+
 ## Integrity boundaries
 
 - Every proposal lookup is workspace scoped and locked before mutation.
@@ -54,4 +59,3 @@ append-only ledger.
 - The migration and cockpit wiring are validated offline by the local quality
   gate; isolated live validation remains pending.
 - Canonical document classification promotion remains pending.
-- No audit-event bridge for review decisions is implemented yet.
