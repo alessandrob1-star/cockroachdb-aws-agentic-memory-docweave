@@ -1950,6 +1950,7 @@ class CockpitWindow(QMainWindow):
         self._scan_function = scan_function
         self._classification_function = classification_function
         self._review_decision_function = review_decision_function
+        self._runtime_preflight_function = runtime_preflight_function
         self._integration_snapshot = (
             integration_snapshot
             if integration_snapshot is not None
@@ -2453,6 +2454,7 @@ class CockpitWindow(QMainWindow):
             return
         if self.scan_in_progress or self.classification_in_progress:
             return
+        self._refresh_runtime_preflight_report()
         runtime_block = _classification_preflight_block(self._runtime_preflight_report)
         if runtime_block is not None:
             self._set_status(
@@ -2787,7 +2789,7 @@ class CockpitWindow(QMainWindow):
         )
         self.console.buttons[2].setEnabled(self.scan_in_progress)
         self.console.buttons[3].setEnabled(
-            not blocked and self._ready_document_count() > 0 and analysis_ready
+            not blocked and self._ready_document_count() > 0
         )
         if analysis_ready:
             self.console.buttons[3].setToolTip(
@@ -2795,7 +2797,7 @@ class CockpitWindow(QMainWindow):
             )
         else:
             self.console.buttons[3].setToolTip(
-                "Runtime configuration must pass preflight before classification."
+                "Retry runtime preflight and analyze when configuration is ready."
             )
         self.console.buttons[4].setEnabled(review_ready)
         self.console.buttons[5].setEnabled(review_ready)
@@ -2827,6 +2829,24 @@ class CockpitWindow(QMainWindow):
                 ("SECURITY", "Read-only local boundary"),
             ]
         )
+
+    def _refresh_runtime_preflight_report(self) -> None:
+        """Refresh runtime readiness before a user-triggered classification run."""
+        try:
+            self._runtime_preflight_report = _initial_runtime_preflight_report(
+                self._runtime_preflight_function,
+                self._integration_snapshot,
+            )
+        except Exception as error:
+            self._runtime_preflight_report = RuntimePreflightReport(
+                checks=(
+                    PreflightCheck(
+                        "runtime_config",
+                        PreflightState.FAIL,
+                        error.__class__.__name__,
+                    ),
+                )
+            )
 
     def _ready_document_count(self) -> int:
         return self.left.count_status("READY")
