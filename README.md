@@ -118,7 +118,9 @@ runtime boundary. It persists one approved or rejected decision for an existing
 proposal using the retained proposal fingerprint and configured reviewer actor,
 without executing file operations. The cockpit now carries the persisted
 proposal identity forward from classification results and can use the same
-review-decision boundary when a real proposal ID is available.
+review-decision boundary when a real proposal ID is available. Durable review
+decisions can also append a human-attributed audit event in the same
+transaction.
 
 The local shared core now also defines an explicit classification runtime that
 keeps extraction, database transactions, and Bedrock invocation in separate

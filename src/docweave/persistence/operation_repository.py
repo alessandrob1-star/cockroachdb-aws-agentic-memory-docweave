@@ -255,7 +255,7 @@ class CockroachOperationRepository(OperationPersistenceRepository):
                 _INSERT_OPERATION,
                 [_item_parameters(command, item) for item in command.items],
             )
-            _append_audit_events(connection, command.audit_events)
+            append_audit_events_to_connection(connection, command.audit_events)
             return PersistenceDisposition.APPLIED
 
         return self._transactions.run(persist).value
@@ -295,7 +295,7 @@ class CockroachOperationRepository(OperationPersistenceRepository):
             if connection.execute(_RECORD_EXECUTION_INTENT, parameters).rowcount != 1:
                 raise PersistenceConflictError("operation intent was not recorded")
             connection.execute(_MARK_BATCH_EXECUTING, parameters)
-            _append_audit_events(connection, (command.audit_event,))
+            append_audit_events_to_connection(connection, (command.audit_event,))
             return PersistenceDisposition.APPLIED
 
         return self._transactions.run(persist).value
@@ -334,7 +334,7 @@ class CockroachOperationRepository(OperationPersistenceRepository):
                 raise PersistenceConflictError("operation result was not recorded")
             if connection.execute(_UPDATE_BATCH_RESULT, parameters).rowcount != 1:
                 raise PersistenceNotFoundError("operation batch was not found")
-            _append_audit_events(connection, (command.audit_event,))
+            append_audit_events_to_connection(connection, (command.audit_event,))
             return PersistenceDisposition.APPLIED
 
         return self._transactions.run(persist).value
@@ -372,7 +372,7 @@ class CockroachOperationRepository(OperationPersistenceRepository):
             raise ValueError("events must not be empty")
 
         def persist(connection: Connection) -> PersistenceDisposition:
-            _append_audit_events(connection, events)
+            append_audit_events_to_connection(connection, events)
             return PersistenceDisposition.APPLIED
 
         return self._transactions.run(persist).value
@@ -607,7 +607,7 @@ def _is_same_terminal_result(
     )
 
 
-def _append_audit_events(
+def append_audit_events_to_connection(
     connection: Connection,
     events: tuple[AuditAppend, ...],
 ) -> None:

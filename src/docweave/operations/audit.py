@@ -34,6 +34,7 @@ class AuditEventType(StrEnum):
     ITEM_VERIFICATION_FAILED = "item_verification_failed"
     ITEM_EXECUTION_REPLAYED = "item_execution_replayed"
     ITEM_EXECUTION_RECONCILED = "item_execution_reconciled"
+    REVIEW_DECISION_RECORDED = "review_decision_recorded"
     ITEM_SKIPPED = "item_skipped"
     BATCH_COMPLETED = "batch_completed"
     BATCH_COMPLETED_WITH_FAILURES = "batch_completed_with_failures"

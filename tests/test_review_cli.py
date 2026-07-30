@@ -83,6 +83,13 @@ def test_persist_review_decision_binds_cli_fields_to_durable_command() -> None:
     assert command.proposal_fingerprint == PROPOSAL_FINGERPRINT
     assert command.operation_plan_fingerprint == PLAN_FINGERPRINT
     assert command.decided_at_utc == NOW
+    assert command.audit_event is not None
+    assert command.audit_event.event_type.value == "review_decision_recorded"
+    assert command.audit_event.actor_id == ACTOR_ID
+    assert command.audit_event.subject_id == str(PROPOSAL_ID)
+    assert command.audit_event.previous_state == "needs_review"
+    assert command.audit_event.new_state == "rejected"
+    assert command.audit_event.plan_sha256 == bytes.fromhex(PLAN_FINGERPRINT)
 
 
 def test_review_main_prints_sanitized_success(

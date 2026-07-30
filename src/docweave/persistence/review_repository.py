@@ -12,8 +12,12 @@ from sqlalchemy.engine import Connection
 from sqlalchemy.engine.row import RowMapping
 
 from docweave.operations import ReviewDecisionAction
-from docweave.persistence.contracts import PersistenceDisposition
-from docweave.persistence.operation_repository import PersistenceConflictError
+from docweave.operations.audit import AuditEventType
+from docweave.persistence.contracts import AuditAppend, PersistenceDisposition
+from docweave.persistence.operation_repository import (
+    PersistenceConflictError,
+    append_audit_events_to_connection,
+)
 from docweave.persistence.transactions import TransactionRun
 
 _SHA256_HEX_LENGTH = 64
@@ -50,6 +54,7 @@ class PersistReviewDecision:
     decided_at_utc: datetime
     reason: str | None = None
     operation_plan_fingerprint: str | None = None
+    audit_event: AuditAppend | None = None
 
     def __post_init__(self) -> None:
         if self.action not in _TERMINAL_PROPOSAL_ACTIONS:
@@ -69,6 +74,8 @@ class PersistReviewDecision:
             "decided_at_utc",
             _as_utc(self.decided_at_utc),
         )
+        if self.audit_event is not None:
+            _validate_audit_event(self.audit_event, self)
 
 
 _LOCK_PROPOSAL = sa.text(
@@ -151,6 +158,8 @@ class CockroachReviewDecisionRepository:
             ).scalar_one_or_none()
             if updated_id != command.proposal_id:
                 raise PersistenceConflictError("proposal review status was not updated")
+            if command.audit_event is not None:
+                append_audit_events_to_connection(connection, (command.audit_event,))
             return PersistenceDisposition.APPLIED
 
         return self._transactions.run(persist_once).value
@@ -226,6 +235,26 @@ def _proposal_status(action: ReviewDecisionAction) -> str:
         ReviewDecisionAction.APPROVE: "approved",
         ReviewDecisionAction.REJECT: "rejected",
     }[action]
+
+
+def _validate_audit_event(
+    audit_event: AuditAppend,
+    command: PersistReviewDecision,
+) -> None:
+    if audit_event.workspace_id != command.workspace_id:
+        raise ValueError("review audit workspace must match decision workspace")
+    if audit_event.actor_id != command.reviewer_actor_id:
+        raise ValueError("review audit actor must match reviewer")
+    if audit_event.event_type is not AuditEventType.REVIEW_DECISION_RECORDED:
+        raise ValueError("review audit event type must record review decision")
+    if audit_event.subject_kind != "classification_proposal":
+        raise ValueError("review audit subject kind must be classification_proposal")
+    if audit_event.subject_id != str(command.proposal_id):
+        raise ValueError("review audit subject must match proposal")
+    if audit_event.previous_state != "needs_review":
+        raise ValueError("review audit previous state must be needs_review")
+    if audit_event.new_state != _proposal_status(command.action):
+        raise ValueError("review audit new state must match action")
 
 
 def _validate_fingerprint(name: str, value: str) -> None:
