@@ -351,6 +351,38 @@ def test_appends_non_result_audit_event_in_one_transaction() -> None:
     transaction_runner.connection.assert_consumed()
 
 
+def test_appends_restore_audit_as_bound_sql_parameters() -> None:
+    injection_payload = "restore'); DROP TABLE docweave.audit_events; --.pdf"
+    adapter, transaction_runner = repository(
+        [
+            FakeResult(scalar=WORKSPACE_ID),
+            FakeResult(mapping=None),
+            FakeResult(),
+        ]
+    )
+    mapped_event = replace(
+        audit_event(AuditEventType.RESTORE_EXECUTION_BLOCKED),
+        idempotency_key="restore-batch-001:item-001:restore",
+        reason="restore_plan_changed",
+        source_relative_path=f"organized/{injection_payload}",
+        destination_relative_path=f"incoming/{injection_payload}",
+        error_category="restore_plan_changed",
+    )
+
+    disposition = adapter.append_audit_events((mapped_event,))
+
+    assert disposition is PersistenceDisposition.APPLIED
+    connection = transaction_runner.connection
+    connection.assert_consumed()
+    assert all(injection_payload not in statement for statement, _ in connection.calls)
+    audit_parameters = cast(Mapping[str, object], connection.calls[2][1])
+    assert audit_parameters["event_type"] == "restore_execution_blocked"
+    assert audit_parameters["source_relative_path"] == f"organized/{injection_payload}"
+    assert (
+        audit_parameters["destination_relative_path"] == f"incoming/{injection_payload}"
+    )
+
+
 def test_rejects_empty_audit_append() -> None:
     adapter, transaction_runner = repository([])
 

@@ -159,7 +159,7 @@ must be closed before production-grade batch execution:
 | No live application bootstrap execution | The composed restart path is not yet a live application integration | Run the configured runtime against the approved validation target |
 | Audit adapter has no live runtime evidence | Activity History cannot yet survive restart | Run approved integration and restart tests against CockroachDB |
 | Lease renewal and execution fencing are not implemented | A worker that outlives its lease is not yet safe for concurrent production execution | Add renewal or fencing before enabling multiple workers |
-| Restore persistence not wired | Move and copy outcomes now have tested restore-preview, approved local restore-execution, explicit local restore audit events, and bounded local batch restore orchestration, but no durable restore audit path is wired yet | Add CockroachDB-backed restore history and UI controls |
+| Restore persistence not wired | Move and copy outcomes now have tested restore-preview, approved local restore-execution, explicit local restore audit events, bounded local batch restore orchestration, and CockroachDB-ready restore audit mapping/append evidence, but no durable restore workflow is wired yet | Add CockroachDB-backed restore history and UI controls |
 | No workspace/user authorization model | Approval uses user identifiers but no role policy yet | Add authorization contract before user interface or cloud execution |
 
 ## 6. Completed live validation boundary
@@ -213,7 +213,10 @@ attribution, exact restore fingerprint, approval id, source/destination
 relative paths, and sanitized failure categories. Bounded local batch restore
 orchestration now plans up to 1,000 restore items, keeps blocked items visible,
 executes ready items independently, and reports partial outcomes without hiding
-per-item status.
+per-item status. Restore audit events also have persistence-mapper and
+repository tests showing that restore event type, attribution, fingerprint,
+approval id, idempotency key, and relative paths are carried as bound SQL
+parameters instead of interpolated SQL text.
 
 `docs/operations/runtime-configuration-runbook.md` records the current
 operator sequence for safe local runtime configuration, configuration-only
