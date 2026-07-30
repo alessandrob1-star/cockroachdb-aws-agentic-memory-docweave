@@ -11,6 +11,7 @@ ALEMBIC_CONFIG_PATH = REPOSITORY_ROOT / "alembic.ini"
 DATABASE_URL_ENVIRONMENT_VARIABLE = "DOCWEAVE_DATABASE_URL"
 INITIAL_REVISION = "0001_operational_foundation"
 CLASSIFICATION_REVISION = "0002_classification_memory"
+REVIEW_REVISION = "0003_review_decision_memory"
 
 
 def alembic_config() -> Config:
@@ -38,7 +39,7 @@ def render_downgrade_sql() -> str:
 def test_migration_history_has_one_expected_head() -> None:
     script = ScriptDirectory.from_config(alembic_config())
 
-    assert script.get_heads() == [CLASSIFICATION_REVISION]
+    assert script.get_heads() == [REVIEW_REVISION]
     assert script.get_base() == INITIAL_REVISION
 
 
@@ -60,6 +61,7 @@ def test_offline_upgrade_creates_approved_non_vector_memory_tables() -> None:
         "proposals",
         "classification_proposals",
         "proposal_evidence",
+        "review_decisions",
     }
     for table_name in expected_tables:
         assert f"CREATE TABLE docweave.{table_name}" in sql
@@ -68,7 +70,6 @@ def test_offline_upgrade_creates_approved_non_vector_memory_tables() -> None:
     assert "VECTOR" not in sql
     assert "document_chunks" not in sql
     assert "document_classifications" not in sql
-    assert "review_decisions" not in sql
     assert "CREATE ROLE" not in sql
 
 
@@ -83,6 +84,20 @@ def test_classification_memory_separates_proposals_from_canonical_state() -> Non
     assert "proposal_status" in sql
     assert "'needs_review'" in sql
     assert "outcome JSONB NOT NULL" in sql
+
+
+def test_review_decision_memory_is_attributable_and_bound_to_proposal() -> None:
+    sql = render_upgrade_sql()
+
+    assert "CREATE TABLE docweave.review_decisions" in sql
+    assert "reviewer_actor_id" in sql
+    assert "proposal_sha256" in sql
+    assert "operation_plan_sha256" in sql
+    assert "fk_review_decisions_proposal_workspace" in sql
+    assert "fk_review_decisions_reviewer" in sql
+    assert "uq_review_decisions_proposal" in sql
+    assert "ck_review_decisions_reason_required" in sql
+    assert "ix_review_decisions_workspace_chronology" in sql
 
 
 def test_offline_upgrade_enforces_workspace_and_idempotency_boundaries() -> None:
@@ -127,6 +142,7 @@ def test_offline_upgrade_contains_append_only_audit_storage_shape() -> None:
 def test_offline_downgrade_drops_tables_in_dependency_order() -> None:
     sql = render_downgrade_sql()
     expected_order = [
+        "DROP TABLE docweave.review_decisions",
         "DROP TABLE docweave.proposal_evidence",
         "DROP TABLE docweave.classification_proposals",
         "DROP TABLE docweave.proposals",

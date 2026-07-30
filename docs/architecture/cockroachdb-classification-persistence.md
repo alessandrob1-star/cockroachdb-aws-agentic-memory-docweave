@@ -16,9 +16,10 @@ One serializable transaction writes:
 3. one `classification_proposals` subtype row; and
 4. the proposal's inspectable `proposal_evidence` excerpts.
 
-The migration deliberately does not create `document_classifications` or
-`review_decisions`. Those canonical tables belong to the separately approved
-human-review and promotion workflow.
+The classification migration deliberately does not create
+`document_classifications`. Durable final approve/reject decisions are handled
+by the later `0003_review_decision_memory` migration and repository. Canonical
+classification promotion still belongs to a separately implemented workflow.
 
 ## Integrity boundaries
 
@@ -70,8 +71,8 @@ record is verified intake state, not a fabricated classification success.
 
 - The composed runtime is not wired into desktop startup or a configured engine.
 - No file-instance registration is implemented.
-- No review, canonical promotion, workflow checkpoint, or classification audit
-  event is implemented in this revision.
+- No canonical promotion, workflow checkpoint, or classification audit event is
+  implemented in this revision.
 - No vector column or index is created; embedding parameters remain unresolved.
 - Local tests prove document and taxonomy replay behavior, statement
   parameterization, runtime ordering, fail-closed extraction gates, transaction

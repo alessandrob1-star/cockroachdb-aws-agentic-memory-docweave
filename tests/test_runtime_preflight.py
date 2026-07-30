@@ -80,6 +80,7 @@ def _required_tables() -> set[str]:
         "proposals",
         "classification_proposals",
         "proposal_evidence",
+        "review_decisions",
     }
 
 

@@ -62,8 +62,12 @@ exact proposal and optional operation plan that was reviewed, and append-only in
 the local test ledger. The cockpit now exposes local APPROVE and REJECT controls
 for selected review rows, records the decision against the retained proposal
 fingerprint, and visibly confirms that no copy or move has been executed. These
-controls do not yet persist review decisions in CockroachDB or execute approved
-filesystem operations. Automated tests exercise a 30-PDF cockpit batch with an
+controls are not yet wired to CockroachDB and do not execute approved
+filesystem operations. A third non-vector CockroachDB migration and typed
+repository now define atomic, idempotent persistence for final approve/reject
+review decisions, binding each decision to the exact proposal fingerprint and
+optional operation-plan fingerprint while updating the proposal status in the
+same transaction. Automated tests exercise a 30-PDF cockpit batch with an
 injected non-cloud function, and live desktop classification remains dependent
 on runtime configuration and a migrated database.
 Document-controlled persistence values remain bound parameters rather than
@@ -89,14 +93,14 @@ completed real extraction, model invocation, evidence reconstruction, and
 validation. This proves the integration slice, not classification quality or
 production readiness.
 
-A second non-vector CockroachDB migration and typed repository now define the
+A second non-vector CockroachDB migration and typed repository define the
 atomic, idempotent persistence of a validated Bedrock agent run, one
 non-authoritative classification proposal, minimized evidence excerpts, and
 runtime provenance. Model and document values remain bound SQL parameters, and
-the schema deliberately omits canonical classifications and review decisions
-until the human-review workflow is implemented. Runtime wiring, document
-registration, taxonomy initialization, and an uncalibrated scoring boundary are
-implemented locally. A side-effect-free application runtime configuration
+the schema deliberately omits canonical classifications until the promotion
+workflow is implemented. Runtime wiring, document registration, taxonomy
+initialization, and an uncalibrated scoring boundary are implemented locally. A
+side-effect-free application runtime configuration
 boundary can now compose the CockroachDB SQLAlchemy engine, approved Bedrock
 Runtime client, validated Bedrock gateway, and classification runtime from
 explicit environment values without opening a database connection or invoking a
@@ -187,7 +191,7 @@ docweave-runtime-preflight --database
 The default command validates configuration and Bedrock client construction
 without opening external services. The `--database` form opens the configured
 CockroachDB target and checks that the current non-vector DocWeave schema
-tables needed by classification are present.
+tables needed by classification and review persistence are present.
 
 The cockpit surfaces the same fail-closed runtime readiness categories in its
 connection-state panel at startup. This is still a configuration preflight only:
@@ -220,6 +224,7 @@ Approved architecture:
 - [CockroachDB Entity Relationship model](docs/architecture/cockroachdb-entity-relationship.md)
 - [CockroachDB operation persistence boundary](docs/architecture/cockroachdb-operation-persistence.md)
 - [CockroachDB classification persistence boundary](docs/architecture/cockroachdb-classification-persistence.md)
+- [CockroachDB review decision persistence boundary](docs/architecture/cockroachdb-review-decision-persistence.md)
 - [Desktop discovery shell](docs/architecture/desktop-discovery-shell.md)
 - [Verified AWS and CockroachDB environment baseline](docs/operations/environment-baseline.md)
 - [Runtime configuration runbook](docs/operations/runtime-configuration-runbook.md)
