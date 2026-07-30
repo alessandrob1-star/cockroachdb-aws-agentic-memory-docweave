@@ -146,6 +146,9 @@ def test_cockpit_starts_with_definitive_local_surface(
     assert window.left.table.rowCount() == 0
     assert "CockroachDB      Configured" in window.console.status_text.text()
     assert "Bedrock          Client configured" in window.console.status_text.text()
+    assert "Read-only CockroachDB restore history reader is available" in (
+        window.right.restore_text.text()
+    )
 
     close_cockpit_window(window)
 
@@ -175,6 +178,10 @@ def test_cockpit_surfaces_runtime_preflight_fail_closed(
     assert "CockroachDB      Not configured" in status
     assert "Bedrock          Blocked by config" in status
     assert "DOCWEAVE_DATABASE_URL" not in status
+    assert "Restore history reader blocked by runtime config" in (
+        window.right.restore_text.text()
+    )
+    assert "DOCWEAVE_DATABASE_URL" not in window.right.restore_text.text()
 
     close_cockpit_window(window)
 

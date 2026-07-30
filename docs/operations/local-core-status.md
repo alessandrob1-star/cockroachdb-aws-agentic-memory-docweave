@@ -223,7 +223,9 @@ can now load CockroachDB restore audit evidence by workspace, optional batch,
 and optional item filters, and the durable operation runtime now exposes that
 reader for future Activity History and restore UI views. The application
 runtime also has a side-effect-free restore audit runtime builder for real
-configuration handoff, but those views are not wired yet.
+configuration handoff. The cockpit now surfaces that boundary as a read-only
+restore history readiness indicator, but it does not yet render persisted
+history rows or execute restore actions from the user interface.
 
 `docs/operations/runtime-configuration-runbook.md` records the current
 operator sequence for safe local runtime configuration, configuration-only
