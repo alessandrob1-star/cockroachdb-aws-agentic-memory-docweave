@@ -160,6 +160,9 @@ Bounded batch classification uses the same explicit runtime path:
 docweave-classify-batch <folder> --authorized-root <folder> --limit 1000
 ```
 
+Use `--json-report <path>` to write a sanitized machine-readable validation
+artifact. Existing report files are not overwritten.
+
 These commands require explicit runtime configuration through environment
 variables and perform real extraction, Amazon Bedrock invocation, and
 CockroachDB writes only when invoked. It does not create cloud resources,

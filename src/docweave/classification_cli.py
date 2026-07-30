@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 import sys
 from dataclasses import dataclass
 from pathlib import Path
@@ -233,6 +234,65 @@ def classify_pdf_batch(
     )
 
 
+def batch_result_to_report(
+    result: ClassificationBatchCommandResult,
+) -> dict[str, object]:
+    """Return a sanitized machine-readable batch report."""
+    return {
+        "schema_version": "docweave.classification_batch_report.v1",
+        "discovered_count": result.discovered_count,
+        "attempted_count": result.attempted_count,
+        "succeeded_count": result.succeeded_count,
+        "failed_count": result.failed_count,
+        "limit": result.limit,
+        "stopped_on_failure": result.stopped_on_failure,
+        "items": [_batch_item_to_report(item) for item in result.items],
+    }
+
+
+def write_batch_report(
+    result: ClassificationBatchCommandResult,
+    report_path: Path,
+) -> None:
+    """Write one sanitized report without overwriting an existing file."""
+    payload = batch_result_to_report(result)
+    with report_path.open("x", encoding="utf-8") as stream:
+        json.dump(payload, stream, ensure_ascii=False, indent=2, sort_keys=True)
+        stream.write("\n")
+
+
+def _batch_item_to_report(
+    item: ClassificationBatchItemResult,
+) -> dict[str, object]:
+    payload: dict[str, object] = {
+        "relative_path": item.relative_path,
+        "status": item.status,
+    }
+    if item.status == "failed":
+        payload["error_category"] = item.error_category
+        return payload
+    assert item.result is not None
+    payload.update(
+        {
+            "proposed_class": item.result.proposed_class,
+            "document_disposition": item.result.document_disposition,
+            "taxonomy_disposition": item.result.taxonomy_disposition,
+            "proposal_disposition": item.result.proposal_disposition,
+            "input_tokens": item.result.input_tokens,
+            "output_tokens": item.result.output_tokens,
+            "total_tokens": item.result.total_tokens,
+            "estimated_cost_usd": item.result.estimated_cost_usd,
+            "evidence_count": item.result.evidence_count,
+            "metadata_count": item.result.metadata_count,
+            "raw_confidence": item.result.raw_confidence,
+            "classification_confidence": item.result.classification_confidence,
+            "metadata_confidence": item.result.metadata_confidence,
+            "retry_attempts": item.result.retry_attempts,
+        }
+    )
+    return payload
+
+
 def discover_batch_pdfs(
     source_root: Path,
     *,
@@ -376,6 +436,11 @@ def batch_main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="Stop after the first per-document failure.",
     )
+    parser.add_argument(
+        "--json-report",
+        type=Path,
+        help="Optional sanitized JSON report path. Existing files are not overwritten.",
+    )
     args = parser.parse_args(argv)
 
     try:
@@ -412,6 +477,13 @@ def batch_main(argv: list[str] | None = None) -> int:
             f"class={item.result.proposed_class} "
             f"tokens={item.result.total_tokens}"
         )
+    if args.json_report is not None:
+        try:
+            write_batch_report(result, args.json_report)
+        except FileExistsError:
+            print("Batch report failed: target already exists", file=sys.stderr)
+            return 2
+        print(f"JSON report: {args.json_report}")
     return 1 if result.failed_count else 0
 
 
