@@ -27,6 +27,7 @@ from docweave.analysis import (
 )
 from docweave.persistence import (
     ClassificationRuntime,
+    CockroachRestoreAuditRepository,
     CockroachReviewDecisionRepository,
     CockroachTransactionRunner,
     build_classification_runtime,
@@ -126,6 +127,16 @@ class ConfiguredReviewDecisionRuntime:
     repository: CockroachReviewDecisionRepository
 
 
+@dataclass(frozen=True, slots=True)
+class ConfiguredRestoreAuditRuntime:
+    """Lazily composed runtime dependencies for durable restore audit history."""
+
+    config: RuntimeEnvironmentConfig
+    engine: Engine
+    transaction_runner: CockroachTransactionRunner
+    repository: CockroachRestoreAuditRepository
+
+
 class SessionLike(Protocol):
     """Narrow boto3 session surface accepted by the Bedrock client factory."""
 
@@ -167,6 +178,16 @@ class ReviewRepositoryFactory(Protocol):
         transaction_runner: CockroachTransactionRunner,
     ) -> CockroachReviewDecisionRepository:
         """Create a review decision repository."""
+
+
+class RestoreAuditRepositoryFactory(Protocol):
+    """Narrow restore audit repository factory used for deterministic tests."""
+
+    def __call__(
+        self,
+        transaction_runner: CockroachTransactionRunner,
+    ) -> CockroachRestoreAuditRepository:
+        """Create a restore audit repository."""
 
 
 def runtime_integration_snapshot(
@@ -253,6 +274,30 @@ def build_configured_review_decision_runtime(
     )
 
 
+def build_configured_restore_audit_runtime(
+    environment: Mapping[str, str] | None = None,
+    *,
+    engine_factory: EngineFactory = create_engine,
+    transaction_runner_factory: TransactionRunnerFactory = CockroachTransactionRunner,
+    repository_factory: RestoreAuditRepositoryFactory = CockroachRestoreAuditRepository,
+) -> ConfiguredRestoreAuditRuntime:
+    """Compose CockroachDB restore-history dependencies without database I/O."""
+    config = load_runtime_environment_config(environment)
+    engine = engine_factory(
+        config.database_url,
+        pool_pre_ping=True,
+        future=True,
+    )
+    transaction_runner = transaction_runner_factory(engine)
+    repository = repository_factory(transaction_runner)
+    return ConfiguredRestoreAuditRuntime(
+        config=config,
+        engine=engine,
+        transaction_runner=transaction_runner,
+        repository=repository,
+    )
+
+
 def _required_secret_like_value(values: Mapping[str, str], variable_name: str) -> str:
     value = values.get(variable_name, "")
     if not value.strip():
@@ -286,12 +331,14 @@ __all__ = [
     "DOCWEAVE_TAXONOMY_VERSION_ID",
     "DOCWEAVE_WORKSPACE_ID",
     "ConfiguredClassificationRuntime",
+    "ConfiguredRestoreAuditRuntime",
     "ConfiguredReviewDecisionRuntime",
     "RuntimeConfigurationError",
     "RuntimeConfigurationErrorCode",
     "RuntimeEnvironmentConfig",
     "RuntimeIntegrationSnapshot",
     "build_configured_classification_runtime",
+    "build_configured_restore_audit_runtime",
     "build_configured_review_decision_runtime",
     "load_runtime_environment_config",
     "runtime_integration_snapshot",

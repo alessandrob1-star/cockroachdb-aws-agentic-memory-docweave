@@ -12,12 +12,14 @@ from docweave.application_runtime import (
     RuntimeConfigurationError,
     RuntimeConfigurationErrorCode,
     build_configured_classification_runtime,
+    build_configured_restore_audit_runtime,
     build_configured_review_decision_runtime,
     load_runtime_environment_config,
     runtime_integration_snapshot,
 )
 from docweave.persistence import (
     ClassificationRuntime,
+    CockroachRestoreAuditRepository,
     CockroachReviewDecisionRepository,
     CockroachTransactionRunner,
 )
@@ -148,4 +150,38 @@ def test_configured_review_decision_runtime_composition_is_lazy() -> None:
         "engine:cockroachdb://user:secret@example.test/docweave:True",
         "transactions",
         "review_repository",
+    ]
+
+
+def test_configured_restore_audit_runtime_composition_is_lazy() -> None:
+    calls: list[str] = []
+
+    def fake_engine_factory(url: str, **kwargs: Any) -> Engine:
+        calls.append(f"engine:{url}:{kwargs['pool_pre_ping']}")
+        return cast(Engine, object())
+
+    def fake_transaction_runner_factory(engine: Engine) -> CockroachTransactionRunner:
+        assert engine is not None
+        calls.append("transactions")
+        return cast(CockroachTransactionRunner, object())
+
+    def fake_repository_factory(
+        transaction_runner: CockroachTransactionRunner,
+    ) -> CockroachRestoreAuditRepository:
+        assert transaction_runner is not None
+        calls.append("restore_audit_repository")
+        return cast(CockroachRestoreAuditRepository, object())
+
+    configured = build_configured_restore_audit_runtime(
+        _valid_environment(),
+        engine_factory=fake_engine_factory,
+        transaction_runner_factory=fake_transaction_runner_factory,
+        repository_factory=fake_repository_factory,
+    )
+
+    assert configured.config.workspace_id == UUID(WORKSPACE_ID)
+    assert calls == [
+        "engine:cockroachdb://user:secret@example.test/docweave:True",
+        "transactions",
+        "restore_audit_repository",
     ]
