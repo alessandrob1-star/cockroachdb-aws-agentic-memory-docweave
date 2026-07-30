@@ -6,9 +6,16 @@ from datetime import UTC, datetime
 from enum import StrEnum
 from hashlib import sha256
 from pathlib import Path
+from uuid import uuid4
 
 from docweave.core.fingerprints import compute_sha256_fingerprint
 from docweave.operations.approval import approve_operation_plan
+from docweave.operations.audit import (
+    AppendOnlyAuditTrail,
+    AuditActorType,
+    AuditEvent,
+    AuditEventType,
+)
 from docweave.operations.execution import (
     ExecutionReason,
     ExecutionResult,
@@ -133,6 +140,18 @@ class RestoreExecutionResult:
     def succeeded(self) -> bool:
         """Return whether the restore completed and verified successfully."""
         return self.status is RestoreExecutionStatus.SUCCEEDED
+
+
+@dataclass(frozen=True, slots=True)
+class RestoreAuditContext:
+    """Attribution context for explicit restore audit events."""
+
+    workspace_id: str
+    batch_id: str
+    batch_item_id: str
+    actor_id: str
+    correlation_id: str
+    occurred_at_utc: datetime
 
 
 @dataclass(frozen=True, slots=True)
@@ -448,6 +467,71 @@ def execute_restore_operation(
     return _execute_move_restore(plan, approval, restore_id=restore_id, now_utc=now_utc)
 
 
+def append_restore_approval_audit_event(
+    audit_trail: AppendOnlyAuditTrail,
+    plan: RestorePlan,
+    approval: RestoreApproval,
+    context: RestoreAuditContext,
+) -> AuditEvent:
+    """Append one explicit human approval event for an exact restore preview."""
+    event = AuditEvent(
+        event_id=str(uuid4()),
+        workspace_id=context.workspace_id,
+        batch_id=context.batch_id,
+        batch_item_id=context.batch_item_id,
+        event_type=AuditEventType.RESTORE_APPROVED,
+        actor_type=AuditActorType.HUMAN,
+        actor_id=context.actor_id,
+        occurred_at_utc=approval.approved_at_utc,
+        correlation_id=context.correlation_id,
+        previous_state=RestorePlanStatus.READY.value,
+        new_state="approved",
+        reason=plan.reason.value,
+        plan_fingerprint=approval.restore_fingerprint,
+        approval_id=approval.approval_id,
+        source_relative_path=plan.source_relative_path,
+        destination_relative_path=plan.destination_relative_path,
+    )
+    audit_trail.append(event)
+    return event
+
+
+def append_restore_execution_audit_event(
+    audit_trail: AppendOnlyAuditTrail,
+    plan: RestorePlan,
+    result: RestoreExecutionResult,
+    context: RestoreAuditContext,
+) -> AuditEvent:
+    """Append one explicit terminal restore execution event."""
+    event = AuditEvent(
+        event_id=str(uuid4()),
+        workspace_id=context.workspace_id,
+        batch_id=context.batch_id,
+        batch_item_id=context.batch_item_id,
+        event_type=_restore_audit_event_type(result.status),
+        actor_type=AuditActorType.SYSTEM,
+        actor_id=context.actor_id,
+        occurred_at_utc=context.occurred_at_utc,
+        correlation_id=context.correlation_id,
+        idempotency_key=result.restore_id,
+        previous_state="approved",
+        new_state=result.status.value,
+        reason=result.reason.value,
+        plan_fingerprint=result.restore_fingerprint,
+        approval_id=result.approval_id,
+        source_relative_path=plan.source_relative_path,
+        destination_relative_path=plan.destination_relative_path,
+        error_class=result.error,
+        error_category=(
+            None
+            if result.status is RestoreExecutionStatus.SUCCEEDED
+            else result.reason.value
+        ),
+    )
+    audit_trail.append(event)
+    return event
+
+
 def restore_plan_fingerprint(plan: RestorePlan) -> str:
     """Return a stable fingerprint for the exact user-visible restore preview."""
     payload = {
@@ -465,6 +549,17 @@ def restore_plan_fingerprint(plan: RestorePlan) -> str:
     }
     canonical_json = json.dumps(payload, sort_keys=True, separators=(",", ":"))
     return sha256(canonical_json.encode("utf-8")).hexdigest()
+
+
+def _restore_audit_event_type(status: RestoreExecutionStatus) -> AuditEventType:
+    return {
+        RestoreExecutionStatus.SUCCEEDED: AuditEventType.RESTORE_EXECUTION_SUCCEEDED,
+        RestoreExecutionStatus.BLOCKED: AuditEventType.RESTORE_EXECUTION_BLOCKED,
+        RestoreExecutionStatus.FAILED: AuditEventType.RESTORE_EXECUTION_FAILED,
+        RestoreExecutionStatus.VERIFICATION_FAILED: (
+            AuditEventType.RESTORE_VERIFICATION_FAILED
+        ),
+    }[status]
 
 
 def _restore_precondition_blocker(

@@ -59,6 +59,7 @@ from docweave.operations.planning import (
 )
 from docweave.operations.restore import (
     RestoreApproval,
+    RestoreAuditContext,
     RestoreExecutionReason,
     RestoreExecutionResult,
     RestoreExecutionStatus,
@@ -66,6 +67,8 @@ from docweave.operations.restore import (
     RestorePlan,
     RestorePlanReason,
     RestorePlanStatus,
+    append_restore_approval_audit_event,
+    append_restore_execution_audit_event,
     approve_restore_plan,
     execute_restore_operation,
     plan_restore_operation,
@@ -132,6 +135,7 @@ __all__ = [
     "ProposalReviewDecision",
     "ProposalReviewDecisionRequest",
     "RestoreApproval",
+    "RestoreAuditContext",
     "RestoreExecutionReason",
     "RestoreExecutionResult",
     "RestoreExecutionStatus",
@@ -144,6 +148,8 @@ __all__ = [
     "ReviewDecisionValidation",
     "ReviewDecisionValidationReason",
     "ReviewDecisionValidationStatus",
+    "append_restore_approval_audit_event",
+    "append_restore_execution_audit_event",
     "approve_operation_batch",
     "approve_operation_plan",
     "approve_restore_plan",

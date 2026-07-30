@@ -3,18 +3,24 @@ from pathlib import Path
 
 from docweave.core.fingerprints import compute_sha256_fingerprint
 from docweave.operations import (
+    AppendOnlyAuditTrail,
+    AuditActorType,
+    AuditEventType,
     ExecutionReason,
     ExecutionStatus,
     FileOperation,
     FileOperationPlan,
     FileOperationRequest,
     OperationResultRecord,
+    RestoreAuditContext,
     RestoreExecutionReason,
     RestoreExecutionStatus,
     RestoreOperation,
     RestorePlanReason,
     RestorePlanStatus,
     ResultDisposition,
+    append_restore_approval_audit_event,
+    append_restore_execution_audit_event,
     approve_restore_plan,
     execute_file_operation,
     execute_restore_operation,
@@ -24,6 +30,17 @@ from docweave.operations import (
 from docweave.operations.approval import approve_operation_plan
 
 BASE_TIME = datetime(2026, 7, 30, 12, 0, tzinfo=UTC)
+
+
+def restore_audit_context() -> RestoreAuditContext:
+    return RestoreAuditContext(
+        workspace_id="workspace-001",
+        batch_id="batch-001",
+        batch_item_id="item-001",
+        actor_id="reviewer-001",
+        correlation_id="restore-correlation-001",
+        occurred_at_utc=BASE_TIME.replace(minute=4),
+    )
 
 
 def write_file(path: Path, content: bytes = b"%PDF-1.7\ncontent") -> None:
@@ -281,3 +298,77 @@ def test_blocks_restore_execution_when_plan_changes_after_approval(
     assert execution.status is RestoreExecutionStatus.BLOCKED
     assert execution.reason is RestoreExecutionReason.RESTORE_PLAN_CHANGED
     assert plan.destination_path.exists()
+
+
+def test_appends_restore_approval_and_execution_audit_events(
+    tmp_path: Path,
+) -> None:
+    plan, result = execute_original_operation(tmp_path, operation=FileOperation.COPY)
+    restore = plan_restore_operation(plan, result)
+    approval = approve_restore_plan(
+        restore,
+        approval_id="restore-approval-001",
+        approved_by_user_id="reviewer-001",
+        approved_at_utc=BASE_TIME.replace(minute=2),
+        expires_at_utc=BASE_TIME.replace(hour=13),
+    )
+    execution = execute_restore_operation(
+        restore,
+        approval,
+        restore_id="restore-001",
+        now_utc=BASE_TIME.replace(minute=3),
+    )
+    trail = AppendOnlyAuditTrail()
+    context = restore_audit_context()
+
+    approval_event = append_restore_approval_audit_event(
+        trail,
+        restore,
+        approval,
+        context,
+    )
+    execution_event = append_restore_execution_audit_event(
+        trail,
+        restore,
+        execution,
+        context,
+    )
+
+    assert trail.events == (approval_event, execution_event)
+    assert approval_event.event_type is AuditEventType.RESTORE_APPROVED
+    assert approval_event.actor_type is AuditActorType.HUMAN
+    assert approval_event.plan_fingerprint == approval.restore_fingerprint
+    assert execution_event.event_type is AuditEventType.RESTORE_EXECUTION_SUCCEEDED
+    assert execution_event.actor_type is AuditActorType.SYSTEM
+    assert execution_event.idempotency_key == "restore-001"
+    assert execution_event.error_category is None
+
+
+def test_restore_execution_audit_records_blocked_reason(tmp_path: Path) -> None:
+    plan, result = execute_original_operation(tmp_path, operation=FileOperation.COPY)
+    restore = plan_restore_operation(plan, result)
+    approval = approve_restore_plan(
+        restore,
+        approval_id="restore-approval-001",
+        approved_by_user_id="reviewer-001",
+        approved_at_utc=BASE_TIME.replace(minute=2),
+        expires_at_utc=BASE_TIME.replace(minute=3),
+    )
+    execution = execute_restore_operation(
+        restore,
+        approval,
+        restore_id="restore-001",
+        now_utc=BASE_TIME.replace(minute=3),
+    )
+    trail = AppendOnlyAuditTrail()
+
+    event = append_restore_execution_audit_event(
+        trail,
+        restore,
+        execution,
+        restore_audit_context(),
+    )
+
+    assert event.event_type is AuditEventType.RESTORE_EXECUTION_BLOCKED
+    assert event.error_category == RestoreExecutionReason.APPROVAL_EXPIRED.value
+    assert event.reason == RestoreExecutionReason.APPROVAL_EXPIRED.value
