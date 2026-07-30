@@ -1,6 +1,7 @@
 # CockroachDB Classification Persistence Boundary
 
-**Status:** Implemented adapter and migration; runtime wiring pending
+**Status:** Implemented adapter, migration, command-line runtime wiring, and
+desktop batch dispatch wiring
 **Revision:** `0002_classification_memory`
 
 ## Purpose
