@@ -9,11 +9,15 @@ from docweave.operations import (
     FileOperationPlan,
     FileOperationRequest,
     OperationResultRecord,
+    RestoreExecutionReason,
+    RestoreExecutionStatus,
     RestoreOperation,
     RestorePlanReason,
     RestorePlanStatus,
     ResultDisposition,
+    approve_restore_plan,
     execute_file_operation,
+    execute_restore_operation,
     plan_file_operation,
     plan_restore_operation,
 )
@@ -171,3 +175,109 @@ def test_blocks_restore_for_failed_original_result(tmp_path: Path) -> None:
 
     assert restore.status is RestorePlanStatus.BLOCKED
     assert restore.reason is RestorePlanReason.ORIGINAL_RESULT_NOT_SUCCEEDED
+
+
+def test_executes_approved_copy_restore_by_removing_generated_copy(
+    tmp_path: Path,
+) -> None:
+    plan, result = execute_original_operation(tmp_path, operation=FileOperation.COPY)
+    restore = plan_restore_operation(plan, result)
+    approval = approve_restore_plan(
+        restore,
+        approval_id="restore-approval-001",
+        approved_by_user_id="reviewer-001",
+        approved_at_utc=BASE_TIME.replace(minute=2),
+        expires_at_utc=BASE_TIME.replace(hour=13),
+    )
+
+    execution = execute_restore_operation(
+        restore,
+        approval,
+        restore_id="restore-001",
+        now_utc=BASE_TIME.replace(minute=3),
+    )
+
+    assert execution.succeeded is True
+    assert execution.status is RestoreExecutionStatus.SUCCEEDED
+    assert execution.reason is RestoreExecutionReason.SUCCEEDED
+    assert plan.source_path is not None
+    assert plan.destination_path is not None
+    assert plan.source_path.exists()
+    assert not plan.destination_path.exists()
+
+
+def test_executes_approved_move_restore_without_overwrite(tmp_path: Path) -> None:
+    plan, result = execute_original_operation(tmp_path, operation=FileOperation.MOVE)
+    restore = plan_restore_operation(plan, result)
+    approval = approve_restore_plan(
+        restore,
+        approval_id="restore-approval-001",
+        approved_by_user_id="reviewer-001",
+        approved_at_utc=BASE_TIME.replace(minute=2),
+        expires_at_utc=BASE_TIME.replace(hour=13),
+    )
+
+    execution = execute_restore_operation(
+        restore,
+        approval,
+        restore_id="restore-001",
+        now_utc=BASE_TIME.replace(minute=3),
+    )
+
+    assert execution.status is RestoreExecutionStatus.SUCCEEDED
+    assert execution.reason is RestoreExecutionReason.SUCCEEDED
+    assert plan.source_path is not None
+    assert plan.destination_path is not None
+    assert plan.source_path.exists()
+    assert not plan.destination_path.exists()
+
+
+def test_blocks_restore_execution_when_approval_expired(tmp_path: Path) -> None:
+    plan, result = execute_original_operation(tmp_path, operation=FileOperation.COPY)
+    restore = plan_restore_operation(plan, result)
+    approval = approve_restore_plan(
+        restore,
+        approval_id="restore-approval-001",
+        approved_by_user_id="reviewer-001",
+        approved_at_utc=BASE_TIME.replace(minute=2),
+        expires_at_utc=BASE_TIME.replace(minute=3),
+    )
+
+    execution = execute_restore_operation(
+        restore,
+        approval,
+        restore_id="restore-001",
+        now_utc=BASE_TIME.replace(minute=3),
+    )
+
+    assert execution.status is RestoreExecutionStatus.BLOCKED
+    assert execution.reason is RestoreExecutionReason.APPROVAL_EXPIRED
+    assert plan.destination_path is not None
+    assert plan.destination_path.exists()
+
+
+def test_blocks_restore_execution_when_plan_changes_after_approval(
+    tmp_path: Path,
+) -> None:
+    plan, result = execute_original_operation(tmp_path, operation=FileOperation.COPY)
+    restore = plan_restore_operation(plan, result)
+    approval = approve_restore_plan(
+        restore,
+        approval_id="restore-approval-001",
+        approved_by_user_id="reviewer-001",
+        approved_at_utc=BASE_TIME.replace(minute=2),
+        expires_at_utc=BASE_TIME.replace(hour=13),
+    )
+    assert plan.destination_path is not None
+    plan.destination_path.write_bytes(b"%PDF-1.7\nchanged")
+
+    execution = execute_restore_operation(
+        restore,
+        approval,
+        restore_id="restore-001",
+        now_utc=BASE_TIME.replace(minute=3),
+    )
+
+    assert execution.status is RestoreExecutionStatus.BLOCKED
+    assert execution.reason is RestoreExecutionReason.RESTORE_PLAN_CHANGED
+    assert plan.destination_path.exists()
