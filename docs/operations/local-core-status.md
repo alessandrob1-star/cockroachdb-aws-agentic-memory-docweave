@@ -159,7 +159,7 @@ must be closed before production-grade batch execution:
 | No live application bootstrap execution | The composed restart path is not yet a live application integration | Run the configured runtime against the approved validation target |
 | Audit adapter has no live runtime evidence | Activity History cannot yet survive restart | Run approved integration and restart tests against CockroachDB |
 | Lease renewal and execution fencing are not implemented | A worker that outlives its lease is not yet safe for concurrent production execution | Add renewal or fencing before enabling multiple workers |
-| No restore contract | Move and copy outcomes are not yet reversible through tested restore semantics | Add restore planning after batch result and audit semantics |
+| Restore execution not wired | Move and copy outcomes now have tested restore-preview semantics, but no approved restore executor or durable restore audit path is wired yet | Add approved restore execution and CockroachDB-backed restore history |
 | No workspace/user authorization model | Approval uses user identifiers but no role policy yet | Add authorization contract before user interface or cloud execution |
 
 ## 6. Completed live validation boundary
@@ -190,13 +190,22 @@ instead of waiting for the whole CockroachDB milestone to finish.
 The desktop cockpit now presents phase progress, cooperative cancellation,
 process-local workspace state, discovered PDF preview, guarded external-link
 delegation, sanitized fail-closed CockroachDB/Bedrock runtime preflight
-readiness, and a background Analyze dispatch for the selected ready PDF. The
-startup preflight does not open CockroachDB or invoke Bedrock; it only exposes
-configuration and client-construction readiness. Accepted proposals update the
-visible document row to `REVIEW`, show the proposed class, and report Bedrock
-token and persistence dispositions as non-authoritative review evidence. Its
-next increment must run that workflow against the approved live validation
-target without inventing CockroachDB persistence or user authorization.
+readiness, and a background Analyze dispatch for ready PDFs. Analyze now
+refreshes the fail-closed runtime preflight immediately before classification,
+so a startup configuration block can be retried without restarting the cockpit.
+The startup preflight does not open CockroachDB or invoke Bedrock; it only
+exposes configuration and client-construction readiness. Accepted proposals
+update the visible document row to `REVIEW`, show the proposed class, and
+report Bedrock token and persistence dispositions as non-authoritative review
+evidence. Its next increment must run that workflow against the approved live
+validation target without inventing CockroachDB persistence or user
+authorization.
+
+The local core also has a restore-preview contract for prior successful copy
+and move results. It blocks changed generated copies, changed moved files,
+missing files, non-succeeded source results, and original-location collisions.
+This is not yet restore execution, user-interface restore, or durable restore
+history.
 
 `docs/operations/runtime-configuration-runbook.md` records the current
 operator sequence for safe local runtime configuration, configuration-only
