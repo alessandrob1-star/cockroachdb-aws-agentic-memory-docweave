@@ -110,14 +110,17 @@ def assert_visible_classification_proposal(window: CockpitWindow) -> None:
     review_metric = cast(Any, window.right.metric_frames[2]).number
     assert ready_metric.text() == "0"
     assert review_metric.text() == "30"
-    assert cast(Any, window.right.event_rows[0]).event_text.text() == ("30/30 complete")
-    assert cast(Any, window.right.event_rows[1]).event_text.text() == (
+    assert cast(Any, window.right.event_rows[0]).event_text.text() == (
+        "30/30 persisted"
+    )
+    assert cast(Any, window.right.event_rows[1]).event_text.text() == "0 item(s)"
+    assert cast(Any, window.right.event_rows[2]).event_text.text() == (
         "30 awaiting human review"
     )
-    assert cast(Any, window.right.event_rows[2]).event_text.text() == (
+    assert cast(Any, window.right.event_rows[3]).event_text.text() == (
         "0 ready remaining"
     )
-    assert cast(Any, window.right.event_rows[3]).event_text.text() == (
+    assert cast(Any, window.right.event_rows[4]).event_text.text() == (
         "Proposals persisted"
     )
 
@@ -495,10 +498,10 @@ def test_cockpit_analysis_batch_preserves_progress_after_failure(
     assert calls == list(batch_paths)
     assert window.left.count_status("REVIEW") == 2
     assert window.left.count_status("READY") == 1
-    assert "Classification batch failed safely (RuntimeError)." in (
+    assert "Classification batch complete: 2 of 3 proposal(s) persisted" in (
         window.console.log_text.text()
     )
-    assert "2/3 proposal(s) persisted" in window.console.log_text.text()
+    assert "Failed item(s): 1" in window.console.log_text.text()
     assert window.console.buttons[3].isEnabled()
 
     close_cockpit_window(window)
