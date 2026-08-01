@@ -281,6 +281,11 @@ Launch the initial read-only desktop discovery shell:
 .\.venv\Scripts\docweave-desktop.exe
 ```
 
+On Windows, the same dashboard can also be started by double-clicking
+`launch-docweave-dashboard.cmd` in the repository root. The launcher uses only
+the repository-local virtual environment and does not embed runtime credentials
+or cloud configuration.
+
 The shell does not yet connect to CockroachDB or Amazon Bedrock, does not
 persist its session, and does not modify files.
 
