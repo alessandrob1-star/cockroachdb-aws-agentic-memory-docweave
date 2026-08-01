@@ -6,6 +6,7 @@ import pytest
 from PySide6.QtCore import QCoreApplication, QEventLoop, QTimer
 from PySide6.QtWidgets import QFileDialog
 
+import docweave.desktop.cockpit as cockpit_module
 from docweave.analysis import BedrockGatewayError, BedrockGatewayErrorCode
 from docweave.application_runtime import RuntimeIntegrationSnapshot
 from docweave.classification_cli import (
@@ -427,6 +428,84 @@ def test_cockpit_retries_runtime_preflight_before_analyze(
     assert preflight_calls == 2
     assert calls == 1
     assert "Classification batch complete: 1 of 1" in window.console.log_text.text()
+
+    close_cockpit_window(window)
+
+
+def test_cockpit_checks_database_before_analyze_and_reports_reachable(
+    qt_application: object,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    corpus = Path("pdf_sintetici").resolve(strict=True)
+    first_pdf = sorted(corpus.glob("*.pdf"))[0]
+    check_database_calls: list[bool] = []
+
+    def fake_run_preflight(*, check_database: bool) -> RuntimePreflightReport:
+        check_database_calls.append(check_database)
+        cockroach_state = PreflightState.OK if check_database else PreflightState.SKIP
+        cockroach_detail = "reachable" if check_database else "not_requested"
+        return RuntimePreflightReport(
+            checks=(
+                PreflightCheck("runtime_config", PreflightState.OK, "loaded"),
+                PreflightCheck(
+                    "bedrock_client",
+                    PreflightState.OK,
+                    "eu-central-1:configured",
+                ),
+                PreflightCheck(
+                    "cockroachdb_connection",
+                    cockroach_state,
+                    cockroach_detail,
+                ),
+            )
+        )
+
+    def fake_classification(
+        source_path: Path,
+        authorized_root: Path,
+    ) -> ClassificationCommandResult:
+        return ClassificationCommandResult(
+            proposed_class="invoice",
+            document_disposition="applied",
+            taxonomy_disposition="applied",
+            proposal_disposition="applied",
+            input_tokens=10,
+            output_tokens=5,
+            total_tokens=15,
+            estimated_cost_usd=None,
+            document_language="en",
+            rationale="The document contains invoice wording and a total.",
+        )
+
+    monkeypatch.setenv(
+        "DOCWEAVE_DATABASE_URL",
+        "cockroachdb://user:secret@example.test/docweave",
+    )
+    monkeypatch.setattr(cockpit_module, "run_preflight", fake_run_preflight)
+
+    window = CockpitWindow(classification_function=fake_classification)
+    window.set_authorized_root(corpus)
+    window.left.set_documents(
+        [
+            Document(
+                name=first_pdf.name,
+                category="PDF",
+                pages="-",
+                status="READY",
+                path=first_pdf,
+            )
+        ]
+    )
+    window._selected_document_row = 0
+    window._set_busy(False)
+
+    assert "CockroachDB      Configured" in window.console.status_text.text()
+
+    window._analyze_selected_document()
+    wait_for_cockpit_classification(window)
+
+    assert check_database_calls == [False, True]
+    assert "CockroachDB      Reachable" in window.console.status_text.text()
 
     close_cockpit_window(window)
 
