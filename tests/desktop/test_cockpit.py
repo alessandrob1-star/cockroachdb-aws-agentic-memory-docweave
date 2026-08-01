@@ -158,6 +158,9 @@ def test_cockpit_starts_with_definitive_local_surface(
 
     assert window.windowTitle() == "DocWeave Cockpit"
     assert window.left.table.rowCount() == 0
+    assert window.left.table.font().pointSize() >= 11
+    assert window.left.table.horizontalHeader().font().pointSize() >= 11
+    assert cast(Any, window.right.event_rows[0]).event_text.wordWrap()
     assert "CockroachDB      Configured" in window.console.status_text.text()
     assert "Bedrock          Client configured" in window.console.status_text.text()
     assert "Read-only CockroachDB restore history reader is available" in (

@@ -651,8 +651,10 @@ class LeftScreen(ShapeWidget):
         self.table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
         self.table.setSelectionMode(QTableWidget.SelectionMode.SingleSelection)
         self.table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
+        self.table.setFont(QFont("Segoe UI", 11, QFont.Weight.Medium))
 
         header = self.table.horizontalHeader()
+        header.setFont(QFont("Segoe UI", 11, QFont.Weight.Bold))
         header.setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
         header.setSectionResizeMode(1, QHeaderView.ResizeMode.ResizeToContents)
         header.setSectionResizeMode(2, QHeaderView.ResizeMode.ResizeToContents)
@@ -753,6 +755,7 @@ class LeftScreen(ShapeWidget):
                     else ACCENT
                 )
             self.table.setItem(row, column, item)
+        self.table.setRowHeight(row, 34)
 
     def count_status(self, status: str) -> int:
         """Count current visible document states."""
@@ -902,6 +905,7 @@ class RightScreen(ShapeWidget):
             a.setObjectName("eventName")
             b = QLabel(text, frame)
             b.setObjectName("eventText")
+            b.setWordWrap(True)
             frame.event_name = a
             frame.event_text = b
             self.event_rows.append(frame)
@@ -974,7 +978,7 @@ class RightScreen(ShapeWidget):
         )
 
         row_y = stream_top + 30
-        row_height = 50
+        row_height = 58
         row_gap = 8
         for frame in self.event_rows:
             frame.setGeometry(
@@ -983,8 +987,8 @@ class RightScreen(ShapeWidget):
                 content_width,
                 row_height,
             )
-            frame.event_name.setGeometry(12, 7, content_width - 24, 18)
-            frame.event_text.setGeometry(12, 28, content_width - 24, 22)
+            frame.event_name.setGeometry(12, 7, content_width - 24, 20)
+            frame.event_text.setGeometry(12, 29, content_width - 24, 26)
             row_y += row_height + row_gap
 
         restore_y = row_y + 4
@@ -2080,7 +2084,7 @@ class CockpitWindow(QMainWindow):
 
             QLabel#brand {
                 color: #FF3B3B;
-                font-size: 15px;
+                font-size: 17px;
                 font-weight: 700;
                 letter-spacing: 0.7px;
                 background: transparent;
@@ -2088,7 +2092,7 @@ class CockpitWindow(QMainWindow):
 
             QLabel#screenTitle {
                 color: #FF3B3B;
-                font-size: 14px;
+                font-size: 16px;
                 font-weight: 700;
                 letter-spacing: 0.4px;
                 background: transparent;
@@ -2096,7 +2100,7 @@ class CockpitWindow(QMainWindow):
 
             QLabel#sectionLabel {
                 color: #FF4C4C;
-                font-size: 10px;
+                font-size: 12px;
                 font-weight: 700;
                 letter-spacing: 0.5px;
                 background: transparent;
@@ -2104,14 +2108,14 @@ class CockpitWindow(QMainWindow):
 
             QLabel#online {
                 color: #FF3B3B;
-                font-size: 10px;
+                font-size: 11px;
                 font-weight: 800;
                 background: transparent;
             }
 
             QLabel#muted {
                 color: #FF6A6A;
-                font-size: 10px;
+                font-size: 11px;
                 font-weight: 700;
                 background: transparent;
             }
@@ -2131,6 +2135,7 @@ class CockpitWindow(QMainWindow):
                 outline: none;
                 selection-background-color: rgba(73, 179, 144, 75);
                 selection-color: #FFFFFF;
+                font-size: 12px;
             }
 
             QTableWidget#documentTable::item {
@@ -2143,8 +2148,8 @@ class CockpitWindow(QMainWindow):
                 border: none;
                 border-bottom: 1px solid rgba(89, 198, 162, 80);
                 color: #A8C2B8;
-                font-size: 10px;
-                font-weight: 600;
+                font-size: 12px;
+                font-weight: 800;
                 padding: 8px;
             }
 
@@ -2156,14 +2161,14 @@ class CockpitWindow(QMainWindow):
 
             QLabel#metricValue {
                 color: #EAF5F1;
-                font-size: 24px;
+                font-size: 27px;
                 font-weight: 800;
             }
 
             QLabel#metricLabel {
                 color: #7EA496;
-                font-size: 9px;
-                font-weight: 700;
+                font-size: 10px;
+                font-weight: 800;
             }
 
             QFrame#eventRow {
@@ -2174,14 +2179,14 @@ class CockpitWindow(QMainWindow):
 
             QLabel#eventName {
                 color: #67D8B0;
-                font-size: 9px;
+                font-size: 11px;
                 font-weight: 800;
             }
 
             QLabel#eventText {
                 color: #EDF7F3;
-                font-size: 10px;
-                font-weight: 500;
+                font-size: 11px;
+                font-weight: 650;
             }
 
             QPushButton {

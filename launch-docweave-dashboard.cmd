@@ -4,8 +4,14 @@ setlocal
 set "DOCWEAVE_REPO_DIR=%~dp0"
 cd /d "%DOCWEAVE_REPO_DIR%"
 
+set "DOCWEAVE_RUNTIME_LAUNCHER=%APPDATA%\DocWeave\launch-docweave-runtime.cmd"
 set "DOCWEAVE_DESKTOP_EXE=%DOCWEAVE_REPO_DIR%.venv\Scripts\docweave-desktop.exe"
 set "DOCWEAVE_PYTHON_EXE=%DOCWEAVE_REPO_DIR%.venv\Scripts\python.exe"
+
+if exist "%DOCWEAVE_RUNTIME_LAUNCHER%" (
+    start "DocWeave Dashboard" "%DOCWEAVE_RUNTIME_LAUNCHER%"
+    exit /b 0
+)
 
 if exist "%DOCWEAVE_DESKTOP_EXE%" (
     start "DocWeave Dashboard" "%DOCWEAVE_DESKTOP_EXE%"

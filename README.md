@@ -283,9 +283,12 @@ Launch the initial read-only desktop discovery shell:
 ```
 
 On Windows, the same dashboard can also be started by double-clicking
-`launch-docweave-dashboard.cmd` in the repository root. The launcher uses only
-the repository-local virtual environment and does not embed runtime credentials
-or cloud configuration.
+`launch-docweave-dashboard.cmd` in the repository root. When the local
+runtime launcher exists under the user's DocWeave application-data directory,
+the repository launcher delegates to it so the dashboard inherits the explicit
+runtime environment already configured outside the repository. Otherwise it
+falls back to the repository-local virtual environment. It does not embed
+runtime credentials or cloud configuration.
 
 The shell does not yet connect to CockroachDB or Amazon Bedrock, does not
 persist scan results or document analysis by default, and does not modify
