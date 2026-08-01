@@ -94,6 +94,7 @@ from docweave.desktop.link_security import (
     ExternalLinkOutcome,
     request_external_pdf_link,
 )
+from docweave.desktop.folder_memory import FolderMemory, QtFolderMemory
 from docweave.desktop.opening import PdfOpenValidationError, validate_pdf_for_open
 from docweave.desktop.preview import SecurePdfView
 from docweave.desktop.scan import (
@@ -1963,7 +1964,7 @@ class CockpitWindow(QMainWindow):
     scan_finished = Signal()
     classification_finished = Signal()
 
-    def __init__(
+    def __init__(  # noqa: PLR0913
         self,
         *,
         scan_function: ScanFunction = scan_authorized_root,
@@ -1971,12 +1972,16 @@ class CockpitWindow(QMainWindow):
         classification_function: ClassificationFunction = classify_pdf_for_cockpit,
         review_decision_function: ReviewDecisionFunction = persist_review_decision,
         runtime_preflight_function: RuntimePreflightFunction | None = None,
+        folder_memory: FolderMemory | None = None,
     ) -> None:
         super().__init__()
         self._scan_function = scan_function
         self._classification_function = classification_function
         self._review_decision_function = review_decision_function
         self._runtime_preflight_function = runtime_preflight_function
+        self._folder_memory = (
+            folder_memory if folder_memory is not None else QtFolderMemory()
+        )
         self._integration_snapshot = (
             integration_snapshot
             if integration_snapshot is not None
@@ -2279,6 +2284,7 @@ class CockpitWindow(QMainWindow):
         self._selected_document_row = None
         self.left.set_documents([])
         self.right.set_metrics(0, 0, 0)
+        self._remember_authorized_root(resolved)
         self._set_status(f"Authorized folder: {resolved}")
 
     @Slot()
@@ -2419,6 +2425,7 @@ class CockpitWindow(QMainWindow):
         selected = QFileDialog.getExistingDirectory(
             self,
             "Choose an authorized document folder",
+            self._folder_dialog_start_directory(),
         )
         if not selected:
             return
@@ -2428,6 +2435,21 @@ class CockpitWindow(QMainWindow):
             self._set_status(
                 f"Folder authorization failed safely ({error.__class__.__name__})."
             )
+
+    def _folder_dialog_start_directory(self) -> str:
+        authorized_root = self.authorized_root
+        if authorized_root is not None:
+            return str(authorized_root)
+        remembered = self._folder_memory.last_authorized_folder()
+        if remembered is None:
+            return ""
+        return str(remembered)
+
+    def _remember_authorized_root(self, root: Path) -> None:
+        try:
+            self._folder_memory.remember_authorized_folder(root)
+        except OSError:
+            return
 
     @Slot(int)
     def _open_document_row(self, row: int) -> None:

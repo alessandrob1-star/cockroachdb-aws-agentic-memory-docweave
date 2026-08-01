@@ -22,6 +22,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from docweave.desktop.folder_memory import FolderMemory, QtFolderMemory
 from docweave.desktop.models import DocumentTableModel
 from docweave.desktop.opening import PdfOpenValidationError, validate_pdf_for_open
 from docweave.desktop.preview import create_pdf_preview
@@ -158,10 +159,14 @@ class DocWeaveMainWindow(QMainWindow):
         *,
         scan_function: ScanFunction = scan_authorized_root,
         preview_factory: PreviewFactory = create_pdf_preview,
+        folder_memory: FolderMemory | None = None,
     ) -> None:
         super().__init__()
         self._scan_function = scan_function
         self._preview_factory = preview_factory
+        self._folder_memory = (
+            folder_memory if folder_memory is not None else QtFolderMemory()
+        )
         self._preview_dialogs: set[QDialog] = set()
         self._scan_thread: QThread | None = None
         self._scan_worker: ScanWorker | None = None
@@ -198,6 +203,7 @@ class DocWeaveMainWindow(QMainWindow):
         self._update_metrics(discovered=0, ready=0, attention=0)
         self._root_field.setText(str(resolved))
         self._scan_button.setEnabled(True)
+        self._remember_authorized_root(resolved)
         self._set_status(
             "Folder authorized for read-only discovery. No files will be changed."
         )
@@ -352,6 +358,7 @@ class DocWeaveMainWindow(QMainWindow):
         selected = QFileDialog.getExistingDirectory(
             self,
             "Choose an authorized document folder",
+            self._folder_dialog_start_directory(),
         )
         if selected:
             try:
@@ -361,6 +368,21 @@ class DocWeaveMainWindow(QMainWindow):
                     "Folder authorization failed safely "
                     f"({error.__class__.__name__}). No files were changed."
                 )
+
+    def _folder_dialog_start_directory(self) -> str:
+        authorized_root = self.authorized_root
+        if authorized_root is not None:
+            return str(authorized_root)
+        remembered = self._folder_memory.last_authorized_folder()
+        if remembered is None:
+            return ""
+        return str(remembered)
+
+    def _remember_authorized_root(self, root: Path) -> None:
+        try:
+            self._folder_memory.remember_authorized_folder(root)
+        except OSError:
+            return
 
     def _build_window(self) -> None:
         self.setWindowTitle("DocWeave — Local document discovery")
