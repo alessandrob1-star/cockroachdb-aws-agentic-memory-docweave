@@ -26,6 +26,19 @@ from docweave.desktop.scan import (
 from docweave.desktop.workspace import WorkspacePhase
 
 
+class _InMemoryFolderMemory:
+    def __init__(self, remembered: Path | None = None) -> None:
+        self.remembered = remembered
+        self.saved: list[Path] = []
+
+    def last_authorized_folder(self) -> Path | None:
+        return self.remembered
+
+    def remember_authorized_folder(self, folder: Path) -> None:
+        self.saved.append(folder)
+        self.remembered = folder
+
+
 def wait_for_scan(window: DocWeaveMainWindow) -> None:
     loop = QEventLoop()
     timed_out = False
@@ -365,16 +378,29 @@ def test_folder_picker_authorizes_selected_directory(
     qt_application: object,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    window = DocWeaveMainWindow()
-    monkeypatch.setattr(
-        QFileDialog,
-        "getExistingDirectory",
-        lambda *args: str(tmp_path),
-    )
+    remembered = tmp_path / "pdf_sintetici"
+    selected = tmp_path / "selected"
+    remembered.mkdir()
+    selected.mkdir()
+    memory = _InMemoryFolderMemory(remembered.resolve())
+    dialog_directories: list[str] = []
+
+    def choose_directory(
+        _parent: object,
+        _caption: str,
+        directory: str,
+    ) -> str:
+        dialog_directories.append(directory)
+        return str(selected)
+
+    window = DocWeaveMainWindow(folder_memory=memory)
+    monkeypatch.setattr(QFileDialog, "getExistingDirectory", choose_directory)
 
     window._choose_folder()
 
-    assert window.authorized_root == tmp_path.resolve()
+    assert dialog_directories == [str(remembered.resolve())]
+    assert window.authorized_root == selected.resolve()
+    assert memory.saved == [selected.resolve()]
     window.close()
 
 
@@ -384,7 +410,8 @@ def test_folder_picker_reports_invalid_selection_without_path_leak(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     missing = tmp_path / "private-missing"
-    window = DocWeaveMainWindow()
+    memory = _InMemoryFolderMemory()
+    window = DocWeaveMainWindow(folder_memory=memory)
     monkeypatch.setattr(
         QFileDialog,
         "getExistingDirectory",
@@ -399,4 +426,5 @@ def test_folder_picker_reports_invalid_selection_without_path_leak(
         "Folder authorization failed safely (FileNotFoundError). No files were changed."
     )
     assert str(missing) not in status.text()
+    assert memory.saved == []
     window.close()

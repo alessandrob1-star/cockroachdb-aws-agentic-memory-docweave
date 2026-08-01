@@ -4,6 +4,7 @@ from uuid import UUID
 
 import pytest
 from PySide6.QtCore import QCoreApplication, QEventLoop, QTimer
+from PySide6.QtWidgets import QFileDialog
 
 from docweave.application_runtime import RuntimeIntegrationSnapshot
 from docweave.classification_cli import (
@@ -25,6 +26,19 @@ from docweave.runtime_preflight import (
     PreflightState,
     RuntimePreflightReport,
 )
+
+
+class _InMemoryFolderMemory:
+    def __init__(self, remembered: Path | None = None) -> None:
+        self.remembered = remembered
+        self.saved: list[Path] = []
+
+    def last_authorized_folder(self) -> Path | None:
+        return self.remembered
+
+    def remember_authorized_folder(self, folder: Path) -> None:
+        self.saved.append(folder)
+        self.remembered = folder
 
 
 def wait_for_cockpit_scan(window: CockpitWindow) -> None:
@@ -149,6 +163,38 @@ def test_cockpit_starts_with_definitive_local_surface(
     assert "Read-only CockroachDB restore history reader is available" in (
         window.right.restore_text.text()
     )
+
+    close_cockpit_window(window)
+
+
+def test_cockpit_folder_picker_reopens_remembered_directory(
+    tmp_path: Path,
+    qt_application: object,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    remembered = tmp_path / "pdf_sintetici"
+    selected = tmp_path / "selected"
+    remembered.mkdir()
+    selected.mkdir()
+    memory = _InMemoryFolderMemory(remembered.resolve())
+    dialog_directories: list[str] = []
+
+    def choose_directory(
+        _parent: object,
+        _caption: str,
+        directory: str,
+    ) -> str:
+        dialog_directories.append(directory)
+        return str(selected)
+
+    window = CockpitWindow(folder_memory=memory)
+    monkeypatch.setattr(QFileDialog, "getExistingDirectory", choose_directory)
+
+    window._choose_folder()
+
+    assert dialog_directories == [str(remembered.resolve())]
+    assert window.authorized_root == selected.resolve()
+    assert memory.saved == [selected.resolve()]
 
     close_cockpit_window(window)
 

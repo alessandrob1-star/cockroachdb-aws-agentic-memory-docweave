@@ -39,8 +39,9 @@ DocWeave state. It exposes authorized-folder selection, non-blocking local
 discovery, deterministic intake counts, phase-aware progress, cooperative
 cancellation, explicit in-memory workspace state, a real discovered-PDF table,
 safe user-initiated opening of ready PDFs in the central embedded read-only
-preview, and confirmed and policy-validated delegation of eligible PDF
-hyperlinks to the user's default browser. The cockpit now displays sanitized
+preview, local remembrance of the last successfully authorized folder for the
+next folder picker, and confirmed and policy-validated delegation of eligible
+PDF hyperlinks to the user's default browser. The cockpit now displays sanitized
 runtime readiness for CockroachDB configuration and the approved Amazon Bedrock
 client without exposing connection values or performing startup I/O. The
 `ANALYZE` control now builds a bounded batch from visible ready PDFs, validates
@@ -287,7 +288,9 @@ the repository-local virtual environment and does not embed runtime credentials
 or cloud configuration.
 
 The shell does not yet connect to CockroachDB or Amazon Bedrock, does not
-persist its session, and does not modify files.
+persist scan results or document analysis by default, and does not modify
+files. It only remembers the last successfully authorized folder path in the
+local desktop settings store so the next folder picker starts there.
 
 ## License
 
