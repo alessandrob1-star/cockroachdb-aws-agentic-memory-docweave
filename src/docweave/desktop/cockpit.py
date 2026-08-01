@@ -86,6 +86,7 @@ from docweave.application_runtime import (
     RuntimeIntegrationSnapshot,
     runtime_integration_snapshot,
 )
+from docweave.analysis import BedrockGatewayError
 from docweave.classification_cli import (
     ClassificationCommandResult,
     classify_pdf_once,
@@ -194,6 +195,7 @@ class ClassificationBatchSummary:
     completed: int
     failed: int
     total: int
+    last_error_category: str | None = None
 
 
 DOCUMENTS: list[Document] = []
@@ -237,6 +239,7 @@ class ClassificationWorker(QObject):
         total = len(self._items)
         completed = 0
         failed = 0
+        last_error_category: str | None = None
         for attempted, item in enumerate(self._items, start=1):
             try:
                 result = self._classification_function(
@@ -245,11 +248,12 @@ class ClassificationWorker(QObject):
                 )
             except RuntimeConfigurationError as error:
                 failed += 1
+                last_error_category = f"configuration:{error.code.value}"
                 self.item_failed.emit(
                     ClassificationBatchFailure(
                         row=item.row,
                         source_path=item.source_path,
-                        error_category=f"configuration:{error.code.value}",
+                        error_category=last_error_category,
                         attempted=attempted,
                         completed=completed,
                         failed=failed,
@@ -259,14 +263,29 @@ class ClassificationWorker(QObject):
                 continue
             except ClassificationPipelineError as error:
                 failed += 1
+                last_error_category = (
+                    f"classification:{error.code.value}:{error.extraction_status.value}"
+                )
                 self.item_failed.emit(
                     ClassificationBatchFailure(
                         row=item.row,
                         source_path=item.source_path,
-                        error_category=(
-                            "classification:"
-                            f"{error.code.value}:{error.extraction_status.value}"
-                        ),
+                        error_category=last_error_category,
+                        attempted=attempted,
+                        completed=completed,
+                        failed=failed,
+                        total=total,
+                    )
+                )
+                continue
+            except BedrockGatewayError as error:
+                failed += 1
+                last_error_category = f"bedrock:{error.code.value}"
+                self.item_failed.emit(
+                    ClassificationBatchFailure(
+                        row=item.row,
+                        source_path=item.source_path,
+                        error_category=last_error_category,
                         attempted=attempted,
                         completed=completed,
                         failed=failed,
@@ -276,11 +295,12 @@ class ClassificationWorker(QObject):
                 continue
             except Exception as error:
                 failed += 1
+                last_error_category = error.__class__.__name__
                 self.item_failed.emit(
                     ClassificationBatchFailure(
                         row=item.row,
                         source_path=item.source_path,
-                        error_category=error.__class__.__name__,
+                        error_category=last_error_category,
                         attempted=attempted,
                         completed=completed,
                         failed=failed,
@@ -299,7 +319,12 @@ class ClassificationWorker(QObject):
                 )
             )
         self.completed.emit(
-            ClassificationBatchSummary(completed=completed, failed=failed, total=total)
+            ClassificationBatchSummary(
+                completed=completed,
+                failed=failed,
+                total=total,
+                last_error_category=last_error_category,
+            )
         )
 
 
@@ -2673,6 +2698,11 @@ class CockpitWindow(QMainWindow):
             f"{raw_summary.total} proposal(s) persisted for human review.\n"
             f"Failed item(s): {raw_summary.failed}; "
             "ready documents remain eligible for retry."
+            + (
+                f"\nLast error: {raw_summary.last_error_category}"
+                if raw_summary.last_error_category is not None
+                else ""
+            )
         )
         self.right.set_events(
             [
@@ -2680,7 +2710,12 @@ class CockpitWindow(QMainWindow):
                     "CLASSIFIER",
                     f"{raw_summary.completed}/{raw_summary.total} persisted",
                 ),
-                ("FAILED", f"{raw_summary.failed} item(s)"),
+                (
+                    "FAILED",
+                    (f"{raw_summary.failed} item(s); {raw_summary.last_error_category}")
+                    if raw_summary.last_error_category is not None
+                    else f"{raw_summary.failed} item(s)",
+                ),
                 ("REVIEW", f"{self.left.count_status('REVIEW')} awaiting human review"),
                 ("READY", f"{self.left.count_status('READY')} ready remaining"),
                 ("MEMORY", "Proposals persisted"),

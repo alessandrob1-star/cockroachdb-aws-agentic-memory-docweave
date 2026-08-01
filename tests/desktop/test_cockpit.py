@@ -6,6 +6,7 @@ import pytest
 from PySide6.QtCore import QCoreApplication, QEventLoop, QTimer
 from PySide6.QtWidgets import QFileDialog
 
+from docweave.analysis import BedrockGatewayError, BedrockGatewayErrorCode
 from docweave.application_runtime import RuntimeIntegrationSnapshot
 from docweave.classification_cli import (
     ClassificationCommandResult,
@@ -798,6 +799,53 @@ def test_cockpit_analysis_batch_preserves_progress_after_failure(
     )
     assert "Failed item(s): 1" in window.console.log_text.text()
     assert window.console.buttons[3].isEnabled()
+
+    close_cockpit_window(window)
+
+
+def test_cockpit_reports_sanitized_bedrock_gateway_error(
+    qt_application: object,
+) -> None:
+    corpus = Path("pdf_sintetici").resolve(strict=True)
+    first_pdf = sorted(corpus.glob("*.pdf"))[0]
+
+    def fail_classification(
+        source_path: Path,
+        authorized_root: Path,
+    ) -> ClassificationCommandResult:
+        raise BedrockGatewayError(BedrockGatewayErrorCode.AUTHENTICATION_FAILED)
+
+    window = CockpitWindow(
+        classification_function=fail_classification,
+        runtime_preflight_function=ready_runtime_preflight_report,
+    )
+    window.set_authorized_root(corpus)
+    window.left.set_documents(
+        [
+            Document(
+                name=first_pdf.name,
+                category="PDF",
+                pages="-",
+                status="READY",
+                path=first_pdf,
+            )
+        ]
+    )
+    window._selected_document_row = 0
+    window._set_busy(False)
+
+    window._analyze_selected_document()
+    wait_for_cockpit_classification(window)
+
+    assert "bedrock:authentication_failed" in window.console.log_text.text()
+    assert (
+        "bedrock:authentication_failed"
+        in cast(
+            Any,
+            window.right.event_rows[1],
+        ).event_text.text()
+    )
+    assert "DOCWEAVE_DATABASE_URL" not in window.console.log_text.text()
 
     close_cockpit_window(window)
 
