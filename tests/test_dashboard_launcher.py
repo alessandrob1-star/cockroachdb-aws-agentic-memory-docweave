@@ -12,6 +12,7 @@ def test_windows_dashboard_launcher_uses_local_environment() -> None:
     launcher = LAUNCHER_PATH.read_text(encoding="utf-8")
 
     assert "%~dp0" in launcher
+    assert "%APPDATA%\\DocWeave\\launch-docweave-runtime.cmd" in launcher
     assert ".venv\\Scripts\\docweave-desktop.exe" in launcher
     assert "-m docweave.desktop.application" in launcher
     assert "PYTHONPATH=%DOCWEAVE_REPO_DIR%src;%PYTHONPATH%" in launcher
