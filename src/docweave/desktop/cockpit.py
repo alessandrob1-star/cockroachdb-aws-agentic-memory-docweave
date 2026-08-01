@@ -2930,6 +2930,7 @@ class CockpitWindow(QMainWindow):
             self._runtime_preflight_report = _initial_runtime_preflight_report(
                 self._runtime_preflight_function,
                 self._integration_snapshot,
+                check_database=True,
             )
         except Exception as error:
             self._runtime_preflight_report = RuntimePreflightReport(
@@ -3079,12 +3080,14 @@ class CockpitWindow(QMainWindow):
 def _initial_runtime_preflight_report(
     runtime_preflight_function: RuntimePreflightFunction | None,
     integration_snapshot: RuntimeIntegrationSnapshot | None,
+    *,
+    check_database: bool = False,
 ) -> RuntimePreflightReport:
     if runtime_preflight_function is not None:
         return runtime_preflight_function()
-    if integration_snapshot is not None:
+    if integration_snapshot is not None and not check_database:
         return _snapshot_preflight_report(integration_snapshot)
-    return run_preflight(check_database=False)
+    return run_preflight(check_database=check_database)
 
 
 def _snapshot_preflight_report(
@@ -3137,7 +3140,7 @@ def _cockroachdb_status(
         return "Reachable"
     if check.state is PreflightState.SKIP:
         if integration_snapshot.cockroachdb_configured:
-            return "Configured, not connected"
+            return "Configured"
         return "Not configured"
     return f"Blocked ({_compact_preflight_detail(check.detail)})"
 
@@ -3165,7 +3168,7 @@ def _restore_history_status(
         )
 
     cockroachdb_status = _cockroachdb_status(report, integration_snapshot)
-    if cockroachdb_status in {"Reachable", "Configured, not connected", "Configured"}:
+    if cockroachdb_status in {"Reachable", "Configured"}:
         return (
             "Read-only CockroachDB restore history reader is available; "
             "no restore action is wired."
