@@ -95,6 +95,27 @@ SQL for all four revisions and included `0004_file_lineage_memory`. The render
 did not include the CockroachDB endpoint, password, or runtime environment
 variable name.
 
+As of 2026-08-03, the packaged validation command also produced sanitized
+offline evidence:
+
+```text
+migration_head: ok
+offline_sql_sha256: 6323d4e223d6d8f9e369158c4664d5f847a748268a0b815a3a17fad56d9d4dff
+offline_sql_characters: 32364
+offline_required_tables: 16/16
+offline_transaction_boundary: absent
+offline_secret_markers: absent
+live_schema: skip (not_requested)
+```
+
+The command is:
+
+```powershell
+.\.venv\Scripts\docweave-live-memory-validation.exe
+```
+
+This default mode is offline only and does not open CockroachDB.
+
 ## 4. Online execution gate
 
 Online Alembic execution fails when `DOCWEAVE_DATABASE_URL` is absent. The
@@ -135,6 +156,16 @@ docweave_schema: ok (ready)
 
 If `DOCWEAVE_DATABASE_URL` is absent, the command must fail closed with
 `database_url_missing`. That failure means no live database operation occurred.
+
+After explicit approval for the current target and revision, the controlled
+online migration and inspection command is:
+
+```powershell
+.\.venv\Scripts\docweave-live-memory-validation.exe --online-upgrade --inspect-live
+```
+
+The command must not be run from a shell that logs environment variables or
+connection values. Its output is designed to omit the configured database URL.
 
 For the 2026-07-24 predevelopment validation, the project owner explicitly
 approved the existing authenticated root or administrator path and deferred
