@@ -26,6 +26,7 @@ docweave-classify-batch = "docweave.classification_cli:batch_main"
 docweave-classify-pdf = "docweave.classification_cli:main"
 docweave-desktop = "docweave.desktop.application:main"
 docweave-file-lineage = "docweave.lineage_cli:main"
+docweave-live-memory-validation = "docweave.live_memory_validation:main"
 docweave-review-proposal = "docweave.review_cli:main"
 docweave-runtime-preflight = "docweave.runtime_preflight:main"
 

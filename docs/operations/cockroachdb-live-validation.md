@@ -143,3 +143,28 @@ four ordered revisions. Live acceptance of revisions `0002`, `0003`, and
 The runtime preflight command fails closed when `DOCWEAVE_DATABASE_URL` is not
 present. That is the expected safe behavior and proves no live database
 operation occurred from an unconfigured process.
+
+## 9. Sanitized packaged validation as of 2026-08-03
+
+The repository now includes `docweave-live-memory-validation` as a packaged
+operator command. Its default mode renders and validates the migration head
+offline without opening CockroachDB.
+
+Observed sanitized output:
+
+```text
+migration_head: ok
+offline_sql_sha256: 6323d4e223d6d8f9e369158c4664d5f847a748268a0b815a3a17fad56d9d4dff
+offline_sql_characters: 32364
+offline_required_tables: 16/16
+offline_transaction_boundary: absent
+offline_secret_markers: absent
+live_schema: skip (not_requested)
+```
+
+This is not live acceptance. It provides a reproducible command for the next
+authorized live validation, which will use:
+
+```powershell
+.\.venv\Scripts\docweave-live-memory-validation.exe --online-upgrade --inspect-live
+```

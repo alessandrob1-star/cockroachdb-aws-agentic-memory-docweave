@@ -237,6 +237,26 @@ docweave-runtime-preflight
 docweave-runtime-preflight --database
 ```
 
+CockroachDB memory migrations can be validated without opening a database
+connection with:
+
+```powershell
+docweave-live-memory-validation
+```
+
+When `DOCWEAVE_DATABASE_URL` is already supplied by the approved runtime
+launcher or the current shell, the same command can explicitly inspect or
+upgrade the configured target:
+
+```powershell
+docweave-live-memory-validation --inspect-live
+docweave-live-memory-validation --online-upgrade --inspect-live
+```
+
+The validation command prints only sanitized migration and schema evidence. It
+does not invoke Amazon Bedrock, process documents, create cloud resources, or
+print connection values.
+
 The default command validates configuration and Bedrock client construction
 without opening external services. The `--database` form opens the configured
 CockroachDB target and checks that the current non-vector DocWeave schema
