@@ -167,6 +167,18 @@ online migration and inspection command is:
 The command must not be run from a shell that logs environment variables or
 connection values. Its output is designed to omit the configured database URL.
 
+After the target is migrated, collect read-only application-memory evidence
+with:
+
+```powershell
+.\.venv\Scripts\docweave-memory-evidence.exe --json
+```
+
+This report checks the applied Alembic revision, required DocWeave memory table
+presence, and table counts. Add `--workspace-id <uuid>` only when the evidence
+must be scoped to a known workspace. The command is read-only and must not be
+used as a substitute for end-to-end application memory traces.
+
 For the 2026-07-24 predevelopment validation, the project owner explicitly
 approved the existing authenticated root or administrator path and deferred
 least-privilege profiles to a later separately approved phase. No credential
