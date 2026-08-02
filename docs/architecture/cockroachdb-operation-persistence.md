@@ -80,6 +80,11 @@ evidence for the reviewed plan and observed file digests when available.
 An exact repeated command is an idempotent replay. A different row under the
 same idempotency key is rejected and never rewrites prior lineage history.
 
+The `docweave-file-lineage` command exposes this boundary for controlled
+runtime smoke tests. `record` writes one explicit lineage event, and `list`
+loads bounded workspace-scoped history. The command does not run migrations,
+invoke Amazon Bedrock, inspect documents, or mutate files.
+
 ## 4. Audit integrity
 
 Audit append operations lock the owning workspace row before reading the prior

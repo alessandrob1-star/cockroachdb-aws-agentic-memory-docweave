@@ -18,6 +18,7 @@ from docweave.persistence.operation_repository import PersistenceConflictError
 from docweave.persistence.transactions import TransactionRun
 
 _SHA256_HEX_LENGTH = 64
+_MAX_HISTORY_ROWS = 1_000
 _TERMINAL_STATUSES = frozenset(
     {"blocked", "succeeded", "failed", "verification_failed"}
 )
@@ -114,6 +115,72 @@ class PersistFileLineageEvent:
             )
 
 
+@dataclass(frozen=True, slots=True)
+class FileLineageHistoryQuery:
+    """Bounded workspace-scoped query for one lineage history view."""
+
+    workspace_id: UUID
+    logical_document_key: str | None = None
+    limit: int = 100
+
+    def __post_init__(self) -> None:
+        if self.logical_document_key is not None:
+            _require_text("logical_document_key", self.logical_document_key)
+        if not 1 <= self.limit <= _MAX_HISTORY_ROWS:
+            raise ValueError("limit must be between 1 and 1000")
+
+
+@dataclass(frozen=True, slots=True)
+class FileLineageEventSnapshot:
+    """One durable file lineage event safe to show in history views."""
+
+    file_lineage_event_id: UUID
+    workspace_id: UUID
+    logical_document_key: str
+    lineage_sequence: int
+    action: FileLineageAction
+    original_relative_path: str
+    previous_relative_path: str
+    next_relative_path: str
+    original_directory: str
+    original_filename: str
+    previous_directory: str
+    previous_filename: str
+    next_directory: str
+    next_filename: str
+    status: str
+    occurred_at_utc: datetime | None
+    operation_batch_id: UUID | None = None
+    file_operation_id: UUID | None = None
+    batch_item_id: str | None = None
+    proposal_id: UUID | None = None
+
+    def __post_init__(self) -> None:
+        _require_text("logical_document_key", self.logical_document_key)
+        if self.lineage_sequence < 1:
+            raise ValueError("lineage_sequence must be positive")
+        if self.status not in _TERMINAL_STATUSES:
+            raise ValueError("status must be a terminal operation state")
+        for field_name, value in (
+            ("original_relative_path", self.original_relative_path),
+            ("previous_relative_path", self.previous_relative_path),
+            ("next_relative_path", self.next_relative_path),
+        ):
+            _require_relative_path(field_name, value)
+        for field_name, value in (
+            ("original_filename", self.original_filename),
+            ("previous_filename", self.previous_filename),
+            ("next_filename", self.next_filename),
+        ):
+            _require_text(field_name, value)
+        if self.occurred_at_utc is not None:
+            object.__setattr__(
+                self,
+                "occurred_at_utc",
+                _as_utc(self.occurred_at_utc),
+            )
+
+
 _INSERT_LINEAGE = sa.text(
     """
     INSERT INTO docweave.file_lineage_events (
@@ -152,6 +219,25 @@ _SELECT_REPLAY = sa.text(
       AND idempotency_key = :idempotency_key
     """
 )
+_SELECT_HISTORY = sa.text(
+    """
+    SELECT file_lineage_event_id, workspace_id, logical_document_key,
+           lineage_sequence, action, operation_batch_id, file_operation_id,
+           batch_item_id, proposal_id, original_relative_path,
+           previous_relative_path, next_relative_path, original_directory,
+           original_filename, previous_directory, previous_filename,
+           next_directory, next_filename, status, occurred_at
+    FROM docweave.file_lineage_events
+    WHERE workspace_id = :workspace_id
+      AND (
+          :logical_document_key IS NULL
+          OR logical_document_key = :logical_document_key
+      )
+    ORDER BY logical_document_key ASC, lineage_sequence ASC,
+             file_lineage_event_id ASC
+    LIMIT :limit
+    """
+)
 
 
 class CockroachFileLineageRepository:
@@ -176,6 +262,29 @@ class CockroachFileLineageRepository:
             return PersistenceDisposition.APPLIED
 
         return self._transactions.run(persist_once).value
+
+    def load_history(
+        self,
+        query: FileLineageHistoryQuery,
+    ) -> tuple[FileLineageEventSnapshot, ...]:
+        """Load bounded file lineage history inside one workspace."""
+
+        def load(connection: Connection) -> tuple[FileLineageEventSnapshot, ...]:
+            rows = (
+                connection.execute(
+                    _SELECT_HISTORY,
+                    {
+                        "workspace_id": query.workspace_id,
+                        "logical_document_key": query.logical_document_key,
+                        "limit": query.limit,
+                    },
+                )
+                .mappings()
+                .all()
+            )
+            return tuple(_snapshot_from_row(row) for row in rows)
+
+        return self._transactions.run(load).value
 
 
 def _parameters(command: PersistFileLineageEvent) -> dict[str, object]:
@@ -235,6 +344,38 @@ def _validate_replay(
     if not _matches_existing(existing, command):
         raise PersistenceConflictError("file lineage replay has different content")
     return PersistenceDisposition.IDEMPOTENT_REPLAY
+
+
+def _snapshot_from_row(row: RowMapping) -> FileLineageEventSnapshot:
+    try:
+        action = FileLineageAction(str(row["action"]))
+    except ValueError:
+        raise PersistenceConflictError("file lineage row action is invalid") from None
+    try:
+        return FileLineageEventSnapshot(
+            file_lineage_event_id=_uuid(row["file_lineage_event_id"]),
+            workspace_id=_uuid(row["workspace_id"]),
+            logical_document_key=str(row["logical_document_key"]),
+            lineage_sequence=int(row["lineage_sequence"]),
+            action=action,
+            operation_batch_id=_optional_uuid(row["operation_batch_id"]),
+            file_operation_id=_optional_uuid(row["file_operation_id"]),
+            batch_item_id=_optional_text(row["batch_item_id"]),
+            proposal_id=_optional_uuid(row["proposal_id"]),
+            original_relative_path=str(row["original_relative_path"]),
+            previous_relative_path=str(row["previous_relative_path"]),
+            next_relative_path=str(row["next_relative_path"]),
+            original_directory=str(row["original_directory"]),
+            original_filename=str(row["original_filename"]),
+            previous_directory=str(row["previous_directory"]),
+            previous_filename=str(row["previous_filename"]),
+            next_directory=str(row["next_directory"]),
+            next_filename=str(row["next_filename"]),
+            status=str(row["status"]),
+            occurred_at_utc=_stored_optional_time(row["occurred_at"]),
+        )
+    except (TypeError, ValueError) as error:
+        raise PersistenceConflictError("file lineage row is invalid") from error
 
 
 def _matches_existing(
@@ -334,3 +475,25 @@ def _as_utc(value: object) -> datetime:
     if value.tzinfo is None or value.utcoffset() is None:
         raise ValueError("timestamps must be timezone-aware")
     return value.astimezone(UTC)
+
+
+def _uuid(value: object) -> UUID:
+    if isinstance(value, UUID):
+        return value
+    if isinstance(value, str):
+        return UUID(value)
+    raise ValueError("identifier must be UUID")
+
+
+def _optional_uuid(value: object) -> UUID | None:
+    if value is None:
+        return None
+    return _uuid(value)
+
+
+def _optional_text(value: object) -> str | None:
+    if value is None:
+        return None
+    text = str(value)
+    _require_text("optional text", text)
+    return text
