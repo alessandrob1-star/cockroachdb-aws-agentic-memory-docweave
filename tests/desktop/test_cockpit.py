@@ -18,6 +18,8 @@ from docweave.desktop.cockpit import CockpitWindow, Document
 from docweave.desktop.scan import DesktopScanResult
 from docweave.discovery import DiscoveredFile, DiscoveryResult, DiscoveryStatus
 from docweave.intake import IntakeRecord, IntakeResult, IntakeStatus
+from docweave.live_memory_validation import EXPECTED_HEAD
+from docweave.memory_evidence_report import MemoryEvidenceReport, MemoryTableCount
 from docweave.persistence.contracts import PersistenceDisposition
 from docweave.review_cli import (
     ReviewDecisionCommandInput,
@@ -93,6 +95,24 @@ def ready_runtime_preflight_report() -> RuntimePreflightReport:
                 "cockroachdb_connection",
                 PreflightState.SKIP,
                 "not_requested",
+            ),
+        )
+    )
+
+
+def reachable_runtime_preflight_report() -> RuntimePreflightReport:
+    return RuntimePreflightReport(
+        checks=(
+            PreflightCheck("runtime_config", PreflightState.OK, "loaded"),
+            PreflightCheck(
+                "bedrock_client",
+                PreflightState.OK,
+                "eu-central-1:configured",
+            ),
+            PreflightCheck(
+                "cockroachdb_connection",
+                PreflightState.OK,
+                "reachable",
             ),
         )
     )
@@ -181,6 +201,57 @@ def test_cockpit_starts_with_definitive_local_surface(
     assert "Read-only CockroachDB restore history reader is available" in (
         window.right.restore_text.text()
     )
+
+    close_cockpit_window(window)
+
+
+def test_cockpit_surfaces_read_only_memory_evidence(
+    qt_application: object,
+) -> None:
+    report = MemoryEvidenceReport(
+        alembic_revision=EXPECTED_HEAD,
+        expected_head=EXPECTED_HEAD,
+        table_counts=(
+            MemoryTableCount("documents", True, 30),
+            MemoryTableCount("proposals", True, 12),
+            MemoryTableCount("file_lineage_events", True, 6),
+        ),
+    )
+    window = CockpitWindow(
+        runtime_preflight_function=reachable_runtime_preflight_report,
+        memory_evidence_function=lambda: report,
+    )
+
+    window._refresh_runtime_preflight_report()
+    window._set_status("Runtime checked")
+
+    assert (
+        f"CockroachDB memory schema ready: 3/3 tables at {EXPECTED_HEAD}; 48 row(s)."
+    ) in window.right.memory_text.text()
+    assert "DOCWEAVE_DATABASE_URL" not in window.right.memory_text.text()
+
+    close_cockpit_window(window)
+
+
+def test_cockpit_sanitizes_memory_evidence_failures(
+    qt_application: object,
+) -> None:
+    def broken_evidence() -> MemoryEvidenceReport:
+        raise RuntimeError("secret connection value")
+
+    window = CockpitWindow(
+        runtime_preflight_function=reachable_runtime_preflight_report,
+        memory_evidence_function=broken_evidence,
+    )
+
+    window._refresh_runtime_preflight_report()
+    window._set_status("Runtime checked")
+
+    assert (
+        "CockroachDB memory evidence unavailable: RuntimeError."
+        in window.right.memory_text.text()
+    )
+    assert "secret connection value" not in window.right.memory_text.text()
 
     close_cockpit_window(window)
 
