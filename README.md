@@ -244,6 +244,18 @@ connection with:
 docweave-live-memory-validation
 ```
 
+The configured CockroachDB memory layer can also be inspected read-only with:
+
+```powershell
+docweave-memory-evidence
+docweave-memory-evidence --workspace-id <uuid> --json
+```
+
+The report verifies the Alembic revision, required DocWeave memory tables, and
+table counts. The optional workspace filter is applied only to tables that have
+a direct `workspace_id` column. The command never invokes Amazon Bedrock, writes
+database rows, changes schemas, mutates files, or prints connection values.
+
 When `DOCWEAVE_DATABASE_URL` is already supplied by the approved runtime
 launcher or the current shell, the same command can explicitly inspect or
 upgrade the configured target:
