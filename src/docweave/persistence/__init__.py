@@ -35,6 +35,8 @@ from docweave.persistence.contracts import (
 )
 from docweave.persistence.lineage_repository import (
     CockroachFileLineageRepository,
+    FileLineageEventSnapshot,
+    FileLineageHistoryQuery,
     PersistFileLineageEvent,
 )
 from docweave.persistence.mappers import (
@@ -109,6 +111,8 @@ __all__ = [
     "DurableRuntimeOptions",
     "EnsureApprovedTaxonomy",
     "ExecutionIntentMapping",
+    "FileLineageEventSnapshot",
+    "FileLineageHistoryQuery",
     "OperationExecutionIdentity",
     "OperationPersistenceRepository",
     "OperationResultMapping",

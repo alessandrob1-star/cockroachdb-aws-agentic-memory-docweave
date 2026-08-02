@@ -27,6 +27,7 @@ from docweave.analysis import (
 )
 from docweave.persistence import (
     ClassificationRuntime,
+    CockroachFileLineageRepository,
     CockroachRestoreAuditRepository,
     CockroachReviewDecisionRepository,
     CockroachTransactionRunner,
@@ -137,6 +138,16 @@ class ConfiguredRestoreAuditRuntime:
     repository: CockroachRestoreAuditRepository
 
 
+@dataclass(frozen=True, slots=True)
+class ConfiguredFileLineageRuntime:
+    """Lazily composed runtime dependencies for durable file lineage memory."""
+
+    config: RuntimeEnvironmentConfig
+    engine: Engine
+    transaction_runner: CockroachTransactionRunner
+    repository: CockroachFileLineageRepository
+
+
 class SessionLike(Protocol):
     """Narrow boto3 session surface accepted by the Bedrock client factory."""
 
@@ -188,6 +199,16 @@ class RestoreAuditRepositoryFactory(Protocol):
         transaction_runner: CockroachTransactionRunner,
     ) -> CockroachRestoreAuditRepository:
         """Create a restore audit repository."""
+
+
+class FileLineageRepositoryFactory(Protocol):
+    """Narrow file lineage repository factory used for deterministic tests."""
+
+    def __call__(
+        self,
+        transaction_runner: CockroachTransactionRunner,
+    ) -> CockroachFileLineageRepository:
+        """Create a file lineage repository."""
 
 
 def runtime_integration_snapshot(
@@ -298,6 +319,30 @@ def build_configured_restore_audit_runtime(
     )
 
 
+def build_configured_file_lineage_runtime(
+    environment: Mapping[str, str] | None = None,
+    *,
+    engine_factory: EngineFactory = create_engine,
+    transaction_runner_factory: TransactionRunnerFactory = CockroachTransactionRunner,
+    repository_factory: FileLineageRepositoryFactory = CockroachFileLineageRepository,
+) -> ConfiguredFileLineageRuntime:
+    """Compose CockroachDB file-lineage dependencies without database I/O."""
+    config = load_runtime_environment_config(environment)
+    engine = engine_factory(
+        config.database_url,
+        pool_pre_ping=True,
+        future=True,
+    )
+    transaction_runner = transaction_runner_factory(engine)
+    repository = repository_factory(transaction_runner)
+    return ConfiguredFileLineageRuntime(
+        config=config,
+        engine=engine,
+        transaction_runner=transaction_runner,
+        repository=repository,
+    )
+
+
 def _required_secret_like_value(values: Mapping[str, str], variable_name: str) -> str:
     value = values.get(variable_name, "")
     if not value.strip():
@@ -331,6 +376,7 @@ __all__ = [
     "DOCWEAVE_TAXONOMY_VERSION_ID",
     "DOCWEAVE_WORKSPACE_ID",
     "ConfiguredClassificationRuntime",
+    "ConfiguredFileLineageRuntime",
     "ConfiguredRestoreAuditRuntime",
     "ConfiguredReviewDecisionRuntime",
     "RuntimeConfigurationError",
@@ -338,6 +384,7 @@ __all__ = [
     "RuntimeEnvironmentConfig",
     "RuntimeIntegrationSnapshot",
     "build_configured_classification_runtime",
+    "build_configured_file_lineage_runtime",
     "build_configured_restore_audit_runtime",
     "build_configured_review_decision_runtime",
     "load_runtime_environment_config",

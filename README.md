@@ -131,9 +131,12 @@ A fourth non-vector CockroachDB migration now defines append-only
 `file_lineage_events` memory for original, previous, and next directory and
 filename state. A typed repository persists one lineage row atomically and
 idempotently with optional proposal, operation batch, and file-operation
-references. This is offline schema and adapter evidence only: the migration has
-not yet been applied to the live CockroachDB cluster, and cockpit approval or
-execution is not yet wired to persist lineage rows.
+references. The `docweave-file-lineage` command composes the same configured
+runtime and can record or list lineage rows against a migrated CockroachDB
+target without exposing connection values. This is offline schema, adapter,
+and command evidence only: the migration has not yet been applied to the live
+CockroachDB cluster, and cockpit approval or execution is not yet wired to
+persist lineage rows automatically.
 
 The local shared core now also defines an explicit classification runtime that
 keeps extraction, database transactions, and Bedrock invocation in separate
@@ -204,10 +207,24 @@ Durable review decisions for existing proposals are launched with:
 docweave-review-proposal --proposal-id <uuid> --action approve --proposal-fingerprint <sha256>
 ```
 
+Durable file lineage memory can be inspected with:
+
+```powershell
+docweave-file-lineage list --logical-document-key <stable-document-key>
+```
+
+One lineage event can be recorded only with explicit, already reviewed path
+state:
+
+```powershell
+docweave-file-lineage record --logical-document-key <stable-document-key> --lineage-sequence 1 --idempotency-key <stable-key> --action rename --original-relative-path incoming/a.pdf --previous-relative-path incoming/a.pdf --next-relative-path incoming/b.pdf --status succeeded --plan-fingerprint <sha256>
+```
+
 These commands require explicit runtime configuration through environment
-variables and perform real extraction, Amazon Bedrock invocation, and
-CockroachDB writes only when invoked. It does not create cloud resources,
-schemas, migrations, or secrets.
+variables. Classification commands perform real extraction, Amazon Bedrock
+invocation, and CockroachDB writes only when invoked. Review and lineage
+commands perform only their explicit CockroachDB writes or reads when invoked.
+They do not create cloud resources, schemas, migrations, or secrets.
 
 Runtime configuration can be checked before invoking classification with:
 
