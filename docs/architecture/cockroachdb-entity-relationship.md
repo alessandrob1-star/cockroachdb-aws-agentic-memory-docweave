@@ -88,6 +88,8 @@ erDiagram
     DOCUMENTS ||--o{ FILE_OPERATIONS : affects
     FILE_INSTANCES ||--o{ FILE_OPERATIONS : starts_from
     FILE_OPERATIONS ||--o{ FILE_OPERATIONS : compensates
+    FILE_OPERATIONS ||--o{ FILE_LINEAGE_EVENTS : records_path_state
+    PROPOSALS ||--o{ FILE_LINEAGE_EVENTS : informs
 
     REVIEW_DECISIONS ||--o{ PREFERENCE_RULES : grounds
     WORKSPACES ||--o{ PREFERENCE_RULES : learns
@@ -108,6 +110,8 @@ erDiagram
 - Every canonical business entity has one typed subtype.
 - A file operation is authorized before execution and may be compensated by a
   later operation without deleting history.
+- File lineage events record original, previous, and next directory and
+  filename state without rewriting earlier path history.
 - Workflow checkpoints and agent runs remain connected to the same durable
   document and workspace identities.
 - Preference memory is grounded in attributable decisions and can be revoked or

@@ -12,6 +12,7 @@ DATABASE_URL_ENVIRONMENT_VARIABLE = "DOCWEAVE_DATABASE_URL"
 INITIAL_REVISION = "0001_operational_foundation"
 CLASSIFICATION_REVISION = "0002_classification_memory"
 REVIEW_REVISION = "0003_review_decision_memory"
+FILE_LINEAGE_REVISION = "0004_file_lineage_memory"
 
 
 def alembic_config() -> Config:
@@ -39,7 +40,7 @@ def render_downgrade_sql() -> str:
 def test_migration_history_has_one_expected_head() -> None:
     script = ScriptDirectory.from_config(alembic_config())
 
-    assert script.get_heads() == [REVIEW_REVISION]
+    assert script.get_heads() == [FILE_LINEAGE_REVISION]
     assert script.get_base() == INITIAL_REVISION
 
 
@@ -62,6 +63,7 @@ def test_offline_upgrade_creates_approved_non_vector_memory_tables() -> None:
         "classification_proposals",
         "proposal_evidence",
         "review_decisions",
+        "file_lineage_events",
     }
     for table_name in expected_tables:
         assert f"CREATE TABLE docweave.{table_name}" in sql
@@ -98,6 +100,26 @@ def test_review_decision_memory_is_attributable_and_bound_to_proposal() -> None:
     assert "uq_review_decisions_proposal" in sql
     assert "ck_review_decisions_reason_required" in sql
     assert "ix_review_decisions_workspace_chronology" in sql
+
+
+def test_file_lineage_memory_records_append_only_path_history() -> None:
+    sql = render_upgrade_sql()
+
+    assert "CREATE TABLE docweave.file_lineage_events" in sql
+    assert "logical_document_key" in sql
+    assert "lineage_sequence" in sql
+    assert "original_directory" in sql
+    assert "original_filename" in sql
+    assert "previous_directory" in sql
+    assert "previous_filename" in sql
+    assert "next_directory" in sql
+    assert "next_filename" in sql
+    assert "fk_file_lineage_events_operation_workspace" in sql
+    assert "fk_file_lineage_events_proposal_workspace" in sql
+    assert "uq_file_lineage_events_document_sequence" in sql
+    assert "uq_file_lineage_events_idempotency" in sql
+    assert "ck_file_lineage_events_blocked_path" in sql
+    assert "ix_file_lineage_events_document_history" in sql
 
 
 def test_offline_upgrade_enforces_workspace_and_idempotency_boundaries() -> None:
@@ -142,6 +164,7 @@ def test_offline_upgrade_contains_append_only_audit_storage_shape() -> None:
 def test_offline_downgrade_drops_tables_in_dependency_order() -> None:
     sql = render_downgrade_sql()
     expected_order = [
+        "DROP TABLE docweave.file_lineage_events",
         "DROP TABLE docweave.review_decisions",
         "DROP TABLE docweave.proposal_evidence",
         "DROP TABLE docweave.classification_proposals",

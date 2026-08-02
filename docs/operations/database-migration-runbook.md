@@ -2,21 +2,22 @@
 
 **Project:** DocWeave
 **Status:** Initial revision validated live; current head validated offline
-**Last updated:** 2026-07-30
+**Last updated:** 2026-08-02
 
 ## 1. Purpose
 
 This runbook defines the controlled CockroachDB migration workflow. It does not
 authorize future live migrations. Revision `0001_operational_foundation` was
 separately authorized and accepted in the isolated `docweave_validation`
-database on 2026-07-24. Revisions `0002_classification_memory` and
-`0003_review_decision_memory` are locally tested and offline-rendered, but they
-have not yet been accepted by a live CockroachDB database.
+database on 2026-07-24. Revisions `0002_classification_memory`,
+`0003_review_decision_memory`, and `0004_file_lineage_memory` are locally
+tested and offline-rendered, but they have not yet been accepted by a live
+CockroachDB database.
 
 The current migration head is:
 
 ```text
-0003_review_decision_memory
+0004_file_lineage_memory
 ```
 
 The ordered revisions are:
@@ -37,6 +38,10 @@ The ordered revisions are:
    - final human approve or reject decisions;
    - proposal fingerprint binding; and
    - atomic proposal status transition support.
+4. `0004_file_lineage_memory`
+   - append-only original, previous, and next file path history;
+   - replay-safe lineage idempotency; and
+   - optional proposal, operation batch, and file-operation references.
 
 ## 2. Cost boundary
 
@@ -85,10 +90,10 @@ Run the complete repository quality gate:
 Offline rendering validates migration ordering and SQL generation. It does not
 prove that CockroachDB accepted the migration.
 
-As of 2026-07-30, offline rendering from an empty database to `head` produced
-SQL for all three revisions and included `0003_review_decision_memory`. The
-render did not include the CockroachDB endpoint, password, or runtime
-environment variable name.
+As of 2026-08-02, offline rendering from an empty database to `head` produced
+SQL for all four revisions and included `0004_file_lineage_memory`. The render
+did not include the CockroachDB endpoint, password, or runtime environment
+variable name.
 
 ## 4. Online execution gate
 
@@ -156,8 +161,8 @@ An unavailable check or ambiguous schema state is a failure, never a pass.
 The repository does not yet prove:
 
 - online Alembic execution through the Psycopg driver;
-- live acceptance of revisions `0002_classification_memory` and
-  `0003_review_decision_memory`;
+- live acceptance of revisions `0002_classification_memory`,
+  `0003_review_decision_memory`, and `0004_file_lineage_memory`;
 - a fully validated runtime-connected DocWeave schema;
 - runtime database roles or Row-Level Security;
 - serializable retry behavior under live CockroachDB contention;
@@ -171,6 +176,6 @@ database. See
 [`cockroachdb-live-validation.md`](cockroachdb-live-validation.md).
 
 The repository also contains a locally tested serializable transaction runner
-and CockroachDB operation, classification, and review-decision repository
-contracts. These are offline application evidence only and have not executed
-through Psycopg against the live target.
+and CockroachDB operation, classification, review-decision, and file-lineage
+repository contracts. These are offline application evidence only and have not
+executed through Psycopg against the live target.

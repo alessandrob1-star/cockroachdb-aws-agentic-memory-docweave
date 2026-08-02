@@ -1,9 +1,9 @@
 # CockroachDB Operation Persistence Boundary
 
 **Project:** DocWeave
-**Status:** Local adapter, restart loading, and contract tests implemented;
-live runtime pending
-**Date:** 2026-07-26
+**Status:** Local adapter, restart loading, file-lineage memory, and contract
+tests implemented; live runtime pending
+**Date:** 2026-08-02
 
 ## 1. Purpose
 
@@ -19,7 +19,8 @@ The implementation is in:
 - `src/docweave/persistence/orchestration.py`;
 - `src/docweave/persistence/runtime.py`;
 - `src/docweave/persistence/transactions.py`; and
-- `src/docweave/persistence/operation_repository.py`.
+- `src/docweave/persistence/operation_repository.py`; and
+- `src/docweave/persistence/lineage_repository.py`.
 
 ## 2. Transaction policy
 
@@ -67,6 +68,17 @@ matching audit event in one transaction.
 An exact terminal result is replay-safe and cannot increment aggregate counts
 twice. A different result for an already terminal operation is a conflict that
 requires explicit reconciliation.
+
+### Record file lineage event
+
+The command inserts one append-only `file_lineage_events` row after a planned
+or observed operation state has been projected into original, previous, and
+next directory and filename fields. The row uses a workspace-scoped
+idempotency key, optional proposal and operation references, and SHA-256
+evidence for the reviewed plan and observed file digests when available.
+
+An exact repeated command is an idempotent replay. A different row under the
+same idempotency key is rejected and never rewrites prior lineage history.
 
 ## 4. Audit integrity
 
@@ -187,6 +199,8 @@ The following remain pending:
 - live Psycopg execution and contention tests against an approved target;
 - runtime identities, authorization, and Row-Level Security;
 - restart, lease expiry, renewal, and fencing evidence against CockroachDB;
+- cockpit wiring that persists visible rename and move lineage rows during
+  approval and execution;
 - restore persistence and execution;
 - production telemetry and Activity History queries; and
 - any claim of persistent application memory or competition integration.
