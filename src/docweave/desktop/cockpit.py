@@ -121,6 +121,7 @@ from docweave.operations import (
     InMemoryReviewDecisionLedger,
     MassOperationCandidate,
     MassOperationMode,
+    MassOperationPreviewItem,
     ProposalReviewDecisionRequest,
     ReviewDecisionAction,
     build_mass_operation_preview,
@@ -146,6 +147,21 @@ WARNING = QColor("#E1AB4D")
 
 
 @dataclass(frozen=True)
+class CockpitLineagePreview:
+    """Human-visible file lineage state prepared before any file mutation."""
+
+    action: str
+    original_relative_path: str
+    previous_relative_path: str
+    next_relative_path: str
+    original_directory: str
+    original_filename: str
+    next_directory: str
+    next_filename: str
+    plan_fingerprint: str
+
+
+@dataclass(frozen=True)
 class Document:
     name: str
     category: str
@@ -157,6 +173,7 @@ class Document:
     proposal_id: str | None = None
     proposal_fingerprint: str | None = None
     review_decision_id: str | None = None
+    lineage_preview: CockpitLineagePreview | None = None
 
 
 @dataclass(frozen=True)
@@ -715,7 +732,7 @@ class LeftScreen(ShapeWidget):
         for row, doc in enumerate(self._documents):
             self._set_document_row(row, doc)
 
-    def mark_document_for_review(
+    def mark_document_for_review(  # noqa: PLR0913
         self,
         row: int,
         *,
@@ -723,6 +740,7 @@ class LeftScreen(ShapeWidget):
         proposed_destination: str | None = None,
         proposal_id: str | None = None,
         proposal_fingerprint: str | None = None,
+        lineage_preview: CockpitLineagePreview | None = None,
     ) -> None:
         """Update one discovered PDF with a non-authoritative proposal."""
         if not 0 <= row < len(self._documents):
@@ -741,6 +759,7 @@ class LeftScreen(ShapeWidget):
             proposal_id=proposal_id,
             proposal_fingerprint=proposal_fingerprint,
             review_decision_id=None,
+            lineage_preview=lineage_preview,
         )
         self._documents[row] = updated
         self._set_document_row(row, updated)
@@ -767,6 +786,7 @@ class LeftScreen(ShapeWidget):
             proposal_id=current.proposal_id,
             proposal_fingerprint=current.proposal_fingerprint,
             review_decision_id=review_decision_id,
+            lineage_preview=current.lineage_preview,
         )
         self._documents[row] = updated
         self._set_document_row(row, updated)
@@ -776,7 +796,17 @@ class LeftScreen(ShapeWidget):
             item = QTableWidgetItem(value)
             if doc.proposed_destination is not None:
                 action = doc.proposed_operation_action or "operation"
-                item.setToolTip(f"Proposed {action} target: {doc.proposed_destination}")
+                tooltip = f"Proposed {action} target: {doc.proposed_destination}"
+                if doc.lineage_preview is not None:
+                    tooltip = (
+                        f"{tooltip}\n"
+                        "Lineage preview: "
+                        f"{doc.lineage_preview.original_relative_path} -> "
+                        f"{doc.lineage_preview.next_relative_path}\n"
+                        "Plan fingerprint: "
+                        f"{doc.lineage_preview.plan_fingerprint[:12]}"
+                    )
+                item.setToolTip(tooltip)
             if doc.review_decision_id is not None:
                 item.setToolTip(
                     f"{item.toolTip()}\nReview decision: {doc.review_decision_id}"
@@ -2499,6 +2529,7 @@ class CockpitWindow(QMainWindow):
         self._selected_document_row = row
         if document.status == "REVIEW":
             self._set_busy(False)
+            lineage_label = _lineage_preview_label(document.lineage_preview)
             self._set_status(
                 "Review proposal selected. Approve or reject without changing files."
             )
@@ -2510,8 +2541,9 @@ class CockpitWindow(QMainWindow):
                         document.proposed_destination
                         or "No rename/move target available",
                     ),
+                    ("LINEAGE", lineage_label),
                     ("APPROVAL", "Human decision required"),
-                    ("MEMORY", "Local review ledger pending"),
+                    ("MEMORY", "CockroachDB lineage row prepared"),
                     ("SECURITY", "No file mutation performed"),
                 ]
             )
@@ -2596,7 +2628,11 @@ class CockpitWindow(QMainWindow):
         self._classification_batch_completed = raw_progress.completed
         self._classification_batch_total = raw_progress.total
         result = raw_progress.result
-        proposed_destination, proposed_action = self._organization_preview_for(
+        (
+            proposed_destination,
+            proposed_action,
+            lineage_preview,
+        ) = self._organization_preview_for(
             raw_progress.source_path,
             result,
         )
@@ -2606,6 +2642,7 @@ class CockpitWindow(QMainWindow):
             proposed_destination=proposed_destination,
             proposal_id=None if result.proposal_id is None else str(result.proposal_id),
             proposal_fingerprint=result.proposal_fingerprint,
+            lineage_preview=lineage_preview,
         )
         self.right.set_metrics(
             self.left.document_count,
@@ -2636,6 +2673,7 @@ class CockpitWindow(QMainWindow):
             f"Confidence: {confidence_label}\n"
             f"Mass operation preview: {proposed_action or 'unavailable'}\n"
             f"Proposed target: {proposed_destination or 'unavailable'}\n"
+            f"Lineage preview: {_lineage_preview_label(lineage_preview)}\n"
             f"Evidence items: {result.evidence_count}; "
             f"metadata fields: {result.metadata_count}\n"
             f"Rationale: {rationale}"
@@ -2656,6 +2694,7 @@ class CockpitWindow(QMainWindow):
                     if proposed_destination is not None
                     else "Operation preview unavailable",
                 ),
+                ("LINEAGE", _lineage_preview_label(lineage_preview)),
                 ("BEDROCK", f"{result.total_tokens} tokens; {retry_label}"),
                 ("SECURITY", "No file mutation performed"),
             ]
@@ -2871,6 +2910,7 @@ class CockpitWindow(QMainWindow):
                 ("HISTORY", f"{decision_count} append-only decision(s)"),
                 ("MEMORY", memory_label),
                 ("OPERATION", "No copy or move executed"),
+                ("LINEAGE", _lineage_preview_label(document.lineage_preview)),
                 ("SECURITY", "No file mutation performed"),
             ]
         )
@@ -2991,10 +3031,10 @@ class CockpitWindow(QMainWindow):
         self,
         source_path: Path,
         result: ClassificationCommandResult,
-    ) -> tuple[str | None, str | None]:
+    ) -> tuple[str | None, str | None, CockpitLineagePreview | None]:
         root = self.authorized_root
         if root is None:
-            return None, None
+            return None, None, None
         try:
             preview = build_mass_operation_preview(
                 authorized_root=root,
@@ -3016,11 +3056,12 @@ class CockpitWindow(QMainWindow):
                 ),
             )
         except (OSError, ValueError):
-            return None, None
+            return None, None, None
         item = preview.items[0]
         if not item.is_ready:
-            return None, item.action.value
-        return item.plan.destination_relative_path, item.action.value
+            return None, item.action.value, _cockpit_lineage_preview_from_item(item)
+        lineage_preview = _cockpit_lineage_preview_from_item(item)
+        return item.plan.destination_relative_path, item.action.value, lineage_preview
 
     def resizeEvent(self, event) -> None:
         super().resizeEvent(event)
@@ -3232,6 +3273,33 @@ def _classification_evidence_summary(result: ClassificationCommandResult) -> str
         for item in result.evidence_details[:3]
     ]
     return " | ".join(parts)
+
+
+def _cockpit_lineage_preview_from_item(
+    item: MassOperationPreviewItem,
+) -> CockpitLineagePreview:
+    """Project a mass-operation preview into human-visible lineage state."""
+    return CockpitLineagePreview(
+        action=item.action.value,
+        original_relative_path=item.source_relative_path,
+        previous_relative_path=item.plan.source_relative_path,
+        next_relative_path=item.plan.destination_relative_path,
+        original_directory=item.original_directory,
+        original_filename=item.original_filename,
+        next_directory=item.proposed_directory,
+        next_filename=item.proposed_filename,
+        plan_fingerprint=item.plan_fingerprint,
+    )
+
+
+def _lineage_preview_label(preview: CockpitLineagePreview | None) -> str:
+    if preview is None:
+        return "No lineage preview available"
+    return _compact_console_text(
+        f"{preview.action}: {preview.previous_relative_path} -> "
+        f"{preview.next_relative_path}",
+        maximum=76,
+    )
 
 
 def _preflight_check(

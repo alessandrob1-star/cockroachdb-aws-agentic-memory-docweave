@@ -127,6 +127,19 @@ def assert_visible_classification_proposal(window: CockpitWindow) -> None:
         proposed_class_item.toolTip()
     )
     assert "invoice_acme-srl_inv-2026-004.pdf" in proposed_class_item.toolTip()
+    assert "Lineage preview:" in proposed_class_item.toolTip()
+
+    document = window.left.document_at(0)
+    assert document is not None
+    assert document.lineage_preview is not None
+    assert document.lineage_preview.action == "rename_and_move"
+    assert document.lineage_preview.original_relative_path.endswith(".pdf")
+    assert document.lineage_preview.previous_relative_path.endswith(".pdf")
+    assert document.lineage_preview.next_relative_path.startswith(
+        "DocWeave Organized/Invoices/"
+    )
+    assert document.lineage_preview.next_filename == "invoice_acme-srl_inv-2026-004.pdf"
+    assert len(document.lineage_preview.plan_fingerprint) == 64
 
     ready_metric = cast(Any, window.right.metric_frames[1]).number
     review_metric = cast(Any, window.right.metric_frames[2]).number
@@ -633,6 +646,18 @@ def test_cockpit_scans_synthetic_pdfs_and_raises_central_preview(
     assert classified_paths == [(path, corpus) for path in expected_paths]
     assert window.left.count_status("REVIEW") == 30
     assert_visible_classification_proposal(window)
+
+    window._open_document_row(0)
+
+    assert cast(Any, window.right.event_rows[2]).event_name.text() == "LINEAGE"
+    assert "rename_and_move:" in cast(Any, window.right.event_rows[2]).event_text.text()
+    assert (
+        "DocWeave Organized/Invoices/"
+        in cast(
+            Any,
+            window.right.event_rows[2],
+        ).event_text.text()
+    )
 
     close_cockpit_window(window)
 

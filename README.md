@@ -133,10 +133,14 @@ filename state. A typed repository persists one lineage row atomically and
 idempotently with optional proposal, operation batch, and file-operation
 references. The `docweave-file-lineage` command composes the same configured
 runtime and can record or list lineage rows against a migrated CockroachDB
-target without exposing connection values. This is offline schema, adapter,
-and command evidence only: the migration has not yet been applied to the live
-CockroachDB cluster, and cockpit approval or execution is not yet wired to
-persist lineage rows automatically.
+target without exposing connection values. The cockpit now retains the
+operation-preview lineage state for each reviewed proposal, including
+original, previous, and next relative paths plus the plan fingerprint, and
+surfaces that memory preview when the reviewer selects a proposal. This is
+offline schema, adapter, command, and cockpit-preview evidence only: the
+migration has not yet been applied to the live CockroachDB cluster, and
+cockpit approval or execution is not yet wired to persist lineage rows
+automatically.
 
 The local shared core now also defines an explicit classification runtime that
 keeps extraction, database transactions, and Bedrock invocation in separate
