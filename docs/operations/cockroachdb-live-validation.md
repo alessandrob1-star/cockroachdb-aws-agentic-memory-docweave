@@ -86,8 +86,9 @@ The required tables are:
 - `audit_events`.
 
 This proves live acceptance of the initial schema shape. It does not prove
-revisions `0002_classification_memory` or `0003_review_decision_memory`, vector
-indexing, Row-Level Security, runtime roles, or application integration.
+revisions `0002_classification_memory`, `0003_review_decision_memory`, or
+`0004_file_lineage_memory`, vector indexing, Row-Level Security, runtime roles,
+or application integration.
 
 ## 5. Invalid-state evidence
 
@@ -132,12 +133,12 @@ This validation does not prove:
 Each future live migration still requires a target, cost, identity, recovery,
 and explicit approval gate.
 
-## 8. Current head status as of 2026-07-30
+## 8. Current head status as of 2026-08-02
 
-The current repository migration head is `0003_review_decision_memory`. Offline
+The current repository migration head is `0004_file_lineage_memory`. Offline
 rendering from an empty database to `head` was verified locally, including all
-three ordered revisions. Live acceptance of revisions `0002` and `0003` remains
-pending.
+four ordered revisions. Live acceptance of revisions `0002`, `0003`, and
+`0004` remains pending.
 
 The runtime preflight command fails closed when `DOCWEAVE_DATABASE_URL` is not
 present. That is the expected safe behavior and proves no live database

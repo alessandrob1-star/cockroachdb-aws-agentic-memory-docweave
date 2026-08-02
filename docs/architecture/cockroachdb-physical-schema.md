@@ -462,7 +462,27 @@ version, scope, status, and aggregate result without hiding per-file outcomes.
 The idempotency key is unique per workspace. A restore is a new operation that
 references the operation it compensates.
 
-### 8.4 `preference_rules`
+### 8.4 `file_lineage_events`
+
+Append-only file lineage memory records the visible path history required for
+safe rename, move, copy, and restore workflows. Each row stores:
+
+- workspace, logical document key, and a positive per-document lineage sequence;
+- idempotency key for replay-safe writes;
+- action: copy, move, rename, rename and move, or blocked;
+- optional proposal, operation batch, file operation, and batch-item references;
+- original directory and filename;
+- previous directory and filename;
+- next directory and filename;
+- original, previous, and next relative paths;
+- terminal operation status and occurrence time; and
+- plan, source-before, and destination-after SHA-256 evidence when available.
+
+The table does not overwrite the active file instance. It is a chronological
+memory trail that lets the application explain how a document moved from its
+original location to every later approved or blocked state.
+
+### 8.5 `preference_rules`
 
 Controlled preference memory includes scope, version, rule type, structured
 condition, structured outcome, provenance decisions, confidence, status,
@@ -472,7 +492,7 @@ Preference conditions and outcomes may use validated `JSONB` because their
 shape is versioned and rule-specific. Their authority, scope, status, and
 provenance remain typed relational columns.
 
-### 8.5 `audit_events`
+### 8.6 `audit_events`
 
 Append-only material events contain:
 
@@ -506,6 +526,7 @@ Only indexes required by approved workflows enter the first migration:
 | `workflow_runs` | Workspace state and idempotency lookup |
 | `agent_runs` | Workflow trace, document trace, and cost reporting |
 | `file_operations` | Idempotency, executable state, and reconciliation queue |
+| `file_lineage_events` | Per-document path history and current-path lookup |
 | `preference_rules` | Active rules by workspace and scope |
 | `audit_events` | Workspace chronological activity and subject history |
 

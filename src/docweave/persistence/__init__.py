@@ -33,6 +33,10 @@ from docweave.persistence.contracts import (
     RestoreAuditEventSnapshot,
     RestoreAuditQuery,
 )
+from docweave.persistence.lineage_repository import (
+    CockroachFileLineageRepository,
+    PersistFileLineageEvent,
+)
 from docweave.persistence.mappers import (
     ExecutionIntentMapping,
     OperationResultMapping,
@@ -91,6 +95,7 @@ __all__ = [
     "ClassificationRuntimeOptions",
     "ClassificationScores",
     "CockroachClassificationRepository",
+    "CockroachFileLineageRepository",
     "CockroachMemoryFoundationRepository",
     "CockroachOperationRepository",
     "CockroachRestoreAuditRepository",
@@ -108,6 +113,7 @@ __all__ = [
     "OperationPersistenceRepository",
     "OperationResultMapping",
     "PersistClassificationProposal",
+    "PersistFileLineageEvent",
     "PersistReviewDecision",
     "PersistedClassificationRun",
     "PersistedOperationExecution",

@@ -61,8 +61,8 @@ filename, and next directory and filename for each append-only operation
 transition. It also blocks duplicate destination targets inside the same mass
 preview before any human approval or file mutation. This is still a transparent
 planning layer, not free-form semantic Bedrock filename generation. The shared
-local operation core now includes explicit human review-decision contracts for non-authoritative
-classification proposals. Decisions are attributable, fingerprint-bound to the
+local operation core now includes explicit human review-decision contracts for
+non-authoritative classification proposals. Decisions are attributable, fingerprint-bound to the
 exact proposal and optional operation plan that was reviewed, and append-only in
 the local test ledger. The cockpit now exposes local APPROVE and REJECT controls
 for selected review rows, records the decision against the retained proposal
@@ -126,6 +126,14 @@ proposal identity forward from classification results and can use the same
 review-decision boundary when a real proposal ID is available. Durable review
 decisions can also append a human-attributed audit event in the same
 transaction.
+
+A fourth non-vector CockroachDB migration now defines append-only
+`file_lineage_events` memory for original, previous, and next directory and
+filename state. A typed repository persists one lineage row atomically and
+idempotently with optional proposal, operation batch, and file-operation
+references. This is offline schema and adapter evidence only: the migration has
+not yet been applied to the live CockroachDB cluster, and cockpit approval or
+execution is not yet wired to persist lineage rows.
 
 The local shared core now also defines an explicit classification runtime that
 keeps extraction, database transactions, and Bedrock invocation in separate
@@ -211,7 +219,8 @@ docweave-runtime-preflight --database
 The default command validates configuration and Bedrock client construction
 without opening external services. The `--database` form opens the configured
 CockroachDB target and checks that the current non-vector DocWeave schema
-tables needed by classification and review persistence are present.
+tables needed by classification, review, and file-lineage persistence are
+present.
 
 The cockpit surfaces the same fail-closed runtime readiness categories in its
 connection-state panel at startup. This is still a configuration preflight only:
