@@ -119,10 +119,12 @@ from docweave.review_cli import (
 )
 from docweave.operations import (
     InMemoryReviewDecisionLedger,
+    MassOperationCandidate,
+    MassOperationMode,
     ProposalReviewDecisionRequest,
     ReviewDecisionAction,
+    build_mass_operation_preview,
     create_proposal_review_decision_from_fingerprint,
-    propose_safe_organization_copy,
     validate_proposal_review_decision_fingerprint,
 )
 from docweave.runtime_preflight import (
@@ -151,6 +153,7 @@ class Document:
     status: str
     path: Path | None = None
     proposed_destination: str | None = None
+    proposed_operation_action: str | None = None
     proposal_id: str | None = None
     proposal_fingerprint: str | None = None
     review_decision_id: str | None = None
@@ -732,6 +735,9 @@ class LeftScreen(ShapeWidget):
             status="REVIEW",
             path=current.path,
             proposed_destination=proposed_destination,
+            proposed_operation_action=(
+                "rename_and_move" if proposed_destination is not None else None
+            ),
             proposal_id=proposal_id,
             proposal_fingerprint=proposal_fingerprint,
             review_decision_id=None,
@@ -757,6 +763,7 @@ class LeftScreen(ShapeWidget):
             status=status,
             path=current.path,
             proposed_destination=current.proposed_destination,
+            proposed_operation_action=current.proposed_operation_action,
             proposal_id=current.proposal_id,
             proposal_fingerprint=current.proposal_fingerprint,
             review_decision_id=review_decision_id,
@@ -768,7 +775,8 @@ class LeftScreen(ShapeWidget):
         for column, value in enumerate((doc.name, doc.category, doc.pages, doc.status)):
             item = QTableWidgetItem(value)
             if doc.proposed_destination is not None:
-                item.setToolTip(f"Proposed copy target: {doc.proposed_destination}")
+                action = doc.proposed_operation_action or "operation"
+                item.setToolTip(f"Proposed {action} target: {doc.proposed_destination}")
             if doc.review_decision_id is not None:
                 item.setToolTip(
                     f"{item.toolTip()}\nReview decision: {doc.review_decision_id}"
@@ -2499,7 +2507,8 @@ class CockpitWindow(QMainWindow):
                     ("REVIEW", f"Proposal for {document.category}"),
                     (
                         "TARGET",
-                        document.proposed_destination or "No copy target available",
+                        document.proposed_destination
+                        or "No rename/move target available",
                     ),
                     ("APPROVAL", "Human decision required"),
                     ("MEMORY", "Local review ledger pending"),
@@ -2587,7 +2596,7 @@ class CockpitWindow(QMainWindow):
         self._classification_batch_completed = raw_progress.completed
         self._classification_batch_total = raw_progress.total
         result = raw_progress.result
-        proposed_destination = self._organization_destination_for(
+        proposed_destination, proposed_action = self._organization_preview_for(
             raw_progress.source_path,
             result,
         )
@@ -2625,7 +2634,8 @@ class CockpitWindow(QMainWindow):
             f"Document: {raw_progress.source_path.name}\n"
             f"Class: {result.proposed_class}\n"
             f"Confidence: {confidence_label}\n"
-            f"Proposed copy target: {proposed_destination or 'unavailable'}\n"
+            f"Mass operation preview: {proposed_action or 'unavailable'}\n"
+            f"Proposed target: {proposed_destination or 'unavailable'}\n"
             f"Evidence items: {result.evidence_count}; "
             f"metadata fields: {result.metadata_count}\n"
             f"Rationale: {rationale}"
@@ -2642,9 +2652,9 @@ class CockpitWindow(QMainWindow):
                 ("MEMORY", f"Proposal {result.proposal_disposition}"),
                 (
                     "OPERATION",
-                    "Copy plan ready"
+                    f"{proposed_action} preview ready"
                     if proposed_destination is not None
-                    else "Copy plan unavailable",
+                    else "Operation preview unavailable",
                 ),
                 ("BEDROCK", f"{result.total_tokens} tokens; {retry_label}"),
                 ("SECURITY", "No file mutation performed"),
@@ -2718,7 +2728,7 @@ class CockpitWindow(QMainWindow):
                 ),
                 ("REVIEW", f"{self.left.count_status('REVIEW')} awaiting human review"),
                 ("READY", f"{self.left.count_status('READY')} ready remaining"),
-                ("MEMORY", "Proposals persisted"),
+                ("OPERATION", "Mass rename/move previews ready"),
                 ("SECURITY", "No file mutation performed"),
             ]
         )
@@ -2977,26 +2987,40 @@ class CockpitWindow(QMainWindow):
                 break
         return tuple(items)
 
-    def _organization_destination_for(
+    def _organization_preview_for(
         self,
         source_path: Path,
         result: ClassificationCommandResult,
-    ) -> str | None:
+    ) -> tuple[str | None, str | None]:
         root = self.authorized_root
         if root is None:
-            return None
+            return None, None
         try:
-            proposal = propose_safe_organization_copy(
-                source_path=source_path,
+            preview = build_mass_operation_preview(
                 authorized_root=root,
-                proposed_class=result.proposed_class,
-                metadata={item.name: item.value for item in result.metadata_details},
+                mode=MassOperationMode.MOVE_TO_ORGANIZED,
+                candidates=(
+                    MassOperationCandidate(
+                        source_path=source_path,
+                        proposed_class=result.proposed_class,
+                        metadata={
+                            item.name: item.value for item in result.metadata_details
+                        },
+                        proposal_id=(
+                            None
+                            if result.proposal_id is None
+                            else str(result.proposal_id)
+                        ),
+                        proposal_fingerprint=result.proposal_fingerprint,
+                    ),
+                ),
             )
         except (OSError, ValueError):
-            return None
-        if not proposal.is_ready:
-            return None
-        return proposal.destination_relative_path
+            return None, None
+        item = preview.items[0]
+        if not item.is_ready:
+            return None, item.action.value
+        return item.plan.destination_relative_path, item.action.value
 
     def resizeEvent(self, event) -> None:
         super().resizeEvent(event)

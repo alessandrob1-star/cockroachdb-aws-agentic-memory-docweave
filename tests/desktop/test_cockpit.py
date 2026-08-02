@@ -123,7 +123,7 @@ def assert_visible_classification_proposal(window: CockpitWindow) -> None:
     assert review_status_item is not None
     assert proposed_class_item.text() == "invoice"
     assert review_status_item.text() == "REVIEW"
-    assert "Proposed copy target: DocWeave Organized/Invoices/" in (
+    assert "Proposed rename_and_move target: DocWeave Organized/Invoices/" in (
         proposed_class_item.toolTip()
     )
     assert "invoice_acme-srl_inv-2026-004.pdf" in proposed_class_item.toolTip()
@@ -143,7 +143,7 @@ def assert_visible_classification_proposal(window: CockpitWindow) -> None:
         "0 ready remaining"
     )
     assert cast(Any, window.right.event_rows[4]).event_text.text() == (
-        "Proposals persisted"
+        "Mass rename/move previews ready"
     )
 
 

@@ -51,13 +51,17 @@ proposal moves its document into non-authoritative human review state in the
 cockpit, with progress and terminal batch status surfaced without changing any
 file. Per-item classification failures are reported without stopping the
 remaining visible ready documents, and failed items remain ready for a later
-explicit retry. The cockpit also prepares a deterministic, non-mutating copy destination
-proposal from the model-proposed class, validated candidate metadata when
-available, and a sanitized original filename fallback, then binds it to the
-existing safe file-operation planner so collisions and unsafe paths remain
-blocked before any future approval. This is still a transparent planning layer,
-not free-form semantic Bedrock filename generation. The shared local operation
-core now includes explicit human review-decision contracts for non-authoritative
+explicit retry. The cockpit also prepares a deterministic, non-mutating mass
+rename/move preview from the model-proposed class, validated candidate metadata
+when available, and a sanitized original filename fallback, then binds it to
+the existing safe file-operation planner so unsafe paths remain blocked before
+any future approval. The shared operation core now exposes a file-lineage row
+contract that separates original directory and filename, previous directory and
+filename, and next directory and filename for each append-only operation
+transition. It also blocks duplicate destination targets inside the same mass
+preview before any human approval or file mutation. This is still a transparent
+planning layer, not free-form semantic Bedrock filename generation. The shared
+local operation core now includes explicit human review-decision contracts for non-authoritative
 classification proposals. Decisions are attributable, fingerprint-bound to the
 exact proposal and optional operation plan that was reviewed, and append-only in
 the local test ledger. The cockpit now exposes local APPROVE and REJECT controls
