@@ -78,6 +78,20 @@ class BedrockRuntimeClient(Protocol):
         """Invoke the configured Bedrock model."""
 
 
+class CloudMemoryWriter(Protocol):
+    """Narrow persistence seam for future CockroachDB cloud memory writes."""
+
+    def persist_classifications(
+        self,
+        *,
+        workspace_id: str,
+        job_id: str,
+        verified_objects: Sequence[Mapping[str, int | str]],
+        classifications: Sequence[Mapping[str, object]],
+    ) -> Mapping[str, object]:
+        """Persist classifications and return sanitized write evidence."""
+
+
 @dataclass(frozen=True)
 class CloudConfig:
     """Runtime configuration sourced from Lambda environment variables."""
@@ -115,6 +129,17 @@ class CloudConfig:
         )
 
 
+@dataclass(frozen=True)
+class AnalysisResultArtifact:
+    """Sanitized cloud analysis result written to S3."""
+
+    job_id: str
+    workspace_id: str
+    verified_objects: Sequence[Mapping[str, int | str]]
+    classifications: Sequence[Mapping[str, object]]
+    persistence: Mapping[str, object]
+
+
 def api_handler(event: Mapping[str, Any], context: object) -> dict[str, Any]:
     """Handle API Gateway HTTP API events."""
 
@@ -149,6 +174,7 @@ def worker_handler(event: Mapping[str, Any], context: object) -> dict[str, Any]:
     verified_bytes = 0
     result_artifact_count = 0
     classifications: list[dict[str, object]] = []
+    persisted_classification_count = 0
     for record in cast(Sequence[Mapping[str, Any]], event.get("Records", [])):
         message_id = str(record.get("messageId", "unknown"))
         try:
@@ -160,12 +186,21 @@ def worker_handler(event: Mapping[str, Any], context: object) -> dict[str, Any]:
             record_classifications = _classify_s3_pdf_artifacts_with_bedrock(
                 config, verified_objects
             )
-            _write_analysis_result_artifact(
-                config=config,
-                job_id=payload["job_id"],
+            persistence = _persist_cloud_classifications_to_memory(
                 workspace_id=payload["workspace_id"],
+                job_id=payload["job_id"],
                 verified_objects=verified_objects,
                 classifications=record_classifications,
+            )
+            _write_analysis_result_artifact(
+                config=config,
+                result=AnalysisResultArtifact(
+                    job_id=payload["job_id"],
+                    workspace_id=payload["workspace_id"],
+                    verified_objects=verified_objects,
+                    classifications=record_classifications,
+                    persistence=persistence,
+                ),
             )
         except Exception:
             failed_items.append({"itemIdentifier": message_id})
@@ -173,19 +208,26 @@ def worker_handler(event: Mapping[str, Any], context: object) -> dict[str, Any]:
         accepted += 1
         result_artifact_count += 1
         classifications.extend(record_classifications)
+        persisted_classification_count += _persisted_count(persistence)
         verified_object_count += len(verified_objects)
         verified_bytes += sum(
             cast(int, item["content_length"]) for item in verified_objects
         )
+    analysis_status = (
+        "bedrock_classified_cockroachdb_persisted"
+        if persisted_classification_count == len(classifications) and classifications
+        else "bedrock_classified_pending_persistence"
+    )
     return {
         "accepted": accepted,
         "batchItemFailures": failed_items,
         "verifiedObjectCount": verified_object_count,
         "verifiedBytes": verified_bytes,
         "classifiedObjectCount": len(classifications),
+        "persistedClassificationCount": persisted_classification_count,
         "resultArtifactCount": result_artifact_count,
         "classifications": classifications,
-        "analysisStatus": "bedrock_classified_pending_persistence",
+        "analysisStatus": analysis_status,
     }
 
 
@@ -501,26 +543,26 @@ def _bedrock_document_name(object_key: str) -> str:
 def _write_analysis_result_artifact(
     *,
     config: CloudConfig,
-    job_id: str,
-    workspace_id: str,
-    verified_objects: Sequence[Mapping[str, int | str]],
-    classifications: Sequence[Mapping[str, object]],
+    result: AnalysisResultArtifact,
 ) -> str:
-    result_key = _analysis_result_key(workspace_id, job_id)
-    result = {
+    result_key = _analysis_result_key(result.workspace_id, result.job_id)
+    payload = {
         "contract_version": "cloud_analysis_result.v1",
-        "job_id": job_id,
-        "workspace_id": workspace_id,
-        "status": "bedrock_classified_pending_cockroachdb_persistence",
-        "verifiedObjectCount": len(verified_objects),
-        "classifiedObjectCount": len(classifications),
-        "verifiedBytes": sum(int(item["content_length"]) for item in verified_objects),
-        "classifications": list(classifications),
+        "job_id": result.job_id,
+        "workspace_id": result.workspace_id,
+        "status": str(result.persistence["status"]),
+        "persistence": dict(result.persistence),
+        "verifiedObjectCount": len(result.verified_objects),
+        "classifiedObjectCount": len(result.classifications),
+        "verifiedBytes": sum(
+            int(item["content_length"]) for item in result.verified_objects
+        ),
+        "classifications": list(result.classifications),
     }
     _s3_client().put_object(
         Bucket=config.document_bucket,
         Key=result_key,
-        Body=json.dumps(result, sort_keys=True, separators=(",", ":")).encode("utf-8"),
+        Body=json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8"),
         ContentType="application/json",
     )
     return result_key
@@ -552,6 +594,49 @@ def _analysis_result_key(workspace_id: str, job_id: str) -> str:
     return f"workspaces/{workspace_id}/analysis-results/{job_id}.json"
 
 
+def _persist_cloud_classifications_to_memory(
+    *,
+    workspace_id: str,
+    job_id: str,
+    verified_objects: Sequence[Mapping[str, int | str]],
+    classifications: Sequence[Mapping[str, object]],
+) -> Mapping[str, object]:
+    writer = _cloud_memory_writer()
+    if writer is None:
+        return {
+            "status": "bedrock_classified_pending_cockroachdb_persistence",
+            "configured": False,
+            "persisted_count": 0,
+        }
+    result = writer.persist_classifications(
+        workspace_id=workspace_id,
+        job_id=job_id,
+        verified_objects=verified_objects,
+        classifications=classifications,
+    )
+    persisted_count = _persisted_count(result)
+    if persisted_count != len(classifications):
+        raise RuntimeError("cloud_memory_persistence_incomplete")
+    return {
+        "status": "bedrock_classified_cockroachdb_persisted",
+        "configured": True,
+        "persisted_count": persisted_count,
+    }
+
+
+def _cloud_memory_writer() -> CloudMemoryWriter | None:
+    return None
+
+
+def _persisted_count(persistence: Mapping[str, object]) -> int:
+    raw_value = persistence.get("persisted_count", 0)
+    if isinstance(raw_value, int):
+        return raw_value
+    if isinstance(raw_value, str) and raw_value.isdecimal():
+        return int(raw_value)
+    raise RuntimeError("cloud_memory_persistence_count_invalid")
+
+
 def _health_payload(config: CloudConfig) -> dict[str, Any]:
     return {
         "service": "docweave-cloud-api",
@@ -572,6 +657,7 @@ def _health_payload(config: CloudConfig) -> dict[str, Any]:
             "worker_s3_artifact_verification",
             "worker_bedrock_document_classification",
             "cloud_analysis_result_artifacts",
+            "cloud_cockroachdb_persistence_seam",
         ],
     }
 
