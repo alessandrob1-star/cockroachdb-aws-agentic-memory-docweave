@@ -98,6 +98,16 @@ class FakeBedrockRuntimeClient:
         }
 
 
+class FakeCloudMemoryWriter:
+    def __init__(self, *, persisted_count: int) -> None:
+        self.persisted_count = persisted_count
+        self.calls: list[dict[str, Any]] = []
+
+    def persist_classifications(self, **kwargs: Any) -> dict[str, object]:
+        self.calls.append(kwargs)
+        return {"persisted_count": self.persisted_count}
+
+
 def _event(
     method: str, path: str, body: dict[str, Any] | None = None
 ) -> dict[str, Any]:
@@ -279,6 +289,7 @@ def test_worker_verifies_s3_artifacts_before_accepting_job(
                 },
             }
         ],
+        "persistedClassificationCount": 0,
         "resultArtifactCount": 1,
         "verifiedBytes": 1234,
         "verifiedObjectCount": 1,
@@ -300,7 +311,68 @@ def test_worker_verifies_s3_artifacts_before_accepting_job(
     assert (
         result_payload["status"] == "bedrock_classified_pending_cockroachdb_persistence"
     )
+    assert result_payload["persistence"] == {
+        "configured": False,
+        "persisted_count": 0,
+        "status": "bedrock_classified_pending_cockroachdb_persistence",
+    }
     assert result_payload["classifiedObjectCount"] == 1
+
+
+def test_worker_marks_result_persisted_when_cloud_memory_writer_succeeds(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    fake_s3 = FakeS3Client()
+    fake_bedrock = FakeBedrockRuntimeClient()
+    fake_writer = FakeCloudMemoryWriter(persisted_count=1)
+    valid_key = f"workspaces/{WORKSPACE_ID}/originals/job/document.pdf"
+    fake_s3.head_responses[valid_key] = {
+        "ContentLength": 1234,
+        "ContentType": "application/pdf",
+    }
+    fake_s3.object_bodies[valid_key] = FakeBody(b"%PDF-1.7\ninvoice")
+    monkeypatch.setenv("DOCWEAVE_DOCUMENT_BUCKET", "docweave-bucket")
+    monkeypatch.setenv("DOCWEAVE_BEDROCK_MODEL_ID", "eu.amazon.nova-2-lite-v1:0")
+    monkeypatch.setattr(handler, "_s3_client", lambda: fake_s3)
+    monkeypatch.setattr(handler, "_bedrock_runtime_client", lambda: fake_bedrock)
+    monkeypatch.setattr(handler, "_cloud_memory_writer", lambda: fake_writer)
+
+    response = handler.worker_handler(
+        {
+            "Records": [
+                {
+                    "messageId": "good",
+                    "body": json.dumps(
+                        {
+                            "job_id": "44444444-4444-4444-8444-444444444444",
+                            "workspace_id": WORKSPACE_ID,
+                            "object_keys": [valid_key],
+                        }
+                    ),
+                }
+            ]
+        },
+        object(),
+    )
+
+    assert response["analysisStatus"] == "bedrock_classified_cockroachdb_persisted"
+    assert response["persistedClassificationCount"] == 1
+    assert fake_writer.calls[0]["workspace_id"] == WORKSPACE_ID
+    assert fake_writer.calls[0]["job_id"] == "44444444-4444-4444-8444-444444444444"
+    assert fake_writer.calls[0]["verified_objects"] == [
+        {"key": valid_key, "content_length": 1234}
+    ]
+    result_key = (
+        f"workspaces/{WORKSPACE_ID}/analysis-results/"
+        "44444444-4444-4444-8444-444444444444.json"
+    )
+    result_payload = json.loads(fake_s3.put_objects[result_key]["Body"].decode("utf-8"))
+    assert result_payload["status"] == "bedrock_classified_cockroachdb_persisted"
+    assert result_payload["persistence"] == {
+        "configured": True,
+        "persisted_count": 1,
+        "status": "bedrock_classified_cockroachdb_persisted",
+    }
 
 
 def test_worker_reports_partial_failure_when_s3_artifact_is_missing(
@@ -331,6 +403,7 @@ def test_worker_reports_partial_failure_when_s3_artifact_is_missing(
         "batchItemFailures": [{"itemIdentifier": "missing"}],
         "classifiedObjectCount": 0,
         "classifications": [],
+        "persistedClassificationCount": 0,
         "resultArtifactCount": 0,
         "verifiedBytes": 0,
         "verifiedObjectCount": 0,
@@ -383,6 +456,7 @@ def test_worker_rejects_invalid_bedrock_classification_without_acknowledging_job
         "batchItemFailures": [{"itemIdentifier": "invalid-model-output"}],
         "classifiedObjectCount": 0,
         "classifications": [],
+        "persistedClassificationCount": 0,
         "resultArtifactCount": 0,
         "verifiedBytes": 0,
         "verifiedObjectCount": 0,
