@@ -111,6 +111,10 @@ from docweave.desktop.workspace import (
     WorkspacePhase,
 )
 from docweave.intake import IntakeStatus
+from docweave.memory_evidence_report import (
+    MemoryEvidenceReport,
+    collect_memory_evidence,
+)
 from docweave.persistence import ClassificationPipelineError
 from docweave.review_cli import (
     ReviewDecisionCommandInput,
@@ -225,6 +229,7 @@ ReviewDecisionFunction = Callable[
     ReviewDecisionCommandResult,
 ]
 RuntimePreflightFunction = Callable[[], RuntimePreflightReport]
+MemoryEvidenceFunction = Callable[[], MemoryEvidenceReport]
 
 
 def classify_pdf_for_cockpit(
@@ -935,6 +940,14 @@ class RightScreen(ShapeWidget):
         self.restore_label = QLabel("RESTORE HISTORY", self)
         self.restore_label.setObjectName("sectionLabel")
 
+        self.memory_label = QLabel("DATABASE EVIDENCE", self)
+        self.memory_label.setObjectName("sectionLabel")
+
+        self.memory_text = QLabel("Memory evidence waiting for runtime preflight", self)
+        self.memory_text.setObjectName("eventText")
+        self.memory_text.setAccessibleName("CockroachDB memory evidence status")
+        self.memory_text.setWordWrap(True)
+
         self.restore_text = QLabel("Read-only history waiting for runtime", self)
         self.restore_text.setObjectName("eventText")
         self.restore_text.setAccessibleName("Restore history status")
@@ -945,6 +958,7 @@ class RightScreen(ShapeWidget):
             self.online,
             self.section,
             self.stream_label,
+            self.memory_label,
             self.restore_label,
         ):
             glow = QGraphicsDropShadowEffect(label)
@@ -990,6 +1004,9 @@ class RightScreen(ShapeWidget):
     def set_restore_history_status(self, text: str) -> None:
         self.restore_text.setText(text)
 
+    def set_memory_evidence_status(self, text: str) -> None:
+        self.memory_text.setText(text)
+
     def shape_path(self) -> QPainterPath:
         r = self.rect().adjusted(3, 3, -3, -3)
         x, y, w, h = map(float, (r.x(), r.y(), r.width(), r.height()))
@@ -1032,7 +1049,16 @@ class RightScreen(ShapeWidget):
             frame.caption.setGeometry(11, 44, metric_w - 22, 20)
             x += metric_w + metric_gap
 
-        stream_top = metric_top + 94
+        memory_y = metric_top + 92
+        self.memory_label.setGeometry(content_left, memory_y, content_width, 21)
+        self.memory_text.setGeometry(
+            content_left + 12,
+            memory_y + 24,
+            content_width - 24,
+            46,
+        )
+
+        stream_top = memory_y + 80
         self.stream_label.setGeometry(
             content_left,
             stream_top,
@@ -2039,6 +2065,7 @@ class CockpitWindow(QMainWindow):
         classification_function: ClassificationFunction = classify_pdf_for_cockpit,
         review_decision_function: ReviewDecisionFunction = persist_review_decision,
         runtime_preflight_function: RuntimePreflightFunction | None = None,
+        memory_evidence_function: MemoryEvidenceFunction = collect_memory_evidence,
         folder_memory: FolderMemory | None = None,
     ) -> None:
         super().__init__()
@@ -2046,6 +2073,7 @@ class CockpitWindow(QMainWindow):
         self._classification_function = classification_function
         self._review_decision_function = review_decision_function
         self._runtime_preflight_function = runtime_preflight_function
+        self._memory_evidence_function = memory_evidence_function
         self._folder_memory = (
             folder_memory if folder_memory is not None else QtFolderMemory()
         )
@@ -2065,6 +2093,8 @@ class CockpitWindow(QMainWindow):
         self._classification_batch_completed = 0
         self._classification_batch_failed = 0
         self._classification_batch_total = 0
+        self._memory_evidence_report: MemoryEvidenceReport | None = None
+        self._memory_evidence_error: str | None = None
         self._selected_document_row: int | None = None
         self._review_ledger = InMemoryReviewDecisionLedger()
         self._workspace = DesktopWorkspaceSession()
@@ -2742,6 +2772,7 @@ class CockpitWindow(QMainWindow):
         self._classification_batch_completed = raw_summary.completed
         self._classification_batch_failed = raw_summary.failed
         self._classification_batch_total = raw_summary.total
+        self._refresh_memory_evidence()
         self.console.log_text.setText(
             f"Classification batch complete: {raw_summary.completed} of "
             f"{raw_summary.total} proposal(s) persisted for human review.\n"
@@ -2768,6 +2799,15 @@ class CockpitWindow(QMainWindow):
                 ("REVIEW", f"{self.left.count_status('REVIEW')} awaiting human review"),
                 ("READY", f"{self.left.count_status('READY')} ready remaining"),
                 ("OPERATION", "Mass rename/move previews ready"),
+                (
+                    "MEMORY",
+                    _memory_evidence_status(
+                        self._memory_evidence_report,
+                        self._memory_evidence_error,
+                        self._runtime_preflight_report,
+                        self._integration_snapshot,
+                    ),
+                ),
                 ("SECURITY", "No file mutation performed"),
             ]
         )
@@ -2973,6 +3013,14 @@ class CockpitWindow(QMainWindow):
                 self._integration_snapshot,
             )
         )
+        self.right.set_memory_evidence_status(
+            _memory_evidence_status(
+                self._memory_evidence_report,
+                self._memory_evidence_error,
+                self._runtime_preflight_report,
+                self._integration_snapshot,
+            )
+        )
 
     def _refresh_runtime_preflight_report(self) -> None:
         """Refresh runtime readiness before a user-triggered classification run."""
@@ -2992,6 +3040,25 @@ class CockpitWindow(QMainWindow):
                     ),
                 )
             )
+        self._refresh_memory_evidence()
+
+    def _refresh_memory_evidence(self) -> None:
+        """Refresh read-only CockroachDB memory evidence after database preflight."""
+        self._memory_evidence_report = None
+        self._memory_evidence_error = None
+        cockroachdb_check = _preflight_check(
+            self._runtime_preflight_report,
+            "cockroachdb_connection",
+        )
+        if (
+            cockroachdb_check is None
+            or cockroachdb_check.state is not PreflightState.OK
+        ):
+            return
+        try:
+            self._memory_evidence_report = self._memory_evidence_function()
+        except Exception as error:
+            self._memory_evidence_error = error.__class__.__name__
 
     def _ready_document_count(self) -> int:
         return self.left.count_status("READY")
@@ -3239,6 +3306,39 @@ def _restore_history_status(
             "no restore action is wired."
         )
     return f"Restore history reader blocked: CockroachDB {cockroachdb_status.lower()}."
+
+
+def _memory_evidence_status(
+    report: MemoryEvidenceReport | None,
+    error_category: str | None,
+    preflight_report: RuntimePreflightReport,
+    integration_snapshot: RuntimeIntegrationSnapshot,
+) -> str:
+    if report is not None:
+        present = sum(1 for row in report.table_counts if row.present)
+        total = len(report.table_counts)
+        rows = sum(row.row_count or 0 for row in report.table_counts)
+        readiness = "ready" if report.schema_ready else "not ready"
+        return (
+            f"CockroachDB memory schema {readiness}: {present}/{total} "
+            f"tables at {report.alembic_revision or 'missing'}; {rows} row(s)."
+        )
+    if error_category is not None:
+        return f"CockroachDB memory evidence unavailable: {error_category}."
+
+    runtime_check = _preflight_check(preflight_report, "runtime_config")
+    if runtime_check is None:
+        return "CockroachDB memory evidence waiting for runtime configuration."
+    if runtime_check.state is PreflightState.FAIL:
+        return (
+            "CockroachDB memory evidence blocked by runtime config: "
+            f"{_compact_preflight_detail(runtime_check.detail)}."
+        )
+
+    cockroachdb_status = _cockroachdb_status(preflight_report, integration_snapshot)
+    if cockroachdb_status == "Reachable":
+        return "CockroachDB memory evidence waiting for the next read-only refresh."
+    return f"CockroachDB memory evidence waiting: {cockroachdb_status.lower()}."
 
 
 def _classification_preflight_block(report: RuntimePreflightReport) -> str | None:
