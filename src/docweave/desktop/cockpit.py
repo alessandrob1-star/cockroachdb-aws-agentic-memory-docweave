@@ -25,7 +25,7 @@ from __future__ import annotations
 
 import math
 import sys
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -948,6 +948,24 @@ class RightScreen(ShapeWidget):
         self.memory_text.setAccessibleName("CockroachDB memory evidence status")
         self.memory_text.setWordWrap(True)
 
+        self.memory_table = QTableWidget(0, 2, self)
+        self.memory_table.setObjectName("memoryTable")
+        self.memory_table.setAccessibleName("CockroachDB memory table evidence")
+        self.memory_table.setHorizontalHeaderLabels(["TABLE", "ROWS"])
+        self.memory_table.verticalHeader().hide()
+        self.memory_table.horizontalHeader().setSectionResizeMode(
+            0,
+            QHeaderView.ResizeMode.Stretch,
+        )
+        self.memory_table.horizontalHeader().setSectionResizeMode(
+            1,
+            QHeaderView.ResizeMode.ResizeToContents,
+        )
+        self.memory_table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
+        self.memory_table.setSelectionMode(QTableWidget.SelectionMode.NoSelection)
+        self.memory_table.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        self.memory_table.setAlternatingRowColors(True)
+
         self.restore_text = QLabel("Read-only history waiting for runtime", self)
         self.restore_text.setObjectName("eventText")
         self.restore_text.setAccessibleName("Restore history status")
@@ -1007,6 +1025,17 @@ class RightScreen(ShapeWidget):
     def set_memory_evidence_status(self, text: str) -> None:
         self.memory_text.setText(text)
 
+    def set_memory_table_rows(self, rows: Sequence[tuple[str, str]]) -> None:
+        self.memory_table.setRowCount(len(rows))
+        for row_index, (table_name, row_count) in enumerate(rows):
+            table_item = QTableWidgetItem(table_name)
+            count_item = QTableWidgetItem(row_count)
+            table_item.setToolTip(table_name)
+            count_item.setToolTip(f"{table_name}: {row_count}")
+            self.memory_table.setItem(row_index, 0, table_item)
+            self.memory_table.setItem(row_index, 1, count_item)
+            self.memory_table.setRowHeight(row_index, 22)
+
     def shape_path(self) -> QPainterPath:
         r = self.rect().adjusted(3, 3, -3, -3)
         x, y, w, h = map(float, (r.x(), r.y(), r.width(), r.height()))
@@ -1055,10 +1084,16 @@ class RightScreen(ShapeWidget):
             content_left + 12,
             memory_y + 24,
             content_width - 24,
-            46,
+            40,
+        )
+        self.memory_table.setGeometry(
+            content_left,
+            memory_y + 70,
+            content_width,
+            116,
         )
 
-        stream_top = memory_y + 80
+        stream_top = memory_y + 196
         self.stream_label.setGeometry(
             content_left,
             stream_top,
@@ -1067,8 +1102,8 @@ class RightScreen(ShapeWidget):
         )
 
         row_y = stream_top + 30
-        row_height = 58
-        row_gap = 8
+        row_height = 40
+        row_gap = 5
         for frame in self.event_rows:
             frame.setGeometry(
                 content_left,
@@ -1076,8 +1111,8 @@ class RightScreen(ShapeWidget):
                 content_width,
                 row_height,
             )
-            frame.event_name.setGeometry(12, 7, content_width - 24, 20)
-            frame.event_text.setGeometry(12, 29, content_width - 24, 26)
+            frame.event_name.setGeometry(12, 5, content_width - 24, 16)
+            frame.event_text.setGeometry(12, 21, content_width - 24, 17)
             row_y += row_height + row_gap
 
         restore_y = row_y + 4
@@ -2300,14 +2335,40 @@ class CockpitWindow(QMainWindow):
 
             QLabel#eventName {
                 color: #67D8B0;
-                font-size: 11px;
+                font-size: 12px;
                 font-weight: 800;
             }
 
             QLabel#eventText {
                 color: #EDF7F3;
+                font-size: 12px;
+                font-weight: 700;
+            }
+
+            QTableWidget#memoryTable {
+                background: rgba(7, 11, 10, 222);
+                border: 1px solid rgba(125, 240, 200, 120);
+                border-radius: 6px;
+                color: #F3FFF9;
+                gridline-color: rgba(103, 216, 176, 60);
+                alternate-background-color: rgba(22, 36, 32, 180);
                 font-size: 11px;
-                font-weight: 650;
+                font-weight: 700;
+                outline: none;
+            }
+
+            QTableWidget#memoryTable::item {
+                padding-left: 6px;
+            }
+
+            QTableWidget#memoryTable QHeaderView::section {
+                background: rgba(20, 26, 24, 240);
+                border: none;
+                border-bottom: 1px solid rgba(103, 216, 176, 125);
+                color: #67D8B0;
+                font-size: 10px;
+                font-weight: 900;
+                padding: 4px;
             }
 
             QPushButton {
@@ -2384,6 +2445,11 @@ class CockpitWindow(QMainWindow):
         self._set_status(
             "Ready. Choose an authorized folder; no files will be changed."
         )
+        if runtime_preflight_function is None and integration_snapshot is None:
+            self._refresh_runtime_preflight_report()
+            self._set_status(
+                "Ready. Runtime integrations checked; choose an authorized folder."
+            )
 
     @property
     def authorized_root(self) -> Path | None:
@@ -3081,6 +3147,9 @@ class CockpitWindow(QMainWindow):
                 self._integration_snapshot,
             )
         )
+        self.right.set_memory_table_rows(
+            _memory_table_rows(self._memory_evidence_report)
+        )
 
     def _refresh_runtime_preflight_report(self) -> None:
         """Refresh runtime readiness before a user-triggered classification run."""
@@ -3399,6 +3468,17 @@ def _memory_evidence_status(
     if cockroachdb_status == "Reachable":
         return "CockroachDB memory evidence waiting for the next read-only refresh."
     return f"CockroachDB memory evidence waiting: {cockroachdb_status.lower()}."
+
+
+def _memory_table_rows(
+    report: MemoryEvidenceReport | None,
+) -> tuple[tuple[str, str], ...]:
+    if report is None:
+        return (("schema", "waiting"),)
+    return tuple(
+        (row.table_name, "missing" if not row.present else str(row.row_count or 0))
+        for row in sorted(report.table_counts, key=lambda item: item.table_name)
+    )
 
 
 def _classification_preflight_block(report: RuntimePreflightReport) -> str | None:

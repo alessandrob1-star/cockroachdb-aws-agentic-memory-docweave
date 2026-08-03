@@ -234,6 +234,19 @@ def test_cockpit_surfaces_read_only_memory_evidence(
     assert (
         f"CockroachDB memory schema ready: 3/3 tables at {EXPECTED_HEAD}; 48 row(s)."
     ) in window.right.memory_text.text()
+    assert window.right.memory_table.rowCount() == 3
+    first_table = window.right.memory_table.item(0, 0)
+    first_count = window.right.memory_table.item(0, 1)
+    last_table = window.right.memory_table.item(2, 0)
+    last_count = window.right.memory_table.item(2, 1)
+    assert first_table is not None
+    assert first_count is not None
+    assert last_table is not None
+    assert last_count is not None
+    assert first_table.text() == "documents"
+    assert first_count.text() == "30"
+    assert last_table.text() == "proposals"
+    assert last_count.text() == "12"
     assert "DOCWEAVE_DATABASE_URL" not in window.right.memory_text.text()
 
     close_cockpit_window(window)
@@ -589,12 +602,12 @@ def test_cockpit_checks_database_before_analyze_and_reports_reachable(
     window._selected_document_row = 0
     window._set_busy(False)
 
-    assert "CockroachDB      Configured" in window.console.status_text.text()
+    assert "CockroachDB      Reachable" in window.console.status_text.text()
 
     window._analyze_selected_document()
     wait_for_cockpit_classification(window)
 
-    assert check_database_calls == [False, True]
+    assert check_database_calls == [False, True, True]
     assert "CockroachDB      Reachable" in window.console.status_text.text()
 
     close_cockpit_window(window)
