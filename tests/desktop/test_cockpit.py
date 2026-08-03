@@ -133,6 +133,12 @@ def assert_visible_classification_proposal(window: CockpitWindow) -> None:
     assert "ev_2 p1: Supplier name is visible" in (
         window.center.analysis_evidence.text()
     )
+    assert not window.center.memory_panel.isHidden()
+    assert "Bedrock proposal persisted as applied" in (
+        window.center.memory_summary.text()
+    )
+    assert "Fingerprint" in window.center.memory_detail.text()
+    assert "rename_and_move" in window.center.memory_detail.text()
 
     log_text = window.console.log_text.text()
     assert "Classification batch complete: 30 of 30" in log_text
@@ -758,6 +764,9 @@ def test_cockpit_records_local_review_decision_without_file_mutation(
 
     assert window.console.buttons[4].isEnabled()
     assert window.console.buttons[5].isEnabled()
+    assert not window.center.memory_panel.isHidden()
+    assert "Review memory selected for invoice" in window.center.memory_summary.text()
+    assert "fingerprint aaaaaaaaaaaa" in window.center.memory_detail.text()
 
     window._approve_selected_review()
 
@@ -774,6 +783,10 @@ def test_cockpit_records_local_review_decision_without_file_mutation(
     assert cast(Any, window.right.event_rows[4]).event_text.text() == (
         "No copy or move executed"
     )
+    assert "Human review approved append recorded" in (
+        window.center.memory_summary.text()
+    )
+    assert "Local review ledger" in window.center.memory_detail.text()
 
     close_cockpit_window(window)
 
@@ -833,6 +846,10 @@ def test_cockpit_records_durable_review_decision_when_proposal_id_is_available(
     assert cast(Any, window.right.event_rows[3]).event_text.text() == (
         "CockroachDB applied"
     )
+    assert "Human review approved append recorded" in (
+        window.center.memory_summary.text()
+    )
+    assert "CockroachDB applied" in window.center.memory_detail.text()
 
     close_cockpit_window(window)
 
