@@ -442,6 +442,18 @@
         }
       }
     },
+    "AnalysisResultRoute": {
+      "Type": "AWS::ApiGatewayV2::Route",
+      "Properties": {
+        "ApiId": {
+          "Ref": "HttpApi"
+        },
+        "RouteKey": "GET /analysis-results/{job_id}",
+        "Target": {
+          "Fn::Sub": "integrations/${HttpApiIntegration}"
+        }
+      }
+    },
     "HttpApiStage": {
       "Type": "AWS::ApiGatewayV2::Stage",
       "Properties": {

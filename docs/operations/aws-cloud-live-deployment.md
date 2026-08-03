@@ -88,6 +88,44 @@ This capability is labelled `bedrock_classified_pending_persistence` because it
 does not yet write the proposal to CockroachDB. The CockroachDB runtime secret
 and cloud persistence path remain separate pending work.
 
+## Cloud analysis result artifacts
+
+The cloud API now returns a result URL when an analysis job is queued:
+
+```json
+{
+  "job_id": "<uuid>",
+  "result_url": "/analysis-results/<uuid>?workspace_id=<workspace-uuid>",
+  "status": "queued"
+}
+```
+
+After the worker classifies the uploaded PDF, it writes a bounded JSON artifact
+under the workspace prefix in S3. The API can read that artifact through
+`GET /analysis-results/{job_id}?workspace_id=...`.
+
+Live smoke evidence after deployment:
+
+```json
+{
+  "healthStatus": "ready",
+  "resultUrlReturned": true,
+  "workerAccepted": 1,
+  "workerResultArtifactCount": 1,
+  "resultStatus": "bedrock_classified_pending_cockroachdb_persistence",
+  "resultClassifiedObjectCount": 1,
+  "resultVerifiedObjectCount": 1,
+  "queueVisible": "0",
+  "queueInFlight": "0",
+  "queueDelayed": "0"
+}
+```
+
+This is a cloud result artifact for AWS workflow observability and demo
+verification. It is not the authoritative agentic memory layer; CockroachDB
+must still persist the durable operational, semantic, episodic, preference, and
+audit memory before final submission claims are made.
+
 ## Live health payload
 
 The cloud API reported:
@@ -108,7 +146,8 @@ The cloud API reported:
     "presigned_pdf_upload",
     "queued_analysis_request",
     "worker_s3_artifact_verification",
-    "worker_bedrock_document_classification"
+    "worker_bedrock_document_classification",
+    "cloud_analysis_result_artifacts"
   ]
 }
 ```
