@@ -31,7 +31,9 @@ DocWeave will use a serverless AWS foundation for the first cloud slice:
 - Amazon CloudWatch Logs records Lambda runtime evidence with bounded
   retention.
 - Amazon Bedrock remains the real model-inference service for document
-  classification and relationship reasoning.
+  classification and relationship reasoning. The first deployed smoke-test
+  model is `eu.amazon.nova-2-lite-v1:0`; Anthropic Claude access requires the
+  account-level use-case form before it can be used in this environment.
 - CockroachDB remains the authoritative memory layer; the cloud worker must use
   the existing runtime contracts rather than creating a separate database model.
 
@@ -73,4 +75,3 @@ SQS, and S3.
 Rejected. API Gateway has payload limits and would route document bytes through
 the API handler. Pre-signed S3 uploads keep the API thin and preserve a clear
 artifact boundary.
-

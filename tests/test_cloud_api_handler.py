@@ -70,6 +70,17 @@ def test_health_reports_configured_aws_services(
     }
 
 
+def test_health_accepts_api_gateway_stage_prefixed_path(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("DOCWEAVE_DOCUMENT_BUCKET", "docweave-bucket")
+
+    response = handler.api_handler(_event("GET", "/dev/health"), object())
+
+    assert response["statusCode"] == 200
+    assert _body(response)["service"] == "docweave-cloud-api"
+
+
 def test_presign_upload_restricts_pdf_to_workspace_prefix(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -95,7 +106,8 @@ def test_presign_upload_restricts_pdf_to_workspace_prefix(
     payload = _body(response)
     assert payload["key"].startswith(f"workspaces/{WORKSPACE_ID}/originals/")
     assert payload["key"].endswith("/Invoice 001.pdf")
-    assert fake_s3.calls[0]["Params"]["ServerSideEncryption"] == "AES256"
+    assert fake_s3.calls[0]["Params"]["ContentType"] == "application/pdf"
+    assert "ServerSideEncryption" not in fake_s3.calls[0]["Params"]
 
 
 def test_analysis_job_sends_sqs_message(monkeypatch: pytest.MonkeyPatch) -> None:

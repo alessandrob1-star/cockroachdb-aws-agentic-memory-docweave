@@ -10,10 +10,23 @@ TEMPLATE_PATH = (
     / "aws"
     / "docweave-cloud-foundation.template.json"
 )
+ARTIFACT_TEMPLATE_PATH = (
+    Path(__file__).resolve().parents[1]
+    / "infrastructure"
+    / "aws"
+    / "docweave-artifact-bucket.template.json"
+)
 
 
 def _template() -> dict[str, Any]:
     return cast(dict[str, Any], json.loads(TEMPLATE_PATH.read_text(encoding="utf-8")))
+
+
+def _artifact_template() -> dict[str, Any]:
+    return cast(
+        dict[str, Any],
+        json.loads(ARTIFACT_TEMPLATE_PATH.read_text(encoding="utf-8")),
+    )
 
 
 def test_template_declares_required_aws_services() -> None:
@@ -75,3 +88,19 @@ def test_api_routes_expose_health_upload_and_analysis_job_boundaries() -> None:
     assert (
         resources["AnalysisJobRoute"]["Properties"]["RouteKey"] == "POST /analysis-jobs"
     )
+
+
+def test_artifact_bucket_template_is_private_encrypted_versioned_and_retained() -> None:
+    bucket = _artifact_template()["Resources"]["DeploymentArtifactBucket"]
+    properties = bucket["Properties"]
+
+    assert bucket["DeletionPolicy"] == "Retain"
+    assert bucket["UpdateReplacePolicy"] == "Retain"
+    assert properties["VersioningConfiguration"]["Status"] == "Enabled"
+    assert properties["BucketEncryption"]["ServerSideEncryptionConfiguration"]
+    assert properties["PublicAccessBlockConfiguration"] == {
+        "BlockPublicAcls": True,
+        "BlockPublicPolicy": True,
+        "IgnorePublicAcls": True,
+        "RestrictPublicBuckets": True,
+    }
