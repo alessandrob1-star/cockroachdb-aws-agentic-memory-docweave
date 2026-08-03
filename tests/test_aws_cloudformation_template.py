@@ -90,6 +90,20 @@ def test_api_routes_expose_health_upload_and_analysis_job_boundaries() -> None:
     )
 
 
+def test_worker_declares_bounded_bedrock_document_size() -> None:
+    template = _template()
+    parameter = template["Parameters"]["MaxBedrockDocumentBytes"]
+    worker_environment = template["Resources"]["AnalysisWorkerFunction"]["Properties"][
+        "Environment"
+    ]["Variables"]
+
+    assert parameter["Default"] == 4194304
+    assert parameter["MaxValue"] == 10485760
+    assert worker_environment["DOCWEAVE_MAX_BEDROCK_DOCUMENT_BYTES"] == {
+        "Ref": "MaxBedrockDocumentBytes"
+    }
+
+
 def test_artifact_bucket_template_is_private_encrypted_versioned_and_retained() -> None:
     bucket = _artifact_template()["Resources"]["DeploymentArtifactBucket"]
     properties = bucket["Properties"]
