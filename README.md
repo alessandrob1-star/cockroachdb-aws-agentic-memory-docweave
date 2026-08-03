@@ -41,9 +41,11 @@ cancellation, explicit in-memory workspace state, a real discovered-PDF table,
 safe user-initiated opening of ready PDFs in the central embedded read-only
 preview, local remembrance of the last successfully authorized folder for the
 next folder picker, and confirmed and policy-validated delegation of eligible
-PDF hyperlinks to the user's default browser. The cockpit now displays sanitized
-runtime readiness for CockroachDB configuration and the approved Amazon Bedrock
-client without exposing connection values or performing startup I/O. The
+PDF hyperlinks to the user's default browser. The cockpit now performs a
+fail-closed read-only runtime preflight at startup when explicit runtime values
+are present, displays whether CockroachDB is reachable, and exposes a sanitized
+table-count grid for the configured CockroachDB memory schema without printing
+connection values. The
 `ANALYZE` control now builds a bounded batch from visible ready PDFs, validates
 each item under the authorized root, and dispatches the batch to a background
 classification worker using the same configured runtime path. Each accepted
@@ -258,12 +260,17 @@ The configured CockroachDB memory layer can also be inspected read-only with:
 ```powershell
 docweave-memory-evidence
 docweave-memory-evidence --workspace-id <uuid> --json
+docweave-memory-schema
+docweave-memory-schema --json
 ```
 
 The report verifies the Alembic revision, required DocWeave memory tables, and
 table counts. The optional workspace filter is applied only to tables that have
 a direct `workspace_id` column. The command never invokes Amazon Bedrock, writes
-database rows, changes schemas, mutates files, or prints connection values.
+database rows, changes schemas, mutates files, or prints connection values. The
+schema report prints the same live target as a table-by-table inventory with
+columns, primary keys, and foreign keys so the implemented memory graph can be
+checked without relying on the CockroachDB Cloud query builder view.
 
 When `DOCWEAVE_DATABASE_URL` is already supplied by the approved runtime
 launcher or the current shell, the same command can explicitly inspect or
@@ -285,11 +292,12 @@ tables needed by classification, review, and file-lineage persistence are
 present.
 
 The cockpit surfaces the same fail-closed runtime readiness categories in its
-connection-state panel at startup. This is still a configuration preflight only:
-the desktop does not open CockroachDB, invoke Bedrock, create cloud resources,
-or write application rows until the user starts an explicit analysis action
-with the required runtime values present. That action may process multiple
-ready PDFs sequentially, bounded by the MVP processing-batch limit.
+connection-state panel at startup. When the required runtime values are present,
+startup also performs a read-only CockroachDB reachability and schema-evidence
+refresh. It does not invoke Bedrock, create cloud resources, mutate schemas, or
+write application rows until the user starts an explicit analysis action. That
+action may process multiple ready PDFs sequentially, bounded by the MVP
+processing-batch limit.
 
 ## CockroachDB schema map
 
