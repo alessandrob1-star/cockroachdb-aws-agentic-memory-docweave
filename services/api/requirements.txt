@@ -1,0 +1,13 @@
+boto3==1.43.56
+botocore==1.43.56
+greenlet==3.2.5
+jmespath==1.1.0
+psycopg[binary]==3.3.4
+python-dateutil==2.9.0.post0
+s3transfer==0.19.2
+six==1.17.0
+SQLAlchemy==2.0.51
+sqlalchemy-cockroachdb==2.0.4
+typing_extensions==4.16.0
+tzdata==2026.3
+urllib3==2.7.0
