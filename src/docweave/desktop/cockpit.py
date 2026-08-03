@@ -1261,6 +1261,18 @@ class CenterPreview(ShapeWidget):
         self.analysis_evidence.setObjectName("eventText")
         self.analysis_evidence.setWordWrap(True)
 
+        self.memory_panel = QFrame(self)
+        self.memory_panel.setObjectName("eventRow")
+        self.memory_panel.hide()
+        self.memory_title = QLabel("MEMORY TRACE", self.memory_panel)
+        self.memory_title.setObjectName("eventName")
+        self.memory_summary = QLabel("No memory trace selected.", self.memory_panel)
+        self.memory_summary.setObjectName("eventText")
+        self.memory_summary.setWordWrap(True)
+        self.memory_detail = QLabel("", self.memory_panel)
+        self.memory_detail.setObjectName("muted")
+        self.memory_detail.setWordWrap(True)
+
         self._document = QPdfDocument(self)
         self.page = SecurePdfView(self)
         self.page.setObjectName("centralPdfView")
@@ -1356,16 +1368,23 @@ class CenterPreview(ShapeWidget):
         self.fit.setGeometry(248, 72, 62, 30)
         self.counter.setGeometry(w - 98, 75, 70, 25)
 
-        # PDF uses almost the entire inner screen and remains fully opaque.
+        top = 112
         if self.analysis_panel.isVisible():
             self.analysis_panel.setGeometry(18, 112, w - 36, 132)
             self.analysis_title.setGeometry(16, 8, 120, 20)
             self.analysis_summary.setGeometry(16, 28, w - 68, 24)
             self.analysis_rationale.setGeometry(16, 52, w - 68, 28)
             self.analysis_evidence.setGeometry(16, 84, w - 68, 40)
-            self.page.setGeometry(18, 254, w - 36, h - 270)
-        else:
-            self.page.setGeometry(18, 112, w - 36, h - 128)
+            top = 254
+
+        if self.memory_panel.isVisible():
+            self.memory_panel.setGeometry(18, top, w - 36, 92)
+            self.memory_title.setGeometry(16, 7, 135, 20)
+            self.memory_summary.setGeometry(16, 28, w - 68, 24)
+            self.memory_detail.setGeometry(16, 53, w - 68, 31)
+            top += 102
+
+        self.page.setGeometry(18, top, w - 36, h - top - 16)
 
     def set_target_rect(self, rect: QRect) -> None:
         self._target_rect = QRect(rect)
@@ -1389,6 +1408,7 @@ class CenterPreview(ShapeWidget):
             self.setGeometry(collapsed)
 
         self.analysis_panel.hide()
+        self.memory_panel.hide()
         self.resizeEvent(None)
         self.show()
 
@@ -1423,6 +1443,14 @@ class CenterPreview(ShapeWidget):
         self.analysis_evidence.setText(_classification_evidence_summary(result))
         self.analysis_panel.show()
         self.analysis_panel.raise_()
+        self.resizeEvent(None)
+
+    def show_memory_trace(self, *, summary: str, detail: str) -> None:
+        """Surface the current CockroachDB-backed memory chain."""
+        self.memory_summary.setText(_compact_console_text(summary, maximum=140))
+        self.memory_detail.setText(_compact_console_text(detail, maximum=190))
+        self.memory_panel.show()
+        self.memory_panel.raise_()
         self.resizeEvent(None)
 
     @Slot()
@@ -2558,6 +2586,18 @@ class CockpitWindow(QMainWindow):
             return
         self._selected_document_row = row
         if document.status == "REVIEW":
+            try:
+                validated_path = validate_pdf_for_open(document.path, root)
+            except PdfOpenValidationError as error:
+                self._set_status(
+                    f"PDF preview blocked safely ({error.category.value})."
+                )
+                return
+            self.center.open_document(validated_path)
+            self.center.show_memory_trace(
+                summary=_review_memory_trace_summary(document),
+                detail=_review_memory_trace_detail(document),
+            )
             self._set_busy(False)
             lineage_label = _lineage_preview_label(document.lineage_preview)
             self._set_status(
@@ -2680,6 +2720,15 @@ class CockpitWindow(QMainWindow):
             self.left.count_status("REVIEW"),
         )
         self.center.show_classification_result(result)
+        self.center.show_memory_trace(
+            summary=_classification_memory_trace_summary(result),
+            detail=_classification_memory_trace_detail(
+                result,
+                proposed_action=proposed_action,
+                proposed_destination=proposed_destination,
+                lineage_preview=lineage_preview,
+            ),
+        )
         self._set_status(
             f"Classification {raw_progress.completed}/{raw_progress.total} persisted "
             f"with {self._classification_batch_failed} failed: "
@@ -2942,6 +2991,17 @@ class CockpitWindow(QMainWindow):
             "Review decision recorded "
             f"{'locally' if durable_result is None else 'durably'}: "
             f"{next_status.lower()}."
+        )
+        self.center.show_memory_trace(
+            summary=(
+                f"Human review {next_status.lower()} append recorded; "
+                f"decision {review_decision_id[:8]}"
+            ),
+            detail=(
+                f"{memory_label}; proposal {decision.proposal_id}; "
+                f"fingerprint {document.proposal_fingerprint[:12]}; "
+                "no file mutation executed."
+            ),
         )
         self.right.set_events(
             [
@@ -3373,6 +3433,61 @@ def _classification_evidence_summary(result: ClassificationCommandResult) -> str
         for item in result.evidence_details[:3]
     ]
     return " | ".join(parts)
+
+
+def _classification_memory_trace_summary(result: ClassificationCommandResult) -> str:
+    proposal_id = "pending" if result.proposal_id is None else str(result.proposal_id)
+    disposition = getattr(
+        result.proposal_disposition,
+        "value",
+        result.proposal_disposition,
+    )
+    return (
+        f"Bedrock proposal persisted as {disposition}; "
+        f"class {result.proposed_class}; proposal {proposal_id}."
+    )
+
+
+def _classification_memory_trace_detail(
+    result: ClassificationCommandResult,
+    *,
+    proposed_action: str | None,
+    proposed_destination: str | None,
+    lineage_preview: CockpitLineagePreview | None,
+) -> str:
+    action = proposed_action or "no operation preview"
+    destination = proposed_destination or "no destination"
+    lineage = _lineage_preview_label(lineage_preview)
+    fingerprint = (
+        "unavailable"
+        if result.proposal_fingerprint is None
+        else result.proposal_fingerprint[:12]
+    )
+    return (
+        f"Fingerprint {fingerprint}; evidence {result.evidence_count}; "
+        f"{action} -> {destination}; {lineage}."
+    )
+
+
+def _review_memory_trace_summary(document: Document) -> str:
+    proposal_id = document.proposal_id or "local proposal"
+    return (
+        f"Review memory selected for {document.category}; proposal {proposal_id}; "
+        "human approval required."
+    )
+
+
+def _review_memory_trace_detail(document: Document) -> str:
+    destination = document.proposed_destination or "no destination proposed"
+    fingerprint = (
+        "missing"
+        if document.proposal_fingerprint is None
+        else document.proposal_fingerprint[:12]
+    )
+    return (
+        f"Target {destination}; fingerprint {fingerprint}; "
+        f"{_lineage_preview_label(document.lineage_preview)}."
+    )
 
 
 def _cockpit_lineage_preview_from_item(
