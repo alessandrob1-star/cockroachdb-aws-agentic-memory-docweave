@@ -96,5 +96,5 @@ ignore = [
 python_version = "3.12"
 strict = true
 warn_unused_configs = true
-mypy_path = "src"
+mypy_path = ["src", "services/api"]
 files = ["src", "tests"]

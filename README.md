@@ -178,6 +178,14 @@ The current approved product direction includes:
 - complete attribution for operators, reviewers, agents, and project managers;
 - a relational-first CockroachDB design with meaningful vector retrieval.
 
+The first AWS cloud foundation is now represented in source control but is not
+deployed by default. It defines private versioned Amazon S3 artifact storage,
+Amazon SQS analysis buffering, AWS Lambda API and worker compute, Amazon API
+Gateway HTTP routing, Amazon CloudWatch Logs retention, and Amazon Bedrock
+invocation permissions. The cloud worker currently accepts queued work only; it
+must still be wired to the shared extraction, Bedrock, and CockroachDB runtime
+before cloud analysis is claimed as end-to-end.
+
 ## Documentation
 
 Start with the [requirements index](docs/requirements/README.md).
@@ -425,6 +433,7 @@ Approved architecture:
 - [Classification v1 structured-contract decision](docs/architecture/decisions/0005-classification-v1-contract.md)
 - [Bedrock classification-gateway decision](docs/architecture/decisions/0006-bedrock-classification-gateway.md)
 - [Uncalibrated confidence v0.1 decision](docs/architecture/decisions/0007-uncalibrated-confidence-v0.md)
+- [AWS cloud service foundation decision](docs/architecture/decisions/0008-aws-cloud-service-foundation.md)
 - [Document-processing pipeline](docs/architecture/document-processing-pipeline.md)
 - [CockroachDB physical-schema specification](docs/architecture/cockroachdb-physical-schema.md)
 - [CockroachDB Entity Relationship model](docs/architecture/cockroachdb-entity-relationship.md)
@@ -484,6 +493,29 @@ The shell does not yet connect to CockroachDB or Amazon Bedrock, does not
 persist scan results or document analysis by default, and does not modify
 files. It only remembers the last successfully authorized folder path in the
 local desktop settings store so the next folder picker starts there.
+
+## AWS cloud foundation
+
+The repository contains the first deployable AWS service foundation:
+
+- [`infrastructure/aws/docweave-cloud-foundation.template.json`](infrastructure/aws/docweave-cloud-foundation.template.json)
+  defines Amazon S3, Amazon SQS, AWS Lambda, Amazon API Gateway, Amazon
+  CloudWatch Logs, and Amazon Bedrock invocation permissions.
+- [`services/api/docweave_cloud_api/handler.py`](services/api/docweave_cloud_api/handler.py)
+  provides the initial Lambda API and worker handlers.
+- [`scripts/package-aws-lambda.ps1`](scripts/package-aws-lambda.ps1) creates
+  the Lambda source archive for a later approved deployment.
+
+The cloud API currently exposes:
+
+- `GET /health` for sanitized AWS service readiness;
+- `POST /uploads/presign` for bounded PDF upload URLs into S3;
+- `POST /analysis-jobs` for queueing workspace-scoped PDF analysis requests.
+
+The worker accepts queued jobs but does not fabricate classification results.
+Real extraction, Amazon Bedrock invocation, CockroachDB persistence, review
+decisions, and file operations must use the shared DocWeave runtime before the
+cloud path is claimed as end-to-end.
 
 ## License
 
