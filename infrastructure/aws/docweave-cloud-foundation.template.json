@@ -35,6 +35,13 @@
       "MinValue": 1,
       "MaxValue": 104857600,
       "Description": "Maximum PDF upload size accepted by the pre-signing API."
+    },
+    "MaxBedrockDocumentBytes": {
+      "Type": "Number",
+      "Default": 4194304,
+      "MinValue": 1,
+      "MaxValue": 10485760,
+      "Description": "Maximum PDF size the worker sends to Amazon Bedrock document analysis."
     }
   },
   "Resources": {
@@ -324,6 +331,9 @@
             },
             "DOCWEAVE_COCKROACHDB_SECRET_ARN": {
               "Ref": "CockroachDbSecretArn"
+            },
+            "DOCWEAVE_MAX_BEDROCK_DOCUMENT_BYTES": {
+              "Ref": "MaxBedrockDocumentBytes"
             }
           }
         },

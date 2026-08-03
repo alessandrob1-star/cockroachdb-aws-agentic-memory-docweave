@@ -15,10 +15,23 @@ from docweave_cloud_api import handler  # noqa: E402
 WORKSPACE_ID = "11111111-1111-4111-8111-111111111111"
 
 
+class FakeBody:
+    def __init__(self, value: bytes) -> None:
+        self.value = value
+        self.closed = False
+
+    def read(self) -> bytes:
+        return self.value
+
+    def close(self) -> None:
+        self.closed = True
+
+
 class FakeS3Client:
     def __init__(self) -> None:
         self.calls: list[dict[str, Any]] = []
         self.head_responses: dict[str, dict[str, Any]] = {}
+        self.object_bodies: dict[str, FakeBody] = {}
 
     def generate_presigned_url(self, *args: Any, **kwargs: Any) -> str:
         del args
@@ -33,6 +46,14 @@ class FakeS3Client:
             raise RuntimeError("object_not_found")
         return self.head_responses[key]
 
+    def get_object(self, *args: Any, **kwargs: Any) -> dict[str, Any]:
+        del args
+        self.calls.append(kwargs)
+        key = str(kwargs["Key"])
+        if key not in self.object_bodies:
+            raise RuntimeError("object_body_not_found")
+        return {"Body": self.object_bodies[key]}
+
 
 class FakeSqsClient:
     def __init__(self) -> None:
@@ -42,6 +63,32 @@ class FakeSqsClient:
         del args
         self.messages.append(kwargs)
         return {"MessageId": "message-1"}
+
+
+class FakeBedrockRuntimeClient:
+    def __init__(self, proposal: dict[str, Any] | None = None) -> None:
+        self.calls: list[dict[str, Any]] = []
+        self.proposal = proposal or {
+            "contract_version": "classification.v1",
+            "taxonomy_version": "docweave_mvp_v0_1",
+            "proposed_class": "invoice",
+            "document_language": "en",
+            "rationale": "The PDF contains invoice evidence.",
+            "confidence_signal": "strong",
+            "candidate_metadata": [{"name": "invoice_number", "value": "INV-001"}],
+        }
+
+    def converse(self, *args: Any, **kwargs: Any) -> dict[str, Any]:
+        del args
+        self.calls.append(kwargs)
+        return {
+            "output": {
+                "message": {
+                    "content": [{"text": json.dumps(self.proposal, sort_keys=True)}]
+                }
+            },
+            "usage": {"inputTokens": 101, "outputTokens": 44, "totalTokens": 145},
+        }
 
 
 def _event(
@@ -166,13 +213,17 @@ def test_worker_verifies_s3_artifacts_before_accepting_job(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     fake_s3 = FakeS3Client()
+    fake_bedrock = FakeBedrockRuntimeClient()
     valid_key = f"workspaces/{WORKSPACE_ID}/originals/job/document.pdf"
     fake_s3.head_responses[valid_key] = {
         "ContentLength": 1234,
         "ContentType": "application/pdf",
     }
+    fake_s3.object_bodies[valid_key] = FakeBody(b"%PDF-1.7\ninvoice")
     monkeypatch.setenv("DOCWEAVE_DOCUMENT_BUCKET", "docweave-bucket")
+    monkeypatch.setenv("DOCWEAVE_BEDROCK_MODEL_ID", "eu.amazon.nova-2-lite-v1:0")
     monkeypatch.setattr(handler, "_s3_client", lambda: fake_s3)
+    monkeypatch.setattr(handler, "_bedrock_runtime_client", lambda: fake_bedrock)
 
     response = handler.worker_handler(
         {
@@ -191,12 +242,41 @@ def test_worker_verifies_s3_artifacts_before_accepting_job(
 
     assert response == {
         "accepted": 1,
-        "analysisStatus": "artifact_verified_pending_runtime",
+        "analysisStatus": "bedrock_classified_pending_persistence",
         "batchItemFailures": [{"itemIdentifier": "bad"}],
+        "classifiedObjectCount": 1,
+        "classifications": [
+            {
+                "object_key": valid_key,
+                "model_id": "eu.amazon.nova-2-lite-v1:0",
+                "proposal": {
+                    "candidate_metadata": [
+                        {"name": "invoice_number", "value": "INV-001"}
+                    ],
+                    "confidence_signal": "strong",
+                    "contract_version": "classification.v1",
+                    "document_language": "en",
+                    "proposed_class": "invoice",
+                    "rationale": "The PDF contains invoice evidence.",
+                    "taxonomy_version": "docweave_mvp_v0_1",
+                },
+                "usage": {
+                    "inputTokens": 101,
+                    "outputTokens": 44,
+                    "totalTokens": 145,
+                },
+            }
+        ],
         "verifiedBytes": 1234,
         "verifiedObjectCount": 1,
     }
     assert fake_s3.calls[0] == {"Bucket": "docweave-bucket", "Key": valid_key}
+    assert fake_s3.object_bodies[valid_key].closed is True
+    bedrock_call = fake_bedrock.calls[0]
+    assert bedrock_call["modelId"] == "eu.amazon.nova-2-lite-v1:0"
+    assert bedrock_call["inferenceConfig"]["maxTokens"] == 900
+    assert bedrock_call["inferenceConfig"]["temperature"] == 0
+    assert bedrock_call["messages"][0]["content"][1]["document"]["format"] == "pdf"
 
 
 def test_worker_reports_partial_failure_when_s3_artifact_is_missing(
@@ -223,8 +303,61 @@ def test_worker_reports_partial_failure_when_s3_artifact_is_missing(
 
     assert response == {
         "accepted": 0,
-        "analysisStatus": "artifact_verified_pending_runtime",
+        "analysisStatus": "bedrock_classified_pending_persistence",
         "batchItemFailures": [{"itemIdentifier": "missing"}],
+        "classifiedObjectCount": 0,
+        "classifications": [],
+        "verifiedBytes": 0,
+        "verifiedObjectCount": 0,
+    }
+
+
+def test_worker_rejects_invalid_bedrock_classification_without_acknowledging_job(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    fake_s3 = FakeS3Client()
+    fake_bedrock = FakeBedrockRuntimeClient(
+        proposal={
+            "contract_version": "classification.v1",
+            "taxonomy_version": "docweave_mvp_v0_1",
+            "proposed_class": "wire_transfer_everything",
+            "document_language": "en",
+            "rationale": "Bad class.",
+            "confidence_signal": "strong",
+            "candidate_metadata": [],
+        }
+    )
+    key = f"workspaces/{WORKSPACE_ID}/originals/job/document.pdf"
+    fake_s3.head_responses[key] = {
+        "ContentLength": 1234,
+        "ContentType": "application/pdf",
+    }
+    fake_s3.object_bodies[key] = FakeBody(b"%PDF-1.7\ninvoice")
+    monkeypatch.setenv("DOCWEAVE_DOCUMENT_BUCKET", "docweave-bucket")
+    monkeypatch.setenv("DOCWEAVE_BEDROCK_MODEL_ID", "eu.amazon.nova-2-lite-v1:0")
+    monkeypatch.setattr(handler, "_s3_client", lambda: fake_s3)
+    monkeypatch.setattr(handler, "_bedrock_runtime_client", lambda: fake_bedrock)
+
+    response = handler.worker_handler(
+        {
+            "Records": [
+                {
+                    "messageId": "invalid-model-output",
+                    "body": json.dumps(
+                        {"workspace_id": WORKSPACE_ID, "object_keys": [key]}
+                    ),
+                }
+            ]
+        },
+        object(),
+    )
+
+    assert response == {
+        "accepted": 0,
+        "analysisStatus": "bedrock_classified_pending_persistence",
+        "batchItemFailures": [{"itemIdentifier": "invalid-model-output"}],
+        "classifiedObjectCount": 0,
+        "classifications": [],
         "verifiedBytes": 0,
         "verifiedObjectCount": 0,
     }

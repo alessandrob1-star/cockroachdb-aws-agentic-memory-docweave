@@ -50,6 +50,44 @@ workspace-scoped S3 key. The worker returned:
 The SQS queue then returned to zero visible, zero in-flight, and zero delayed
 messages.
 
+## Worker Bedrock document classification
+
+The current worker implementation reads a bounded PDF object from S3, submits
+it to Amazon Bedrock Runtime as an untrusted document block, and validates a
+compact `classification.v1` JSON proposal against the approved
+`docweave_mvp_v0_1` taxonomy before acknowledging the SQS message.
+
+Live smoke evidence after deployment:
+
+```json
+{
+  "accepted": 1,
+  "analysisStatus": "bedrock_classified_pending_persistence",
+  "batchItemFailures": [],
+  "classifiedObjectCount": 1,
+  "proposal": {
+    "confidence_signal": "weak",
+    "proposed_class": "other"
+  },
+  "usage": {
+    "inputTokens": 699,
+    "outputTokens": 251,
+    "totalTokens": 950
+  },
+  "verifiedBytes": 5539,
+  "verifiedObjectCount": 1
+}
+```
+
+The tested PDF was a synthetic delivery note. The model selected `other` with
+weak confidence because the current approved taxonomy does not yet include a
+delivery-note class. This is acceptable smoke evidence for the Bedrock document
+path and also records a real taxonomy gap to resolve before final evaluation.
+
+This capability is labelled `bedrock_classified_pending_persistence` because it
+does not yet write the proposal to CockroachDB. The CockroachDB runtime secret
+and cloud persistence path remain separate pending work.
+
 ## Live health payload
 
 The cloud API reported:
@@ -69,7 +107,8 @@ The cloud API reported:
     "health",
     "presigned_pdf_upload",
     "queued_analysis_request",
-    "worker_s3_artifact_verification"
+    "worker_s3_artifact_verification",
+    "worker_bedrock_document_classification"
   ]
 }
 ```
@@ -77,9 +116,9 @@ The cloud API reported:
 ## Important limitations
 
 - The worker verifies queued PDF artifact existence, size, and
-  `application/pdf` content type in S3 before accepting a job. It does not yet
-  run the shared extraction, Bedrock classification, CockroachDB persistence,
-  review-decision, or file-lineage runtime.
+  `application/pdf` content type in S3 and can request a bounded Bedrock
+  document classification proposal before accepting a job. It does not yet run
+  CockroachDB persistence, review-decision, or file-lineage runtime in the cloud.
 - The stack does not yet configure the CockroachDB runtime secret.
 - Anthropic Claude was not available for live smoke testing because the AWS
   account still requires the Anthropic use-case details form. The working live
