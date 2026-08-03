@@ -179,12 +179,13 @@ The current approved product direction includes:
 - a relational-first CockroachDB design with meaningful vector retrieval.
 
 The first AWS cloud foundation is now represented in source control but is not
-deployed by default. It defines private versioned Amazon S3 artifact storage,
-Amazon SQS analysis buffering, AWS Lambda API and worker compute, Amazon API
-Gateway HTTP routing, Amazon CloudWatch Logs retention, and Amazon Bedrock
-invocation permissions. The cloud worker currently accepts queued work only; it
-must still be wired to the shared extraction, Bedrock, and CockroachDB runtime
-before cloud analysis is claimed as end-to-end.
+deployed by application startup. A live `dev` deployment in `eu-central-1`
+now defines private versioned Amazon S3 artifact storage, Amazon SQS analysis
+buffering, AWS Lambda API and worker compute, Amazon API Gateway HTTP routing,
+Amazon CloudWatch Logs retention, and Amazon Bedrock runtime configuration.
+The cloud worker currently accepts queued work only; it must still be wired to
+the shared extraction, Bedrock, and CockroachDB runtime before cloud analysis is
+claimed as end-to-end.
 
 ## Documentation
 
@@ -442,6 +443,7 @@ Approved architecture:
 - [CockroachDB review decision persistence boundary](docs/architecture/cockroachdb-review-decision-persistence.md)
 - [Desktop discovery shell](docs/architecture/desktop-discovery-shell.md)
 - [Verified AWS and CockroachDB environment baseline](docs/operations/environment-baseline.md)
+- [AWS cloud live deployment evidence](docs/operations/aws-cloud-live-deployment.md)
 - [Runtime configuration runbook](docs/operations/runtime-configuration-runbook.md)
 - [CockroachDB live validation evidence](docs/operations/cockroachdb-live-validation.md)
 - [Bedrock live classification validation](docs/operations/bedrock-live-validation.md)
@@ -496,11 +498,13 @@ local desktop settings store so the next folder picker starts there.
 
 ## AWS cloud foundation
 
-The repository contains the first deployable AWS service foundation:
+The repository contains and has deployed the first AWS service foundation:
 
 - [`infrastructure/aws/docweave-cloud-foundation.template.json`](infrastructure/aws/docweave-cloud-foundation.template.json)
   defines Amazon S3, Amazon SQS, AWS Lambda, Amazon API Gateway, Amazon
   CloudWatch Logs, and Amazon Bedrock invocation permissions.
+- [`infrastructure/aws/docweave-artifact-bucket.template.json`](infrastructure/aws/docweave-artifact-bucket.template.json)
+  defines the retained deployment-artifact bucket used for Lambda packages.
 - [`services/api/docweave_cloud_api/handler.py`](services/api/docweave_cloud_api/handler.py)
   provides the initial Lambda API and worker handlers.
 - [`scripts/package-aws-lambda.ps1`](scripts/package-aws-lambda.ps1) creates
@@ -516,6 +520,9 @@ The worker accepts queued jobs but does not fabricate classification results.
 Real extraction, Amazon Bedrock invocation, CockroachDB persistence, review
 decisions, and file operations must use the shared DocWeave runtime before the
 cloud path is claimed as end-to-end.
+
+Live deployment evidence is recorded in
+[`docs/operations/aws-cloud-live-deployment.md`](docs/operations/aws-cloud-live-deployment.md).
 
 ## License
 

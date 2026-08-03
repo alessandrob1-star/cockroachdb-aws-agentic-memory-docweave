@@ -12,8 +12,10 @@ from typing import Any, Protocol, cast
 
 try:  # pragma: no cover - exercised in Lambda, replaced by fakes in tests.
     import boto3  # type: ignore[import-untyped]
+    from botocore.config import Config  # type: ignore[import-untyped]
 except ImportError:  # pragma: no cover - keeps local static checks import-safe.
     boto3 = None
+    Config = None
 
 
 DEFAULT_MAX_UPLOAD_BYTES = 50 * 1024 * 1024
@@ -21,6 +23,7 @@ DEFAULT_PRESIGN_SECONDS = 900
 MAX_FILENAME_LENGTH = 255
 MAX_BATCH_ITEMS = 1000
 PDF_CONTENT_TYPE = "application/pdf"
+KNOWN_ROUTES = ("/health", "/uploads/presign", "/analysis-jobs")
 
 _SAFE_FILENAME_PATTERN = re.compile(r"[^A-Za-z0-9._ -]+")
 
@@ -135,7 +138,6 @@ def _handle_presign_upload(
             "Bucket": config.document_bucket,
             "Key": object_key,
             "ContentType": PDF_CONTENT_TYPE,
-            "ServerSideEncryption": "AES256",
         },
         ExpiresIn=config.presign_seconds,
     )
@@ -230,7 +232,11 @@ def _event_method(event: Mapping[str, Any]) -> str:
 
 
 def _event_path(event: Mapping[str, Any]) -> str:
-    return str(event.get("rawPath", event.get("path", "/"))).rstrip("/") or "/"
+    path = str(event.get("rawPath", event.get("path", "/"))).rstrip("/") or "/"
+    for route in KNOWN_ROUTES:
+        if path == route or path.endswith(route):
+            return route
+    return path
 
 
 def _json_body(event: Mapping[str, Any]) -> Mapping[str, Any]:
@@ -299,9 +305,20 @@ def _positive_int(raw_value: str | None, default: int) -> int:
 
 
 def _s3_client() -> S3Client:
-    if boto3 is None:
+    if boto3 is None or Config is None:
         raise RuntimeError("boto3_unavailable")
-    return cast(S3Client, boto3.client("s3"))
+    region_name = os.environ.get("AWS_REGION", "").strip()
+    if region_name:
+        return cast(
+            S3Client,
+            boto3.client(
+                "s3",
+                region_name=region_name,
+                endpoint_url=f"https://s3.{region_name}.amazonaws.com",
+                config=Config(signature_version="s3v4"),
+            ),
+        )
+    return cast(S3Client, boto3.client("s3", config=Config(signature_version="s3v4")))
 
 
 def _sqs_client() -> SqsClient:

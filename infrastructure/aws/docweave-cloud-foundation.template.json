@@ -20,7 +20,7 @@
     },
     "BedrockModelId": {
       "Type": "String",
-      "Default": "eu.anthropic.claude-sonnet-4-6",
+      "Default": "eu.amazon.nova-2-lite-v1:0",
       "Description": "Amazon Bedrock model or inference profile used by the cloud runtime."
     },
     "CockroachDbSecretArn": {
@@ -483,4 +483,3 @@
     }
   }
 }
-
