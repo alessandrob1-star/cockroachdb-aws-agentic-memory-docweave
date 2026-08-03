@@ -60,6 +60,9 @@ class S3Client(Protocol):
     def get_object(self, *args: Any, **kwargs: Any) -> Mapping[str, Any]:
         """Return object bytes for bounded Bedrock document analysis."""
 
+    def put_object(self, *args: Any, **kwargs: Any) -> Mapping[str, Any]:
+        """Persist derived cloud analysis artifacts."""
+
 
 class SqsClient(Protocol):
     """Narrow SQS client surface used by the API handler."""
@@ -123,6 +126,9 @@ def api_handler(event: Mapping[str, Any], context: object) -> dict[str, Any]:
     try:
         if method == "GET" and path == "/health":
             return _json_response(200, _health_payload(config))
+        result_job_id = _event_analysis_result_job_id(event)
+        if method == "GET" and result_job_id is not None:
+            return _handle_analysis_result(config, event, result_job_id)
         if method == "POST" and path == "/uploads/presign":
             return _handle_presign_upload(config, _json_body(event))
         if method == "POST" and path == "/analysis-jobs":
@@ -141,6 +147,7 @@ def worker_handler(event: Mapping[str, Any], context: object) -> dict[str, Any]:
     failed_items: list[dict[str, str]] = []
     verified_object_count = 0
     verified_bytes = 0
+    result_artifact_count = 0
     classifications: list[dict[str, object]] = []
     for record in cast(Sequence[Mapping[str, Any]], event.get("Records", [])):
         message_id = str(record.get("messageId", "unknown"))
@@ -150,13 +157,22 @@ def worker_handler(event: Mapping[str, Any], context: object) -> dict[str, Any]:
                 raise ValueError("json_object_required")
             payload = _validate_analysis_job_payload(body)
             verified_objects = _verify_s3_pdf_artifacts(config, payload["object_keys"])
-            classifications.extend(
-                _classify_s3_pdf_artifacts_with_bedrock(config, verified_objects)
+            record_classifications = _classify_s3_pdf_artifacts_with_bedrock(
+                config, verified_objects
+            )
+            _write_analysis_result_artifact(
+                config=config,
+                job_id=payload["job_id"],
+                workspace_id=payload["workspace_id"],
+                verified_objects=verified_objects,
+                classifications=record_classifications,
             )
         except Exception:
             failed_items.append({"itemIdentifier": message_id})
             continue
         accepted += 1
+        result_artifact_count += 1
+        classifications.extend(record_classifications)
         verified_object_count += len(verified_objects)
         verified_bytes += sum(
             cast(int, item["content_length"]) for item in verified_objects
@@ -167,6 +183,7 @@ def worker_handler(event: Mapping[str, Any], context: object) -> dict[str, Any]:
         "verifiedObjectCount": verified_object_count,
         "verifiedBytes": verified_bytes,
         "classifiedObjectCount": len(classifications),
+        "resultArtifactCount": result_artifact_count,
         "classifications": classifications,
         "analysisStatus": "bedrock_classified_pending_persistence",
     }
@@ -232,12 +249,32 @@ def _handle_analysis_job(
             "job_id": job_id,
             "status": "queued",
             "item_count": len(payload["object_keys"]),
+            "result_url": (
+                f"/analysis-results/{job_id}?workspace_id={payload['workspace_id']}"
+            ),
         },
     )
 
 
+def _handle_analysis_result(
+    config: CloudConfig, event: Mapping[str, Any], raw_job_id: str
+) -> dict[str, Any]:
+    if not config.document_bucket:
+        return _json_response(503, {"error": "document_bucket_not_configured"})
+    job_id = str(uuid.UUID(raw_job_id))
+    workspace_id = _required_uuid_text(_query_parameters(event), "workspace_id")
+    try:
+        result = _read_analysis_result_artifact(config, workspace_id, job_id)
+    except Exception:
+        return _json_response(404, {"error": "analysis_result_not_found"})
+    return _json_response(200, result)
+
+
 def _validate_analysis_job_payload(body: Mapping[str, Any]) -> dict[str, Any]:
     workspace_id = _required_uuid_text(body, "workspace_id")
+    job_id = (
+        _required_uuid_text(body, "job_id") if "job_id" in body else str(uuid.uuid4())
+    )
     raw_keys = body.get("object_keys")
     if not isinstance(raw_keys, list):
         raise ValueError("object_keys_required")
@@ -255,7 +292,7 @@ def _validate_analysis_job_payload(body: Mapping[str, Any]) -> dict[str, Any]:
         if "\x00" in key or ".." in key.split("/"):
             raise ValueError("object_key_invalid")
         object_keys.append(key)
-    return {"workspace_id": workspace_id, "object_keys": object_keys}
+    return {"job_id": job_id, "workspace_id": workspace_id, "object_keys": object_keys}
 
 
 def _verify_s3_pdf_artifacts(
@@ -461,6 +498,60 @@ def _bedrock_document_name(object_key: str) -> str:
     return name[:200]
 
 
+def _write_analysis_result_artifact(
+    *,
+    config: CloudConfig,
+    job_id: str,
+    workspace_id: str,
+    verified_objects: Sequence[Mapping[str, int | str]],
+    classifications: Sequence[Mapping[str, object]],
+) -> str:
+    result_key = _analysis_result_key(workspace_id, job_id)
+    result = {
+        "contract_version": "cloud_analysis_result.v1",
+        "job_id": job_id,
+        "workspace_id": workspace_id,
+        "status": "bedrock_classified_pending_cockroachdb_persistence",
+        "verifiedObjectCount": len(verified_objects),
+        "classifiedObjectCount": len(classifications),
+        "verifiedBytes": sum(int(item["content_length"]) for item in verified_objects),
+        "classifications": list(classifications),
+    }
+    _s3_client().put_object(
+        Bucket=config.document_bucket,
+        Key=result_key,
+        Body=json.dumps(result, sort_keys=True, separators=(",", ":")).encode("utf-8"),
+        ContentType="application/json",
+    )
+    return result_key
+
+
+def _read_analysis_result_artifact(
+    config: CloudConfig, workspace_id: str, job_id: str
+) -> Mapping[str, Any]:
+    response = _s3_client().get_object(
+        Bucket=config.document_bucket,
+        Key=_analysis_result_key(workspace_id, job_id),
+    )
+    body = response.get("Body")
+    if body is None or not hasattr(body, "read"):
+        raise RuntimeError("analysis_result_body_unavailable")
+    try:
+        data = body.read()
+    finally:
+        close = getattr(body, "close", None)
+        if callable(close):
+            close()
+    payload = json.loads(data.decode("utf-8") if isinstance(data, bytes) else str(data))
+    if not isinstance(payload, dict):
+        raise ValueError("analysis_result_json_object_required")
+    return cast(Mapping[str, Any], payload)
+
+
+def _analysis_result_key(workspace_id: str, job_id: str) -> str:
+    return f"workspaces/{workspace_id}/analysis-results/{job_id}.json"
+
+
 def _health_payload(config: CloudConfig) -> dict[str, Any]:
     return {
         "service": "docweave-cloud-api",
@@ -480,6 +571,7 @@ def _health_payload(config: CloudConfig) -> dict[str, Any]:
             "queued_analysis_request",
             "worker_s3_artifact_verification",
             "worker_bedrock_document_classification",
+            "cloud_analysis_result_artifacts",
         ],
     }
 
@@ -496,6 +588,25 @@ def _event_path(event: Mapping[str, Any]) -> str:
         if path == route or path.endswith(route):
             return route
     return path
+
+
+def _event_analysis_result_job_id(event: Mapping[str, Any]) -> str | None:
+    path = str(event.get("rawPath", event.get("path", "/"))).rstrip("/") or "/"
+    marker = "/analysis-results/"
+    marker_index = path.find(marker)
+    if marker_index < 0:
+        return None
+    raw_job_id = path[marker_index + len(marker) :].split("/", maxsplit=1)[0]
+    if not raw_job_id:
+        return None
+    return raw_job_id
+
+
+def _query_parameters(event: Mapping[str, Any]) -> Mapping[str, Any]:
+    raw_parameters = event.get("queryStringParameters")
+    if not isinstance(raw_parameters, dict):
+        return {}
+    return cast(Mapping[str, Any], raw_parameters)
 
 
 def _json_body(event: Mapping[str, Any]) -> Mapping[str, Any]:

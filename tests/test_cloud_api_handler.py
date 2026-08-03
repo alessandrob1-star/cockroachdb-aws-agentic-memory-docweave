@@ -32,6 +32,7 @@ class FakeS3Client:
         self.calls: list[dict[str, Any]] = []
         self.head_responses: dict[str, dict[str, Any]] = {}
         self.object_bodies: dict[str, FakeBody] = {}
+        self.put_objects: dict[str, dict[str, Any]] = {}
 
     def generate_presigned_url(self, *args: Any, **kwargs: Any) -> str:
         del args
@@ -53,6 +54,12 @@ class FakeS3Client:
         if key not in self.object_bodies:
             raise RuntimeError("object_body_not_found")
         return {"Body": self.object_bodies[key]}
+
+    def put_object(self, *args: Any, **kwargs: Any) -> dict[str, str]:
+        del args
+        self.calls.append(kwargs)
+        self.put_objects[str(kwargs["Key"])] = kwargs
+        return {"ETag": "etag"}
 
 
 class FakeSqsClient:
@@ -186,6 +193,7 @@ def test_analysis_job_sends_sqs_message(monkeypatch: pytest.MonkeyPatch) -> None
     assert message["workspace_id"] == WORKSPACE_ID
     assert message["object_keys"] == [key]
     assert message["requested_action"] == "classification"
+    assert _body(response)["result_url"].startswith("/analysis-results/")
 
 
 def test_analysis_job_rejects_cross_workspace_s3_key(
@@ -231,7 +239,11 @@ def test_worker_verifies_s3_artifacts_before_accepting_job(
                 {
                     "messageId": "good",
                     "body": json.dumps(
-                        {"workspace_id": WORKSPACE_ID, "object_keys": [valid_key]}
+                        {
+                            "job_id": "44444444-4444-4444-8444-444444444444",
+                            "workspace_id": WORKSPACE_ID,
+                            "object_keys": [valid_key],
+                        }
                     ),
                 },
                 {"messageId": "bad", "body": "{}"},
@@ -267,6 +279,7 @@ def test_worker_verifies_s3_artifacts_before_accepting_job(
                 },
             }
         ],
+        "resultArtifactCount": 1,
         "verifiedBytes": 1234,
         "verifiedObjectCount": 1,
     }
@@ -277,6 +290,17 @@ def test_worker_verifies_s3_artifacts_before_accepting_job(
     assert bedrock_call["inferenceConfig"]["maxTokens"] == 900
     assert bedrock_call["inferenceConfig"]["temperature"] == 0
     assert bedrock_call["messages"][0]["content"][1]["document"]["format"] == "pdf"
+    result_key = (
+        f"workspaces/{WORKSPACE_ID}/analysis-results/"
+        "44444444-4444-4444-8444-444444444444.json"
+    )
+    result_object = fake_s3.put_objects[result_key]
+    assert result_object["ContentType"] == "application/json"
+    result_payload = json.loads(result_object["Body"].decode("utf-8"))
+    assert (
+        result_payload["status"] == "bedrock_classified_pending_cockroachdb_persistence"
+    )
+    assert result_payload["classifiedObjectCount"] == 1
 
 
 def test_worker_reports_partial_failure_when_s3_artifact_is_missing(
@@ -307,6 +331,7 @@ def test_worker_reports_partial_failure_when_s3_artifact_is_missing(
         "batchItemFailures": [{"itemIdentifier": "missing"}],
         "classifiedObjectCount": 0,
         "classifications": [],
+        "resultArtifactCount": 0,
         "verifiedBytes": 0,
         "verifiedObjectCount": 0,
     }
@@ -358,6 +383,64 @@ def test_worker_rejects_invalid_bedrock_classification_without_acknowledging_job
         "batchItemFailures": [{"itemIdentifier": "invalid-model-output"}],
         "classifiedObjectCount": 0,
         "classifications": [],
+        "resultArtifactCount": 0,
         "verifiedBytes": 0,
         "verifiedObjectCount": 0,
     }
+
+
+def test_api_returns_analysis_result_artifact(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    fake_s3 = FakeS3Client()
+    job_id = "44444444-4444-4444-8444-444444444444"
+    result_key = f"workspaces/{WORKSPACE_ID}/analysis-results/{job_id}.json"
+    fake_s3.object_bodies[result_key] = FakeBody(
+        json.dumps(
+            {
+                "contract_version": "cloud_analysis_result.v1",
+                "job_id": job_id,
+                "workspace_id": WORKSPACE_ID,
+                "status": "bedrock_classified_pending_cockroachdb_persistence",
+            }
+        ).encode("utf-8")
+    )
+    monkeypatch.setenv("DOCWEAVE_DOCUMENT_BUCKET", "docweave-bucket")
+    monkeypatch.setattr(handler, "_s3_client", lambda: fake_s3)
+
+    response = handler.api_handler(
+        {
+            "requestContext": {"http": {"method": "GET"}},
+            "rawPath": f"/dev/analysis-results/{job_id}",
+            "queryStringParameters": {"workspace_id": WORKSPACE_ID},
+            "body": None,
+        },
+        object(),
+    )
+
+    assert response["statusCode"] == 200
+    payload = _body(response)
+    assert payload["contract_version"] == "cloud_analysis_result.v1"
+    assert payload["job_id"] == job_id
+
+
+def test_api_reports_missing_analysis_result_artifact(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    fake_s3 = FakeS3Client()
+    job_id = "44444444-4444-4444-8444-444444444444"
+    monkeypatch.setenv("DOCWEAVE_DOCUMENT_BUCKET", "docweave-bucket")
+    monkeypatch.setattr(handler, "_s3_client", lambda: fake_s3)
+
+    response = handler.api_handler(
+        {
+            "requestContext": {"http": {"method": "GET"}},
+            "rawPath": f"/analysis-results/{job_id}",
+            "queryStringParameters": {"workspace_id": WORKSPACE_ID},
+            "body": None,
+        },
+        object(),
+    )
+
+    assert response["statusCode"] == 404
+    assert _body(response)["error"] == "analysis_result_not_found"

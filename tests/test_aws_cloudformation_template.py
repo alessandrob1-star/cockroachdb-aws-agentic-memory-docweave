@@ -88,6 +88,10 @@ def test_api_routes_expose_health_upload_and_analysis_job_boundaries() -> None:
     assert (
         resources["AnalysisJobRoute"]["Properties"]["RouteKey"] == "POST /analysis-jobs"
     )
+    assert (
+        resources["AnalysisResultRoute"]["Properties"]["RouteKey"]
+        == "GET /analysis-results/{job_id}"
+    )
 
 
 def test_worker_declares_bounded_bedrock_document_size() -> None:
