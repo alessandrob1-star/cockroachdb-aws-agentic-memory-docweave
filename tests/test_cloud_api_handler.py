@@ -18,11 +18,20 @@ WORKSPACE_ID = "11111111-1111-4111-8111-111111111111"
 class FakeS3Client:
     def __init__(self) -> None:
         self.calls: list[dict[str, Any]] = []
+        self.head_responses: dict[str, dict[str, Any]] = {}
 
     def generate_presigned_url(self, *args: Any, **kwargs: Any) -> str:
         del args
         self.calls.append(kwargs)
         return "https://example.test/presigned"
+
+    def head_object(self, *args: Any, **kwargs: Any) -> dict[str, Any]:
+        del args
+        self.calls.append(kwargs)
+        key = str(kwargs["Key"])
+        if key not in self.head_responses:
+            raise RuntimeError("object_not_found")
+        return self.head_responses[key]
 
 
 class FakeSqsClient:
@@ -153,8 +162,18 @@ def test_analysis_job_rejects_cross_workspace_s3_key(
     assert _body(response)["error"] == "object_key_outside_workspace"
 
 
-def test_worker_reports_partial_failures_without_fabricating_results() -> None:
+def test_worker_verifies_s3_artifacts_before_accepting_job(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    fake_s3 = FakeS3Client()
     valid_key = f"workspaces/{WORKSPACE_ID}/originals/job/document.pdf"
+    fake_s3.head_responses[valid_key] = {
+        "ContentLength": 1234,
+        "ContentType": "application/pdf",
+    }
+    monkeypatch.setenv("DOCWEAVE_DOCUMENT_BUCKET", "docweave-bucket")
+    monkeypatch.setattr(handler, "_s3_client", lambda: fake_s3)
+
     response = handler.worker_handler(
         {
             "Records": [
@@ -172,6 +191,40 @@ def test_worker_reports_partial_failures_without_fabricating_results() -> None:
 
     assert response == {
         "accepted": 1,
-        "analysisStatus": "queued_for_real_runtime",
+        "analysisStatus": "artifact_verified_pending_runtime",
         "batchItemFailures": [{"itemIdentifier": "bad"}],
+        "verifiedBytes": 1234,
+        "verifiedObjectCount": 1,
+    }
+    assert fake_s3.calls[0] == {"Bucket": "docweave-bucket", "Key": valid_key}
+
+
+def test_worker_reports_partial_failure_when_s3_artifact_is_missing(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    fake_s3 = FakeS3Client()
+    missing_key = f"workspaces/{WORKSPACE_ID}/originals/job/missing.pdf"
+    monkeypatch.setenv("DOCWEAVE_DOCUMENT_BUCKET", "docweave-bucket")
+    monkeypatch.setattr(handler, "_s3_client", lambda: fake_s3)
+
+    response = handler.worker_handler(
+        {
+            "Records": [
+                {
+                    "messageId": "missing",
+                    "body": json.dumps(
+                        {"workspace_id": WORKSPACE_ID, "object_keys": [missing_key]}
+                    ),
+                }
+            ]
+        },
+        object(),
+    )
+
+    assert response == {
+        "accepted": 0,
+        "analysisStatus": "artifact_verified_pending_runtime",
+        "batchItemFailures": [{"itemIdentifier": "missing"}],
+        "verifiedBytes": 0,
+        "verifiedObjectCount": 0,
     }

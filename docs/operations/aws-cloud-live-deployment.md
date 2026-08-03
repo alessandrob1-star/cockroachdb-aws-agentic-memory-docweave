@@ -25,11 +25,30 @@ configuration, or end-to-end cloud document analysis.
 | --- | --- | --- |
 | Amazon S3 | Deployment artifact uploaded to the artifact bucket; one synthetic PDF uploaded through the cloud API pre-signed URL to the document artifact bucket | Verified |
 | Amazon API Gateway | `GET /health`, `POST /uploads/presign`, and `POST /analysis-jobs` reached the Lambda API | Verified |
-| AWS Lambda | API Lambda returned live health; worker Lambda direct invocation accepted an SQS-shaped analysis job | Verified |
+| AWS Lambda | API Lambda returned live health; worker Lambda direct invocation accepted an SQS-shaped analysis job after verifying the uploaded PDF artifact metadata in S3 | Verified |
 | Amazon SQS | Analysis job was queued and consumed; queue returned to zero visible and zero in-flight messages | Verified |
 | Amazon CloudWatch Logs | API Lambda log stream exists for the live requests | Verified |
 | Amazon Bedrock | `bedrock-runtime converse` smoke test succeeded with `eu.amazon.nova-2-lite-v1:0`, `stopReason=end_turn`, 62 total tokens, output `OK` | Verified |
 | CockroachDB runtime secret | Not configured in the AWS stack yet | Pending |
+
+## Worker artifact verification smoke test
+
+After the worker update, the live smoke test uploaded one synthetic PDF through
+the cloud API and invoked the worker with an SQS-shaped event for the same
+workspace-scoped S3 key. The worker returned:
+
+```json
+{
+  "accepted": 1,
+  "analysisStatus": "artifact_verified_pending_runtime",
+  "batchItemFailures": [],
+  "verifiedBytes": 5539,
+  "verifiedObjectCount": 1
+}
+```
+
+The SQS queue then returned to zero visible, zero in-flight, and zero delayed
+messages.
 
 ## Live health payload
 
@@ -49,19 +68,20 @@ The cloud API reported:
   "capabilities": [
     "health",
     "presigned_pdf_upload",
-    "queued_analysis_request"
+    "queued_analysis_request",
+    "worker_s3_artifact_verification"
   ]
 }
 ```
 
 ## Important limitations
 
-- The worker currently acknowledges queued jobs but does not yet run the shared
-  extraction, Bedrock classification, CockroachDB persistence, review-decision,
-  or file-lineage runtime.
+- The worker verifies queued PDF artifact existence, size, and
+  `application/pdf` content type in S3 before accepting a job. It does not yet
+  run the shared extraction, Bedrock classification, CockroachDB persistence,
+  review-decision, or file-lineage runtime.
 - The stack does not yet configure the CockroachDB runtime secret.
 - Anthropic Claude was not available for live smoke testing because the AWS
   account still requires the Anthropic use-case details form. The working live
   smoke model is `eu.amazon.nova-2-lite-v1:0`.
 - No guestbook resources were modified.
-

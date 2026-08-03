@@ -34,6 +34,9 @@ class S3Client(Protocol):
     def generate_presigned_url(self, *args: Any, **kwargs: Any) -> str:
         """Return a pre-signed S3 URL."""
 
+    def head_object(self, *args: Any, **kwargs: Any) -> Mapping[str, Any]:
+        """Return object metadata without downloading object contents."""
+
 
 class SqsClient(Protocol):
     """Narrow SQS client surface used by the API handler."""
@@ -95,26 +98,36 @@ def api_handler(event: Mapping[str, Any], context: object) -> dict[str, Any]:
 
 
 def worker_handler(event: Mapping[str, Any], context: object) -> dict[str, Any]:
-    """Accept queued analysis jobs without inventing analysis results."""
+    """Verify queued PDF artifacts before the future runtime processes them."""
 
     del context
+    config = CloudConfig.from_environment()
     accepted = 0
     failed_items: list[dict[str, str]] = []
+    verified_object_count = 0
+    verified_bytes = 0
     for record in cast(Sequence[Mapping[str, Any]], event.get("Records", [])):
         message_id = str(record.get("messageId", "unknown"))
         try:
             body = json.loads(str(record.get("body", "{}")))
             if not isinstance(body, dict):
                 raise ValueError("json_object_required")
-            _validate_analysis_job_payload(body)
-        except (TypeError, ValueError, json.JSONDecodeError):
+            payload = _validate_analysis_job_payload(body)
+            verified_objects = _verify_s3_pdf_artifacts(config, payload["object_keys"])
+        except Exception:
             failed_items.append({"itemIdentifier": message_id})
             continue
         accepted += 1
+        verified_object_count += len(verified_objects)
+        verified_bytes += sum(
+            cast(int, item["content_length"]) for item in verified_objects
+        )
     return {
         "accepted": accepted,
         "batchItemFailures": failed_items,
-        "analysisStatus": "queued_for_real_runtime",
+        "verifiedObjectCount": verified_object_count,
+        "verifiedBytes": verified_bytes,
+        "analysisStatus": "artifact_verified_pending_runtime",
     }
 
 
@@ -204,6 +217,30 @@ def _validate_analysis_job_payload(body: Mapping[str, Any]) -> dict[str, Any]:
     return {"workspace_id": workspace_id, "object_keys": object_keys}
 
 
+def _verify_s3_pdf_artifacts(
+    config: CloudConfig, object_keys: Sequence[str]
+) -> list[dict[str, int | str]]:
+    if not config.document_bucket:
+        raise RuntimeError("document_bucket_not_configured")
+    s3_client = _s3_client()
+    verified_objects: list[dict[str, int | str]] = []
+    for object_key in object_keys:
+        metadata = s3_client.head_object(Bucket=config.document_bucket, Key=object_key)
+        content_length = int(metadata.get("ContentLength", 0))
+        content_type = str(metadata.get("ContentType", "")).lower()
+        if content_length <= 0:
+            raise ValueError("s3_object_empty")
+        if content_type != PDF_CONTENT_TYPE:
+            raise ValueError("s3_object_content_type_must_be_application_pdf")
+        verified_objects.append(
+            {
+                "key": object_key,
+                "content_length": content_length,
+            }
+        )
+    return verified_objects
+
+
 def _health_payload(config: CloudConfig) -> dict[str, Any]:
     return {
         "service": "docweave-cloud-api",
@@ -221,6 +258,7 @@ def _health_payload(config: CloudConfig) -> dict[str, Any]:
             "health",
             "presigned_pdf_upload",
             "queued_analysis_request",
+            "worker_s3_artifact_verification",
         ],
     }
 
