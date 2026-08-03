@@ -282,6 +282,130 @@ or write application rows until the user starts an explicit analysis action
 with the required runtime values present. That action may process multiple
 ready PDFs sequentially, bounded by the MVP processing-batch limit.
 
+## CockroachDB schema map
+
+DocWeave stores the currently implemented memory tables in the `docweave`
+database under the `docweave` SQL schema. In CockroachDB Cloud, tables may not
+appear if the console is focused on `defaultdb`, `public`, or only the query
+builder output. Select the `docweave` database and inspect the `docweave`
+schema, or run the schema-qualified inspection commands below.
+
+```sql
+SHOW DATABASES;
+USE docweave;
+SHOW SCHEMAS;
+SHOW TABLES FROM docweave;
+SHOW COLUMNS FROM docweave.documents;
+SHOW CONSTRAINTS FROM docweave.documents;
+```
+
+The same table inventory can be checked through `information_schema`:
+
+```sql
+SELECT table_schema, table_name
+FROM information_schema.tables
+WHERE table_schema = 'docweave'
+ORDER BY table_name;
+```
+
+Foreign keys can be inspected in a compact SQL Server Management Studio style:
+
+```sql
+SELECT
+    tc.table_schema,
+    tc.table_name,
+    kcu.column_name,
+    ccu.table_schema AS foreign_table_schema,
+    ccu.table_name AS foreign_table_name,
+    ccu.column_name AS foreign_column_name,
+    tc.constraint_name
+FROM information_schema.table_constraints AS tc
+JOIN information_schema.key_column_usage AS kcu
+    ON tc.constraint_name = kcu.constraint_name
+    AND tc.table_schema = kcu.table_schema
+JOIN information_schema.constraint_column_usage AS ccu
+    ON ccu.constraint_name = tc.constraint_name
+    AND ccu.table_schema = tc.table_schema
+WHERE tc.constraint_type = 'FOREIGN KEY'
+    AND tc.table_schema = 'docweave'
+ORDER BY tc.table_name, kcu.ordinal_position;
+```
+
+The implemented physical schema, as of Alembic revision
+`0004_file_lineage_memory`, is:
+
+```mermaid
+erDiagram
+    WORKSPACES ||--o{ WORKSPACE_MEMBERS : authorizes
+    ACTORS ||--o{ WORKSPACE_MEMBERS : receives_role
+    ACTORS ||--o{ WORKSPACE_MEMBERS : grants_role
+
+    WORKSPACES ||--o{ OPERATION_BATCHES : owns
+    ACTORS ||--o{ OPERATION_BATCHES : creates
+    ACTORS ||--o{ OPERATION_BATCHES : approves
+    OPERATION_BATCHES ||--o{ FILE_OPERATIONS : contains
+    ACTORS ||--o{ FILE_OPERATIONS : executes
+    FILE_OPERATIONS ||--o{ FILE_OPERATIONS : compensates
+
+    WORKSPACES ||--o{ AUDIT_EVENTS : records
+    ACTORS ||--o{ AUDIT_EVENTS : causes
+    OPERATION_BATCHES ||--o{ AUDIT_EVENTS : correlates
+    FILE_OPERATIONS ||--o{ AUDIT_EVENTS : documents
+    AUDIT_EVENTS ||--o{ AUDIT_EVENTS : chains_previous
+    AUDIT_EVENTS ||--o{ AUDIT_EVENTS : chains_causation
+
+    WORKSPACES ||--o{ DOCUMENTS : owns
+    DOCUMENTS ||--o{ DOCUMENT_VERSIONS : versions
+    DOCUMENT_VERSIONS ||--o{ DOCUMENT_VERSIONS : supersedes
+
+    WORKSPACES ||--o{ TAXONOMY_VERSIONS : owns
+    ACTORS ||--o{ TAXONOMY_VERSIONS : approves
+    TAXONOMY_VERSIONS ||--o{ TAXONOMY_CLASSES : defines
+
+    DOCUMENT_VERSIONS ||--o{ AGENT_RUNS : analyzed_by
+    AGENT_RUNS ||--|| PROPOSALS : produces
+    DOCUMENT_VERSIONS ||--o{ PROPOSALS : receives
+    PROPOSALS ||--o{ PROPOSALS : supersedes
+    PROPOSALS ||--|| CLASSIFICATION_PROPOSALS : specializes
+    TAXONOMY_CLASSES ||--o{ CLASSIFICATION_PROPOSALS : proposed_class
+    TAXONOMY_CLASSES ||--o{ CLASSIFICATION_PROPOSALS : alternative_class
+    PROPOSALS ||--o{ PROPOSAL_EVIDENCE : supported_by
+
+    PROPOSALS ||--o| REVIEW_DECISIONS : reviewed_by
+    ACTORS ||--o{ REVIEW_DECISIONS : decides
+
+    WORKSPACES ||--o{ FILE_LINEAGE_EVENTS : records
+    OPERATION_BATCHES ||--o{ FILE_LINEAGE_EVENTS : groups
+    FILE_OPERATIONS ||--o{ FILE_LINEAGE_EVENTS : executes
+    PROPOSALS ||--o{ FILE_LINEAGE_EVENTS : informs
+```
+
+Implemented tables and their main relational role:
+
+| Table | Primary key | Main foreign keys | Purpose |
+| --- | --- | --- | --- |
+| `docweave.workspaces` | `workspace_id` | none | Workspace boundary for all operational and memory records. |
+| `docweave.actors` | `actor_id` | none | Human, service, and agent identities used for attribution. |
+| `docweave.workspace_members` | `workspace_id`, `actor_id`, `role_code`, `granted_at` | `workspace_id` to `workspaces`, `actor_id` and `granted_by_actor_id` to `actors` | Workspace role grants and revocations. |
+| `docweave.operation_batches` | `operation_batch_id` | `workspace_id` to `workspaces`, creator and approver actor IDs to `actors` | Human-approved copy or move batch envelope. |
+| `docweave.file_operations` | `file_operation_id` | `(workspace_id, operation_batch_id)` to `operation_batches`, `executor_actor_id` to `actors`, `compensates_operation_id` to `file_operations` | Per-file planned, intended, terminal, and reconciled operation state. |
+| `docweave.audit_events` | `workspace_id`, `event_sequence` | `workspace_id` to `workspaces`, `actor_id` to `actors`, batch and file-operation IDs to operation tables, previous and causation event IDs to `audit_events` | Append-only hash-chained audit chronology. |
+| `docweave.documents` | `document_id` | `workspace_id` to `workspaces` | Logical document identity. |
+| `docweave.document_versions` | `document_version_id` | `(workspace_id, document_id)` to `documents`, predecessor version to `document_versions` | Immutable content versions with digest and extraction state. |
+| `docweave.taxonomy_versions` | `taxonomy_version_id` | `workspace_id` to `workspaces`, `approved_by_actor_id` to `actors` | Versioned classification taxonomy. |
+| `docweave.taxonomy_classes` | `taxonomy_class_id` | `taxonomy_version_id` to `taxonomy_versions` | Class definitions available in a taxonomy version. |
+| `docweave.agent_runs` | `agent_run_id` | `(workspace_id, document_version_id)` to `document_versions` | Durable Amazon Bedrock classification run provenance, metrics, and outcome. |
+| `docweave.proposals` | `proposal_id` | `(workspace_id, document_version_id)` to `document_versions`, `(workspace_id, agent_run_id)` to `agent_runs`, superseded proposal to `proposals` | Non-authoritative agent proposal envelope. |
+| `docweave.classification_proposals` | `proposal_id` | `proposal_id` to `proposals`, proposed and alternative classes to `taxonomy_classes` | Classification-specific proposal details and confidence components. |
+| `docweave.proposal_evidence` | `proposal_evidence_id` | `(workspace_id, proposal_id)` to `proposals` | Minimized evidence excerpts and validation evidence for a proposal. |
+| `docweave.review_decisions` | `review_decision_id` | `(workspace_id, proposal_id)` to `proposals`, `reviewer_actor_id` to `actors` | Append-only human approve, reject, request-change, or escalation decision. |
+| `docweave.file_lineage_events` | `file_lineage_event_id` | `workspace_id` to `workspaces`, batch and file-operation IDs to operation tables, `proposal_id` to `proposals` | Append-only original, previous, and next directory and filename memory. |
+
+Tables shown in the broader architecture diagrams but not listed here are
+planned product schema, not implemented database objects. The authoritative
+implemented schema is the Alembic migration chain under
+[`migrations/versions`](migrations/versions).
+
 Mandatory governance:
 
 - [Project operating rules](PROJECT_RULES.md)
