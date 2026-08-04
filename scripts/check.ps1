@@ -51,10 +51,10 @@ $DesktopTestFiles = Get-ChildItem -LiteralPath $DesktopTestRoot -Filter "test_*.
 foreach ($DesktopTestFile in $DesktopTestFiles) {
     $RelativeTestPath = "tests/desktop/$($DesktopTestFile.Name)"
     if ($DesktopTestFile.Name -eq "test_main_window.py") {
-        # The legacy QWidget main-window suite is retained for local Windows
-        # regression coverage, but PySide6 can segfault when this module is
-        # split across repeated interpreter start/teardown cycles. Keep it in
-        # one clean process on Windows. On Linux CI, PySide6 can still segfault
+        # The legacy QWidget main-window suite is retained for regression
+        # coverage. Run it in one clean process, but keep it out of coverage
+        # append on Windows because coverage/Qt teardown can abort the native
+        # process after the tests pass. On Linux CI, PySide6 can still segfault
         # after successful execution during native Qt teardown, so the
         # definitive cockpit UI remains the cross-platform desktop gate there.
         if ($IsLinux) {
@@ -64,8 +64,7 @@ foreach ($DesktopTestFile in $DesktopTestFiles) {
         Invoke-Check -Command @(
             "-m",
             "pytest",
-            "--cov-append",
-            "--cov-report=",
+            "--no-cov",
             $RelativeTestPath
         )
         continue
