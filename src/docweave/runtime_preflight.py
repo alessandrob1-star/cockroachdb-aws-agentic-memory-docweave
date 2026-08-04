@@ -3,10 +3,15 @@
 from __future__ import annotations
 
 import argparse
-from collections.abc import Callable
+import json
+import os
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from enum import StrEnum
 from typing import Any, Protocol
+from urllib.error import HTTPError, URLError
+from urllib.parse import urljoin, urlparse
+from urllib.request import urlopen
 
 from sqlalchemy import text
 from sqlalchemy.engine import Connection, Engine
@@ -61,6 +66,7 @@ class RuntimeBundle(Protocol):
 
 
 RuntimeBuilder = Callable[[], RuntimeBundle]
+CloudHealthFetcher = Callable[[str], Mapping[str, Any]]
 
 
 def _default_runtime_builder() -> RuntimeBundle:
@@ -71,7 +77,10 @@ def _default_runtime_builder() -> RuntimeBundle:
 def run_preflight(
     *,
     check_database: bool = False,
+    check_cloud: bool = False,
+    cloud_api_url: str | None = None,
     runtime_builder: RuntimeBuilder = _default_runtime_builder,
+    cloud_health_fetcher: CloudHealthFetcher | None = None,
 ) -> RuntimePreflightReport:
     """Run configuration and optional database preflight checks."""
     checks: list[PreflightCheck] = []
@@ -108,6 +117,14 @@ def run_preflight(
             )
         )
 
+    if check_cloud:
+        checks.extend(
+            _cloud_checks(
+                cloud_api_url or os.environ.get("DOCWEAVE_CLOUD_API_URL") or "",
+                cloud_health_fetcher=cloud_health_fetcher or _fetch_cloud_health,
+            )
+        )
+
     return RuntimePreflightReport(checks=tuple(checks))
 
 
@@ -121,9 +138,25 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="Open the configured database and verify required schema tables.",
     )
+    parser.add_argument(
+        "--cloud",
+        action="store_true",
+        help="Call the configured DocWeave cloud API health endpoint.",
+    )
+    parser.add_argument(
+        "--cloud-api-url",
+        help=(
+            "DocWeave cloud API base URL. Defaults to DOCWEAVE_CLOUD_API_URL "
+            "when --cloud is used."
+        ),
+    )
     args = parser.parse_args(argv)
 
-    report = run_preflight(check_database=args.database)
+    report = run_preflight(
+        check_database=args.database,
+        check_cloud=args.cloud,
+        cloud_api_url=args.cloud_api_url,
+    )
     for check in report.checks:
         print(f"{check.name}: {check.state.value} ({check.detail})")
     return 0 if report.succeeded else 2
@@ -170,6 +203,63 @@ def _database_checks(engine: Engine) -> tuple[PreflightCheck, ...]:
     else:
         checks.append(PreflightCheck("docweave_schema", PreflightState.OK, "ready"))
     return tuple(checks)
+
+
+def _cloud_checks(
+    cloud_api_url: str,
+    *,
+    cloud_health_fetcher: CloudHealthFetcher,
+) -> tuple[PreflightCheck, ...]:
+    clean_url = cloud_api_url.strip()
+    if not clean_url:
+        return (
+            PreflightCheck(
+                "cloud_api",
+                PreflightState.FAIL,
+                "cloud_api_url_missing:DOCWEAVE_CLOUD_API_URL",
+            ),
+        )
+    parsed = urlparse(clean_url)
+    if parsed.scheme not in {"https", "http"} or not parsed.netloc:
+        return (PreflightCheck("cloud_api", PreflightState.FAIL, "invalid_url"),)
+
+    try:
+        payload = cloud_health_fetcher(clean_url)
+    except (
+        HTTPError,
+        TimeoutError,
+        URLError,
+        OSError,
+        ValueError,
+        json.JSONDecodeError,
+    ):
+        return (PreflightCheck("cloud_api", PreflightState.FAIL, "unavailable"),)
+
+    status = str(payload.get("status", "")).casefold()
+    services = payload.get("aws_services", {})
+    if not isinstance(services, Mapping):
+        services = {}
+    if status != "ready":
+        return (PreflightCheck("cloud_api", PreflightState.FAIL, "not_ready"),)
+
+    bedrock_status = str(services.get("amazon_bedrock", "unknown")).casefold()
+    lambda_status = str(services.get("aws_lambda", "unknown")).casefold()
+    cockroach_status = str(services.get("cockroachdb_secret", "unknown")).casefold()
+    detail = (
+        f"ready;lambda={lambda_status};bedrock={bedrock_status};"
+        f"cockroachdb_secret={cockroach_status}"
+    )
+    return (PreflightCheck("cloud_api", PreflightState.OK, detail),)
+
+
+def _fetch_cloud_health(cloud_api_url: str) -> Mapping[str, Any]:
+    health_url = urljoin(cloud_api_url.rstrip("/") + "/", "health")
+    with urlopen(health_url, timeout=10) as response:  # noqa: S310
+        raw_payload = response.read(128 * 1024)
+    payload = json.loads(raw_payload.decode("utf-8"))
+    if not isinstance(payload, Mapping):
+        raise ValueError("cloud health payload must be an object")
+    return payload
 
 
 def _docweave_tables(connection: Connection) -> set[str]:

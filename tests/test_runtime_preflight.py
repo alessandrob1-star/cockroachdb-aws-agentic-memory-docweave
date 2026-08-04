@@ -114,6 +114,57 @@ def test_preflight_skips_database_when_not_requested() -> None:
     assert report.checks[-1].state is PreflightState.SKIP
 
 
+def test_preflight_checks_cloud_health_when_requested() -> None:
+    report = run_preflight(
+        check_cloud=True,
+        cloud_api_url="https://example.test/dev",
+        runtime_builder=lambda: _runtime(set()),
+        cloud_health_fetcher=lambda _url: {
+            "status": "ready",
+            "aws_services": {
+                "aws_lambda": "running",
+                "amazon_bedrock": "configured",
+                "cockroachdb_secret": "missing",
+            },
+        },
+    )
+
+    assert report.succeeded
+    assert report.checks[-1].name == "cloud_api"
+    assert report.checks[-1].state is PreflightState.OK
+    assert "lambda=running" in report.checks[-1].detail
+    assert "bedrock=configured" in report.checks[-1].detail
+    assert "cockroachdb_secret=missing" in report.checks[-1].detail
+
+
+def test_preflight_fails_closed_when_cloud_url_is_missing() -> None:
+    report = run_preflight(
+        check_cloud=True,
+        cloud_api_url="",
+        runtime_builder=lambda: _runtime(set()),
+    )
+
+    assert not report.succeeded
+    assert report.checks[-1].name == "cloud_api"
+    assert report.checks[-1].detail == ("cloud_api_url_missing:DOCWEAVE_CLOUD_API_URL")
+
+
+def test_preflight_fails_closed_for_unavailable_cloud_health() -> None:
+    def fail_fetcher(_url: str) -> dict[str, object]:
+        raise OSError("network unavailable")
+
+    report = run_preflight(
+        check_cloud=True,
+        cloud_api_url="https://example.test/dev",
+        runtime_builder=lambda: _runtime(set()),
+        cloud_health_fetcher=fail_fetcher,
+    )
+
+    assert not report.succeeded
+    assert report.checks[-1].state is PreflightState.FAIL
+    assert report.checks[-1].detail == "unavailable"
+
+
 def test_preflight_passes_database_when_required_schema_exists() -> None:
     report = run_preflight(
         check_database=True,
@@ -143,7 +194,7 @@ def test_main_returns_failure_for_failed_preflight(
     monkeypatch.setattr(
         runtime_preflight,
         "run_preflight",
-        lambda *, check_database: runtime_preflight.RuntimePreflightReport(
+        lambda **_kwargs: runtime_preflight.RuntimePreflightReport(
             checks=(
                 runtime_preflight.PreflightCheck(
                     "runtime_config",
