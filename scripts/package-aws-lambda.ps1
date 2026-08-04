@@ -9,7 +9,7 @@ $RequirementsPath = Join-Path $SourceRoot "requirements.txt"
 $LambdaPlatform = if ($env:DOCWEAVE_LAMBDA_PACKAGE_PLATFORM) {
     $env:DOCWEAVE_LAMBDA_PACKAGE_PLATFORM
 } else {
-    "manylinux2014_x86_64"
+    "manylinux2014_aarch64"
 }
 $LambdaPythonVersion = if ($env:DOCWEAVE_LAMBDA_PACKAGE_PYTHON_VERSION) {
     $env:DOCWEAVE_LAMBDA_PACKAGE_PYTHON_VERSION
