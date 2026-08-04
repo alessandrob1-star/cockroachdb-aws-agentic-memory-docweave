@@ -111,6 +111,11 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="Print machine-readable JSON instead of text lines.",
     )
+    parser.add_argument(
+        "--flat",
+        action="store_true",
+        help="Print the original flat table inventory instead of object explorer text.",
+    )
     args = parser.parse_args(argv)
 
     try:
@@ -124,8 +129,10 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.json:
         print(json.dumps(_report_json(report), sort_keys=True, separators=(",", ":")))
+    elif args.flat:
+        _print_flat_text_report(report)
     else:
-        _print_text_report(report)
+        _print_object_explorer_report(report)
     return 0
 
 
@@ -196,7 +203,38 @@ def _group_foreign_keys(rows: Any) -> dict[str, tuple[MemoryForeignKeySchema, ..
     }
 
 
-def _print_text_report(report: MemorySchemaReport) -> None:
+def _print_object_explorer_report(report: MemorySchemaReport) -> None:
+    print("DocWeave CockroachDB Object Explorer")
+    print(f"Revision: {report.alembic_revision or 'missing'}")
+    print("Database: docweave")
+    print("Schema: docweave")
+    print(f"Tables: {len(report.tables)}")
+    for table in report.tables:
+        primary_key_columns = set(table.primary_key_columns)
+        print("")
+        print(f"[table] docweave.{table.table_name}")
+        primary_key = ", ".join(table.primary_key_columns) or "none"
+        print(f"  [primary key] {primary_key}")
+        print("  [columns]")
+        for column in table.columns:
+            nullable = "NULL" if column.nullable else "NOT NULL"
+            key_marker = " PK" if column.name in primary_key_columns else ""
+            print(f"    - {column.name}: {column.data_type} {nullable}{key_marker}")
+        print("  [foreign keys]")
+        if table.foreign_keys:
+            for foreign_key in table.foreign_keys:
+                print(
+                    "    - "
+                    f"{foreign_key.column_name} -> "
+                    f"docweave.{foreign_key.foreign_table_name}."
+                    f"{foreign_key.foreign_column_name} "
+                    f"({foreign_key.constraint_name})"
+                )
+        else:
+            print("    - none")
+
+
+def _print_flat_text_report(report: MemorySchemaReport) -> None:
     print(f"memory_schema_revision: {report.alembic_revision or 'missing'}")
     print(f"memory_schema_tables: {len(report.tables)}")
     for table in report.tables:

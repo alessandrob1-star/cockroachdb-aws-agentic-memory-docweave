@@ -272,6 +272,7 @@ The configured CockroachDB memory layer can also be inspected read-only with:
 docweave-memory-evidence
 docweave-memory-evidence --workspace-id <uuid> --json
 docweave-memory-schema
+docweave-memory-schema --flat
 docweave-memory-schema --json
 ```
 
@@ -279,9 +280,11 @@ The report verifies the Alembic revision, required DocWeave memory tables, and
 table counts. The optional workspace filter is applied only to tables that have
 a direct `workspace_id` column. The command never invokes Amazon Bedrock, writes
 database rows, changes schemas, mutates files, or prints connection values. The
-schema report prints the same live target as a table-by-table inventory with
-columns, primary keys, and foreign keys so the implemented memory graph can be
-checked without relying on the CockroachDB Cloud query builder view.
+schema report prints the same live target as a SQL Server Management Studio
+style object explorer inventory by default: database, schema, tables, primary
+keys, columns, and foreign-key edges. Use `--flat` for the older line-oriented
+inventory and `--json` for automation. This makes the implemented memory graph
+checkable without relying on the CockroachDB Cloud query builder view.
 
 When `DOCWEAVE_DATABASE_URL` is already supplied by the approved runtime
 launcher or the current shell, the same command can explicitly inspect or
@@ -317,6 +320,29 @@ database under the `docweave` SQL schema. In CockroachDB Cloud, tables may not
 appear if the console is focused on `defaultdb`, `public`, or only the query
 builder output. Select the `docweave` database and inspect the `docweave`
 schema, or run the schema-qualified inspection commands below.
+
+For the clearest project-owned view, run:
+
+```powershell
+docweave-memory-schema
+```
+
+Expected shape:
+
+```text
+DocWeave CockroachDB Object Explorer
+Revision: 0005_cloud_analysis_memory
+Database: docweave
+Schema: docweave
+Tables: ...
+
+[table] docweave.documents
+  [primary key] document_id
+  [columns]
+    - document_id: UUID NOT NULL PK
+  [foreign keys]
+    - ...
+```
 
 ```sql
 SHOW DATABASES;

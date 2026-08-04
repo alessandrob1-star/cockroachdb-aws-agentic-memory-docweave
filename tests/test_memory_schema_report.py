@@ -119,3 +119,35 @@ def test_json_output_is_sanitized(monkeypatch: Any, capsys: Any) -> None:
         "fk_proposals_document"
     )
     assert "DOCWEAVE_DATABASE_URL" not in output
+
+
+def test_default_output_is_object_explorer_style(monkeypatch: Any, capsys: Any) -> None:
+    monkeypatch.setattr(
+        "docweave.memory_schema_report.collect_memory_schema",
+        lambda: collect_memory_schema_from_engine(cast(Engine, _FakeEngine())),
+    )
+
+    result = main([])
+
+    output = capsys.readouterr().out
+    assert result == 0
+    assert "DocWeave CockroachDB Object Explorer" in output
+    assert "Database: docweave" in output
+    assert "[table] docweave.documents" in output
+    assert "document_id: UUID NOT NULL PK" in output
+    assert "document_id -> docweave.documents.document_id" in output
+    assert "DOCWEAVE_DATABASE_URL" not in output
+
+
+def test_flat_output_remains_available(monkeypatch: Any, capsys: Any) -> None:
+    monkeypatch.setattr(
+        "docweave.memory_schema_report.collect_memory_schema",
+        lambda: collect_memory_schema_from_engine(cast(Engine, _FakeEngine())),
+    )
+
+    result = main(["--flat"])
+
+    output = capsys.readouterr().out
+    assert result == 0
+    assert "memory_schema_revision:" in output
+    assert "table docweave.documents" in output
