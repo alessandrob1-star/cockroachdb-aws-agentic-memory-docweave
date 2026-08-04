@@ -19,6 +19,8 @@ def test_lambda_package_installs_dedicated_cloud_requirements() -> None:
     assert '$RequirementsPath = Join-Path $SourceRoot "requirements.txt"' in script
     assert "--only-binary=:all:" in script
     assert "--platform $LambdaPlatform" in script
+    assert '"manylinux2014_aarch64"' in script
+    assert '"manylinux2014_x86_64"' not in script
     assert "--implementation cp" in script
     assert "--python-version $LambdaPythonVersion" in script
     assert "--target $StagingRoot" in script
@@ -45,7 +47,7 @@ def test_cloud_runtime_requirements_avoid_desktop_only_dependencies() -> None:
         "botocore==1.43.56",
         "greenlet==3.2.5",
         "jmespath==1.1.0",
-        "psycopg[binary]==3.3.4",
+        "psycopg[binary]==3.2.13",
         "python-dateutil==2.9.0.post0",
         "s3transfer==0.19.2",
         "six==1.17.0",
