@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import sys
+from hashlib import sha256
 from pathlib import Path
 from typing import Any, cast
 
@@ -169,7 +170,7 @@ def test_presign_upload_restricts_pdf_to_workspace_prefix(
                 "workspace_id": WORKSPACE_ID,
                 "filename": "../Invoice 001.pdf",
                 "content_type": "application/pdf",
-                "byte_size": 1234,
+                "byte_size": len(b"%PDF-1.7\ninvoice"),
             },
         ),
         object(),
@@ -270,6 +271,8 @@ def test_worker_verifies_s3_artifacts_before_accepting_job(
         "classifications": [
             {
                 "object_key": valid_key,
+                "byte_size": len(b"%PDF-1.7\ninvoice"),
+                "content_sha256": sha256(b"%PDF-1.7\ninvoice").hexdigest(),
                 "model_id": "eu.amazon.nova-2-lite-v1:0",
                 "proposal": {
                     "candidate_metadata": [
@@ -362,6 +365,10 @@ def test_worker_marks_result_persisted_when_cloud_memory_writer_succeeds(
     assert fake_writer.calls[0]["verified_objects"] == [
         {"key": valid_key, "content_length": 1234}
     ]
+    assert (
+        fake_writer.calls[0]["classifications"][0]["content_sha256"]
+        == sha256(b"%PDF-1.7\ninvoice").hexdigest()
+    )
     result_key = (
         f"workspaces/{WORKSPACE_ID}/analysis-results/"
         "44444444-4444-4444-8444-444444444444.json"

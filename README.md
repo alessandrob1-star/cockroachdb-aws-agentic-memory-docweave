@@ -144,6 +144,14 @@ migration has not yet been applied to the live CockroachDB cluster, and
 cockpit approval or execution is not yet wired to persist lineage rows
 automatically.
 
+A fifth non-vector CockroachDB migration now defines AWS worker memory tables
+for cloud analysis jobs and classified S3 objects. The Lambda worker can
+attach content hashes, byte counts, Bedrock model identifiers, validated
+proposal payloads, and token usage to a parameterized CockroachDB writer when
+`DOCWEAVE_DATABASE_URL` is explicitly supplied by the runtime environment. This
+is real cloud operational memory staging for analysis observations; it is not
+yet the final canonical document-classification promotion workflow.
+
 The local shared core now also defines an explicit classification runtime that
 keeps extraction, database transactions, and Bedrock invocation in separate
 failure boundaries. It can register a verified PDF document version, install
@@ -185,9 +193,12 @@ deployed by application startup. A live `dev` deployment in `eu-central-1`
 now defines private versioned Amazon S3 artifact storage, Amazon SQS analysis
 buffering, AWS Lambda API and worker compute, Amazon API Gateway HTTP routing,
 Amazon CloudWatch Logs retention, and Amazon Bedrock runtime configuration.
-The cloud worker currently accepts queued work only; it must still be wired to
-the shared extraction, Bedrock, and CockroachDB runtime before cloud analysis is
-claimed as end-to-end.
+The cloud worker currently accepts queued jobs, invokes Amazon Bedrock for
+bounded PDF classification, writes sanitized result artifacts to Amazon S3,
+and can persist cloud analysis observations to CockroachDB when an explicit
+runtime database URL is present. It does not fabricate classification results.
+Canonical classification promotion, review decisions, and file operations must
+use the shared DocWeave runtime before the cloud path is claimed as end-to-end.
 
 ## Documentation
 
@@ -349,7 +360,7 @@ ORDER BY tc.table_name, kcu.ordinal_position;
 ```
 
 The implemented physical schema, as of Alembic revision
-`0004_file_lineage_memory`, is:
+`0005_cloud_analysis_memory`, is:
 
 ```mermaid
 erDiagram
@@ -395,6 +406,9 @@ erDiagram
     OPERATION_BATCHES ||--o{ FILE_LINEAGE_EVENTS : groups
     FILE_OPERATIONS ||--o{ FILE_LINEAGE_EVENTS : executes
     PROPOSALS ||--o{ FILE_LINEAGE_EVENTS : informs
+
+    WORKSPACES ||--o{ CLOUD_ANALYSIS_JOBS : owns
+    CLOUD_ANALYSIS_JOBS ||--o{ CLOUD_ANALYSIS_OBJECTS : records
 ```
 
 Implemented tables and their main relational role:
@@ -417,6 +431,8 @@ Implemented tables and their main relational role:
 | `docweave.proposal_evidence` | `proposal_evidence_id` | `(workspace_id, proposal_id)` to `proposals` | Minimized evidence excerpts and validation evidence for a proposal. |
 | `docweave.review_decisions` | `review_decision_id` | `(workspace_id, proposal_id)` to `proposals`, `reviewer_actor_id` to `actors` | Append-only human approve, reject, request-change, or escalation decision. |
 | `docweave.file_lineage_events` | `file_lineage_event_id` | `workspace_id` to `workspaces`, batch and file-operation IDs to operation tables, `proposal_id` to `proposals` | Append-only original, previous, and next directory and filename memory. |
+| `docweave.cloud_analysis_jobs` | `cloud_analysis_job_id` | `workspace_id` to `workspaces` | AWS worker job memory for cloud analysis status and result-artifact location. |
+| `docweave.cloud_analysis_objects` | `cloud_analysis_object_id` | `(workspace_id, cloud_analysis_job_id)` to `cloud_analysis_jobs` | Per-S3-object cloud analysis observations with content hash, byte size, Bedrock model, proposed class, validated proposal JSON, and usage JSON. |
 
 Tables shown in the broader architecture diagrams but not listed here are
 planned product schema, not implemented database objects. The authoritative

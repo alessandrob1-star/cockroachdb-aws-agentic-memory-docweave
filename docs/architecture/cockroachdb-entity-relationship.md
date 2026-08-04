@@ -91,6 +91,9 @@ erDiagram
     FILE_OPERATIONS ||--o{ FILE_LINEAGE_EVENTS : records_path_state
     PROPOSALS ||--o{ FILE_LINEAGE_EVENTS : informs
 
+    WORKSPACES ||--o{ CLOUD_ANALYSIS_JOBS : owns
+    CLOUD_ANALYSIS_JOBS ||--o{ CLOUD_ANALYSIS_OBJECTS : records
+
     REVIEW_DECISIONS ||--o{ PREFERENCE_RULES : grounds
     WORKSPACES ||--o{ PREFERENCE_RULES : learns
 

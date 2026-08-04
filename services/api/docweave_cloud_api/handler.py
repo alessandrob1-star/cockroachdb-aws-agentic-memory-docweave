@@ -8,7 +8,10 @@ import re
 import uuid
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
+from hashlib import sha256
 from typing import Any, Protocol, cast
+
+from docweave_cloud_api.memory import build_cloud_memory_writer_from_environment
 
 try:  # pragma: no cover - exercised in Lambda, replaced by fakes in tests.
     import boto3  # type: ignore[import-untyped]
@@ -374,6 +377,7 @@ def _classify_s3_pdf_artifacts_with_bedrock(
         if content_length > config.max_bedrock_document_bytes:
             raise ValueError("s3_object_too_large_for_bedrock_document_analysis")
         pdf_bytes = _read_s3_pdf_object(config, object_key)
+        content_sha256 = sha256(pdf_bytes).hexdigest()
         response = bedrock_client.converse(
             modelId=config.bedrock_model_id,
             system=[
@@ -410,6 +414,8 @@ def _classify_s3_pdf_artifacts_with_bedrock(
         classifications.append(
             {
                 "object_key": object_key,
+                "byte_size": len(pdf_bytes),
+                "content_sha256": content_sha256,
                 "model_id": config.bedrock_model_id,
                 "proposal": _validated_cloud_classification(response),
                 "usage": _bedrock_usage(response),
@@ -625,7 +631,7 @@ def _persist_cloud_classifications_to_memory(
 
 
 def _cloud_memory_writer() -> CloudMemoryWriter | None:
-    return None
+    return build_cloud_memory_writer_from_environment()
 
 
 def _persisted_count(persistence: Mapping[str, object]) -> int:

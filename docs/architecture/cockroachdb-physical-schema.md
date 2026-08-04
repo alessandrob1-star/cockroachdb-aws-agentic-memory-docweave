@@ -482,7 +482,26 @@ The table does not overwrite the active file instance. It is a chronological
 memory trail that lets the application explain how a document moved from its
 original location to every later approved or blocked state.
 
-### 8.5 `preference_rules`
+### 8.5 `cloud_analysis_jobs` and `cloud_analysis_objects`
+
+Cloud analysis memory records the AWS worker observation layer before final
+canonical promotion. `cloud_analysis_jobs` stores one workspace-scoped worker
+job identity, status, source service, and result-artifact key.
+`cloud_analysis_objects` stores the per-S3-object observation:
+
+- deterministic object identity within the workspace and job;
+- S3 object key as data, not as executable path authority;
+- content SHA-256, byte size, model identifier, proposed class, and confidence
+  signal;
+- validated proposal JSON and usage JSON; and
+- replay-safe uniqueness by job sequence and object key.
+
+This layer is intentionally separate from canonical classifications. It lets
+the cloud worker prove that Bedrock analysis happened and that CockroachDB
+remembered the observation, while later review and promotion workflows can
+decide what becomes authoritative.
+
+### 8.6 `preference_rules`
 
 Controlled preference memory includes scope, version, rule type, structured
 condition, structured outcome, provenance decisions, confidence, status,
@@ -492,7 +511,7 @@ Preference conditions and outcomes may use validated `JSONB` because their
 shape is versioned and rule-specific. Their authority, scope, status, and
 provenance remain typed relational columns.
 
-### 8.6 `audit_events`
+### 8.7 `audit_events`
 
 Append-only material events contain:
 
@@ -527,6 +546,8 @@ Only indexes required by approved workflows enter the first migration:
 | `agent_runs` | Workflow trace, document trace, and cost reporting |
 | `file_operations` | Idempotency, executable state, and reconciliation queue |
 | `file_lineage_events` | Per-document path history and current-path lookup |
+| `cloud_analysis_jobs` | Cloud worker status and result-artifact lookup |
+| `cloud_analysis_objects` | Per-object cloud analysis observation and class lookup |
 | `preference_rules` | Active rules by workspace and scope |
 | `audit_events` | Workspace chronological activity and subject history |
 

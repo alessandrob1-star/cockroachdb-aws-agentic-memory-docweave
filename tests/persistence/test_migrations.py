@@ -13,6 +13,7 @@ INITIAL_REVISION = "0001_operational_foundation"
 CLASSIFICATION_REVISION = "0002_classification_memory"
 REVIEW_REVISION = "0003_review_decision_memory"
 FILE_LINEAGE_REVISION = "0004_file_lineage_memory"
+CLOUD_ANALYSIS_REVISION = "0005_cloud_analysis_memory"
 
 
 def alembic_config() -> Config:
@@ -40,7 +41,7 @@ def render_downgrade_sql() -> str:
 def test_migration_history_has_one_expected_head() -> None:
     script = ScriptDirectory.from_config(alembic_config())
 
-    assert script.get_heads() == [FILE_LINEAGE_REVISION]
+    assert script.get_heads() == [CLOUD_ANALYSIS_REVISION]
     assert script.get_base() == INITIAL_REVISION
 
 
@@ -64,6 +65,8 @@ def test_offline_upgrade_creates_approved_non_vector_memory_tables() -> None:
         "proposal_evidence",
         "review_decisions",
         "file_lineage_events",
+        "cloud_analysis_jobs",
+        "cloud_analysis_objects",
     }
     for table_name in expected_tables:
         assert f"CREATE TABLE docweave.{table_name}" in sql
@@ -122,6 +125,24 @@ def test_file_lineage_memory_records_append_only_path_history() -> None:
     assert "ix_file_lineage_events_document_history" in sql
 
 
+def test_cloud_analysis_memory_records_worker_observations() -> None:
+    sql = render_upgrade_sql()
+
+    assert "CREATE TABLE docweave.cloud_analysis_jobs" in sql
+    assert "CREATE TABLE docweave.cloud_analysis_objects" in sql
+    assert "s3_object_key" in sql
+    assert "content_sha256" in sql
+    assert "proposed_class" in sql
+    assert "confidence_signal" in sql
+    assert "proposal JSONB NOT NULL" in sql
+    assert "usage JSONB NOT NULL" in sql
+    assert "fk_cloud_analysis_objects_job_workspace" in sql
+    assert "uq_cloud_analysis_jobs_workspace_job" in sql
+    assert "uq_cloud_analysis_objects_job_sequence" in sql
+    assert "ck_cloud_analysis_objects_content_digest" in sql
+    assert "ix_cloud_analysis_objects_workspace_class" in sql
+
+
 def test_offline_upgrade_enforces_workspace_and_idempotency_boundaries() -> None:
     sql = render_upgrade_sql()
 
@@ -164,6 +185,8 @@ def test_offline_upgrade_contains_append_only_audit_storage_shape() -> None:
 def test_offline_downgrade_drops_tables_in_dependency_order() -> None:
     sql = render_downgrade_sql()
     expected_order = [
+        "DROP TABLE docweave.cloud_analysis_objects",
+        "DROP TABLE docweave.cloud_analysis_jobs",
         "DROP TABLE docweave.file_lineage_events",
         "DROP TABLE docweave.review_decisions",
         "DROP TABLE docweave.proposal_evidence",
