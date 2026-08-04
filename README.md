@@ -299,6 +299,19 @@ The validation command prints only sanitized migration and schema evidence. It
 does not invoke Amazon Bedrock, process documents, create cloud resources, or
 print connection values.
 
+When the approved cloud stack output has been supplied as
+`DOCWEAVE_CLOUD_API_URL`, the runtime preflight can also check the deployed
+Amazon API Gateway and Lambda health boundary:
+
+```powershell
+docweave-runtime-preflight --cloud
+docweave-runtime-preflight --cloud --cloud-api-url <api-gateway-stage-url>
+```
+
+The cloud preflight calls only `GET /health`; it does not upload documents,
+enqueue analysis jobs, invoke Bedrock directly from the desktop, or print any
+credential material.
+
 The default command validates configuration and Bedrock client construction
 without opening external services. The `--database` form opens the configured
 CockroachDB target and checks that the current non-vector DocWeave schema
