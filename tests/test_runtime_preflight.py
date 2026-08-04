@@ -102,6 +102,36 @@ def test_preflight_reports_missing_runtime_config_without_secret_values() -> Non
     assert "secret" not in report.checks[0].detail
 
 
+def test_preflight_still_checks_cloud_when_runtime_config_is_missing() -> None:
+    def fail_builder() -> FakeRuntime:
+        raise RuntimeConfigurationError(
+            RuntimeConfigurationErrorCode.DATABASE_URL_MISSING,
+            variable_name="DOCWEAVE_DATABASE_URL",
+        )
+
+    report = run_preflight(
+        check_cloud=True,
+        cloud_api_url="https://example.test/dev",
+        runtime_builder=fail_builder,
+        cloud_health_fetcher=lambda _url: {
+            "status": "ready",
+            "aws_services": {
+                "aws_lambda": "running",
+                "amazon_bedrock": "configured",
+                "cockroachdb_secret": "missing",
+            },
+        },
+    )
+
+    assert not report.succeeded
+    assert [check.name for check in report.checks] == [
+        "runtime_config",
+        "cloud_api",
+    ]
+    assert report.checks[0].detail == "database_url_missing:DOCWEAVE_DATABASE_URL"
+    assert report.checks[1].state is PreflightState.OK
+
+
 def test_preflight_skips_database_when_not_requested() -> None:
     report = run_preflight(runtime_builder=lambda: _runtime(set()))
 

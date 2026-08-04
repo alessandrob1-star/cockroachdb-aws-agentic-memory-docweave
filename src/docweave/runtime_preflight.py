@@ -87,15 +87,21 @@ def run_preflight(
     try:
         runtime = runtime_builder()
     except RuntimeConfigurationError as error:
-        return RuntimePreflightReport(
-            checks=(
-                PreflightCheck(
-                    "runtime_config",
-                    PreflightState.FAIL,
-                    f"{error.code.value}:{error.variable_name}",
-                ),
+        checks.append(
+            PreflightCheck(
+                "runtime_config",
+                PreflightState.FAIL,
+                f"{error.code.value}:{error.variable_name}",
             )
         )
+        if check_cloud:
+            checks.extend(
+                _cloud_checks(
+                    cloud_api_url or os.environ.get("DOCWEAVE_CLOUD_API_URL") or "",
+                    cloud_health_fetcher=cloud_health_fetcher or _fetch_cloud_health,
+                )
+            )
+        return RuntimePreflightReport(checks=tuple(checks))
 
     checks.append(PreflightCheck("runtime_config", PreflightState.OK, "loaded"))
     checks.append(
