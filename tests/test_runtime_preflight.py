@@ -82,6 +82,8 @@ def _required_tables() -> set[str]:
         "proposal_evidence",
         "review_decisions",
         "file_lineage_events",
+        "cloud_analysis_jobs",
+        "cloud_analysis_objects",
     }
 
 

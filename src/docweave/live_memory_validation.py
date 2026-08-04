@@ -24,7 +24,7 @@ from docweave.application_runtime import (
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
 ALEMBIC_CONFIG_PATH = REPOSITORY_ROOT / "alembic.ini"
-EXPECTED_HEAD = "0004_file_lineage_memory"
+EXPECTED_HEAD = "0005_cloud_analysis_memory"
 REQUIRED_TABLES = frozenset(
     {
         "workspaces",
@@ -43,6 +43,8 @@ REQUIRED_TABLES = frozenset(
         "proposal_evidence",
         "review_decisions",
         "file_lineage_events",
+        "cloud_analysis_jobs",
+        "cloud_analysis_objects",
     }
 )
 
