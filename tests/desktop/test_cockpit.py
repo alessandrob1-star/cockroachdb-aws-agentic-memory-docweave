@@ -4,7 +4,7 @@ from uuid import UUID
 
 import pytest
 from PySide6.QtCore import QCoreApplication, QEventLoop, QTimer
-from PySide6.QtWidgets import QFileDialog
+from PySide6.QtWidgets import QApplication, QFileDialog
 
 import docweave.desktop.cockpit as cockpit_module
 from docweave.analysis import BedrockGatewayError, BedrockGatewayErrorCode
@@ -207,6 +207,43 @@ def test_cockpit_starts_with_definitive_local_surface(
     assert "Read-only CockroachDB restore history reader is available" in (
         window.right.restore_text.text()
     )
+
+    close_cockpit_window(window)
+
+
+def test_cockpit_right_screen_visible_text_stays_inside_panel(
+    qt_application: object,
+) -> None:
+    window = CockpitWindow(
+        integration_snapshot=RuntimeIntegrationSnapshot(
+            cockroachdb_configured=True,
+            bedrock_region="eu-central-1",
+            bedrock_model_id="eu.amazon.nova-2-lite-v1:0",
+        )
+    )
+    window.resize(1760, 1080)
+    window.show()
+    window.right.resize(431, 739)
+    cast(QApplication, qt_application).processEvents()
+
+    visible_widgets = [
+        window.right.title,
+        window.right.online,
+        window.right.section,
+        window.right.memory_label,
+        window.right.memory_text,
+        window.right.memory_table,
+        window.right.stream_label,
+        *window.right.metric_frames,
+        *window.right.event_rows,
+    ]
+
+    panel_rect = window.right.rect()
+    for widget in visible_widgets:
+        assert panel_rect.contains(widget.geometry()), widget.objectName()
+
+    assert not window.right.restore_label.isVisible()
+    assert not window.right.restore_text.isVisible()
 
     close_cockpit_window(window)
 

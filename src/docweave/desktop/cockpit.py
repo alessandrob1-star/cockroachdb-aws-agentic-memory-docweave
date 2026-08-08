@@ -1118,7 +1118,7 @@ class RightScreen(ShapeWidget):
         )
 
         row_y = stream_top + 30
-        row_height = 44
+        row_height = 42
         row_gap = 5
         for frame in self.event_rows:
             frame.setGeometry(
@@ -1128,17 +1128,13 @@ class RightScreen(ShapeWidget):
                 row_height,
             )
             frame.event_name.setGeometry(12, 6, content_width - 24, 18)
-            frame.event_text.setGeometry(12, 25, content_width - 24, 20)
+            frame.event_text.setGeometry(12, 24, content_width - 24, 18)
             row_y += row_height + row_gap
 
-        restore_y = row_y + 4
-        self.restore_label.setGeometry(content_left, restore_y, content_width, 24)
-        self.restore_text.setGeometry(
-            content_left + 12,
-            restore_y + 28,
-            content_width - 24,
-            54,
-        )
+        self.restore_label.hide()
+        self.restore_text.hide()
+        self.restore_label.setGeometry(content_left, h + 12, content_width, 1)
+        self.restore_text.setGeometry(content_left, h + 16, content_width, 1)
 
 
 class PdfPageMock(QWidget):
