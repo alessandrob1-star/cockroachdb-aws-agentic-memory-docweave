@@ -1,11 +1,12 @@
 # DocWeave
 
 **Hackathon submission in one sentence:** DocWeave is an agentic document
-cockpit that uses **CockroachDB Cloud as persistent memory** and runs a real
-**Amazon Web Services (AWS)** path with **Amazon Bedrock, AWS Lambda, Amazon
-Simple Storage Service (Amazon S3), Amazon Simple Queue Service (Amazon SQS),
-Amazon API Gateway, Amazon CloudWatch Logs, and AWS Secrets Manager dynamic
-references**.
+cockpit that uses **CockroachDB Cloud as persistent memory**, proves
+CockroachDB tool use with **`ccloud` Command-Line Interface (CLI)** and the
+**CockroachDB Agent Skills repository**, and runs a real **Amazon Web Services
+(AWS)** path with **Amazon Bedrock, AWS Lambda, Amazon Simple Storage Service
+(Amazon S3), Amazon Simple Queue Service (Amazon SQS), Amazon API Gateway,
+Amazon CloudWatch Logs, and AWS Secrets Manager dynamic references**.
 
 DocWeave solves a concrete workflow: a user has a folder full of badly named
 Portable Document Format (PDF) files like `scan_000184.pdf`. The dashboard lets
@@ -25,7 +26,7 @@ Choose folder -> Bedrock analysis -> CockroachDB memory -> human approval -> saf
 | CockroachDB as persistent memory | CockroachDB stores documents, Bedrock runs, proposals, human decisions, and before/after file history. |
 | Deployed on AWS | CloudFormation deploys Lambda API/worker, S3 artifacts, SQS queue, API Gateway, CloudWatch Logs, Bedrock permissions, and Secrets Manager dynamic references. |
 | AWS services identified | Amazon Bedrock; AWS Lambda; Amazon S3; Amazon SQS; Amazon API Gateway; Amazon CloudWatch Logs; AWS Secrets Manager dynamic references. |
-| CockroachDB tools identified | Current repo evidence covers CockroachDB Cloud memory. `ccloud`/Managed MCP evidence must be added before final submission if claiming the required second CockroachDB tool. |
+| CockroachDB tools identified | `ccloud` CLI inspects the live `docweave-memory` CockroachDB Cloud cluster; CockroachDB Agent Skills review schema and transaction design. |
 | Demo must show memory layer | The dashboard and SQL queries show original filename, current filename, proposal, human decision, and file history in CockroachDB. |
 
 The distinctive product surface is the **glass-effect desktop cockpit**. It is
@@ -46,6 +47,19 @@ understand the product from the screen before reading logs.
 - **Amazon CloudWatch Logs** - operational evidence for Lambda execution.
 - **AWS Secrets Manager dynamic references** - CloudFormation wiring for the
   CockroachDB runtime URL when a secret ARN is supplied.
+
+## CockroachDB Tools Used
+
+- **`ccloud` CLI** - verifies the live CockroachDB Cloud cluster
+  `docweave-memory`, its AWS region, serverless plan, version, and SQL users
+  without exposing the database password.
+- **CockroachDB Agent Skills repository** - applied the `cockroachdb-sql` and
+  `designing-application-transactions` skills to review the six-table schema,
+  primary keys, idempotent writes, `FOR UPDATE` proposal locking, and bounded
+  `40001` serialization retry handling.
+
+Evidence is recorded in
+[`docs/operations/hackathon-requirement-evidence.md`](docs/operations/hackathon-requirement-evidence.md).
 
 ## CockroachDB Memory
 
