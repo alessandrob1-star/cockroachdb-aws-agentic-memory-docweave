@@ -41,12 +41,22 @@ class _FakeConnection:
         if "public.alembic_version" in sql:
             return _FakeScalarResult(EXPECTED_HEAD)
         if "information_schema.tables" in sql:
-            return _FakeRows((("documents",), ("proposals",)))
+            return _FakeRows(
+                (
+                    ("documents", "BASE TABLE"),
+                    ("file_path_history", "VIEW"),
+                    ("proposals", "BASE TABLE"),
+                )
+            )
         if "information_schema.columns" in sql:
             return _FakeRows(
                 (
                     ("documents", "document_id", "UUID", "NO"),
                     ("documents", "workspace_id", "UUID", "NO"),
+                    ("file_path_history", "previous_directory", "VARCHAR", "YES"),
+                    ("file_path_history", "previous_filename", "VARCHAR", "YES"),
+                    ("file_path_history", "next_directory", "VARCHAR", "YES"),
+                    ("file_path_history", "next_filename", "VARCHAR", "YES"),
                     ("proposals", "proposal_id", "UUID", "NO"),
                     ("proposals", "document_id", "UUID", "NO"),
                 )
@@ -84,9 +94,12 @@ def test_collects_cockroach_memory_schema_shape() -> None:
     assert report.alembic_revision == EXPECTED_HEAD
     assert [table.table_name for table in report.tables] == [
         "documents",
+        "file_path_history",
         "proposals",
     ]
-    proposals = report.tables[1]
+    assert report.tables[1].object_type == "view"
+    assert report.tables[1].primary_key_columns == ()
+    proposals = report.tables[2]
     assert proposals.primary_key_columns == ("proposal_id",)
     assert proposals.foreign_keys[0].column_name == "document_id"
     assert proposals.foreign_keys[0].foreign_table_name == "documents"
@@ -115,7 +128,8 @@ def test_json_output_is_sanitized(monkeypatch: Any, capsys: Any) -> None:
     payload = json.loads(output)
     assert result == 0
     assert payload["alembic_revision"] == EXPECTED_HEAD
-    assert payload["tables"][1]["foreign_keys"][0]["constraint_name"] == (
+    assert payload["tables"][1]["object_type"] == "view"
+    assert payload["tables"][2]["foreign_keys"][0]["constraint_name"] == (
         "fk_proposals_document"
     )
     assert "DOCWEAVE_DATABASE_URL" not in output
@@ -134,6 +148,8 @@ def test_default_output_is_object_explorer_style(monkeypatch: Any, capsys: Any) 
     assert "DocWeave CockroachDB Object Explorer" in output
     assert "Database: docweave" in output
     assert "[table] docweave.documents" in output
+    assert "Views: 1" in output
+    assert "[view] docweave.file_path_history" in output
     assert "document_id: UUID NOT NULL PK" in output
     assert "document_id -> docweave.documents.document_id" in output
     assert "DOCWEAVE_DATABASE_URL" not in output
@@ -150,4 +166,6 @@ def test_flat_output_remains_available(monkeypatch: Any, capsys: Any) -> None:
     output = capsys.readouterr().out
     assert result == 0
     assert "memory_schema_revision:" in output
+    assert "memory_schema_views: 1" in output
     assert "table docweave.documents" in output
+    assert "view docweave.file_path_history" in output

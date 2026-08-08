@@ -14,6 +14,7 @@ CLASSIFICATION_REVISION = "0002_classification_memory"
 REVIEW_REVISION = "0003_review_decision_memory"
 FILE_LINEAGE_REVISION = "0004_file_lineage_memory"
 CLOUD_ANALYSIS_REVISION = "0005_cloud_analysis_memory"
+READABLE_PATH_HISTORY_REVISION = "0006_readable_file_path_history_view"
 
 
 def alembic_config() -> Config:
@@ -41,7 +42,7 @@ def render_downgrade_sql() -> str:
 def test_migration_history_has_one_expected_head() -> None:
     script = ScriptDirectory.from_config(alembic_config())
 
-    assert script.get_heads() == [CLOUD_ANALYSIS_REVISION]
+    assert script.get_heads() == [READABLE_PATH_HISTORY_REVISION]
     assert script.get_base() == INITIAL_REVISION
 
 
@@ -143,6 +144,24 @@ def test_cloud_analysis_memory_records_worker_observations() -> None:
     assert "ix_cloud_analysis_objects_workspace_class" in sql
 
 
+def test_readable_file_path_history_view_exposes_directory_and_filename_columns() -> (
+    None
+):
+    sql = render_upgrade_sql()
+
+    assert "CREATE VIEW docweave.file_path_history AS" in sql
+    assert "FROM docweave.file_lineage_events" in sql
+    assert "original_directory" in sql
+    assert "original_filename" in sql
+    assert "previous_directory" in sql
+    assert "previous_filename" in sql
+    assert "next_directory" in sql
+    assert "next_filename" in sql
+    assert "operation_batch_id" in sql
+    assert "file_operation_id" in sql
+    assert "proposal_id" in sql
+
+
 def test_offline_upgrade_enforces_workspace_and_idempotency_boundaries() -> None:
     sql = render_upgrade_sql()
 
@@ -185,6 +204,7 @@ def test_offline_upgrade_contains_append_only_audit_storage_shape() -> None:
 def test_offline_downgrade_drops_tables_in_dependency_order() -> None:
     sql = render_downgrade_sql()
     expected_order = [
+        "DROP VIEW IF EXISTS docweave.file_path_history",
         "DROP TABLE docweave.cloud_analysis_objects",
         "DROP TABLE docweave.cloud_analysis_jobs",
         "DROP TABLE docweave.file_lineage_events",

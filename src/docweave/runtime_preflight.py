@@ -173,6 +173,7 @@ def _database_checks(engine: Engine) -> tuple[PreflightCheck, ...]:
         with engine.connect() as connection:
             connection.execute(text("SELECT 1"))
             existing_tables = _docweave_tables(connection)
+            existing_views = _docweave_views(connection)
     except SQLAlchemyError:
         return (
             PreflightCheck(
@@ -197,13 +198,19 @@ def _database_checks(engine: Engine) -> tuple[PreflightCheck, ...]:
         "cloud_analysis_objects",
     }
     missing = sorted(required_tables - existing_tables)
+    missing_views = sorted({"file_path_history"} - existing_views)
     checks = [PreflightCheck("cockroachdb_connection", PreflightState.OK, "reachable")]
-    if missing:
+    if missing or missing_views:
+        missing_parts = []
+        if missing:
+            missing_parts.append(f"tables:{','.join(missing)}")
+        if missing_views:
+            missing_parts.append(f"views:{','.join(missing_views)}")
         checks.append(
             PreflightCheck(
                 "docweave_schema",
                 PreflightState.FAIL,
-                f"missing:{','.join(missing)}",
+                f"missing:{';'.join(missing_parts)}",
             )
         )
     else:
@@ -285,6 +292,25 @@ def _docweave_tables(connection: Connection) -> set[str]:
         if isinstance(value, str):
             table_names.add(value)
     return table_names
+
+
+def _docweave_views(connection: Connection) -> set[str]:
+    rows = connection.execute(
+        text(
+            """
+            SELECT table_name
+            FROM information_schema.tables
+            WHERE table_schema = 'docweave'
+              AND table_type = 'VIEW'
+            """
+        )
+    )
+    view_names: set[str] = set()
+    for row in rows:
+        value: Any = row[0]
+        if isinstance(value, str):
+            view_names.add(value)
+    return view_names
 
 
 if __name__ == "__main__":
