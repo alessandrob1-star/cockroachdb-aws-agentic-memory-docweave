@@ -148,7 +148,8 @@ def assert_visible_classification_proposal(window: CockpitWindow) -> None:
     assert proposed_class_item is not None
     assert review_status_item is not None
     assert proposed_class_item.text() == "invoice"
-    assert review_status_item.text() == "REVIEW"
+    assert review_status_item.text() == "● R"
+    assert review_status_item.toolTip() == "Status: REVIEW"
     assert "Proposed rename_and_move target: DocWeave Organized/Invoices/" in (
         proposed_class_item.toolTip()
     )

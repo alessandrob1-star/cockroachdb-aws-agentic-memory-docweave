@@ -705,7 +705,7 @@ class LeftScreen(ShapeWidget):
         self._documents: list[Document] = list(DOCUMENTS)
         self.table = QTableWidget(0, 4, self)
         self.table.setObjectName("documentTable")
-        self.table.setHorizontalHeaderLabels(["DOCUMENT", "TYPE", "PAGES", "STATUS"])
+        self.table.setHorizontalHeaderLabels(["DOCUMENT", "TYPE", "", ""])
         self.table.verticalHeader().setVisible(False)
         self.table.setShowGrid(False)
         self.table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
@@ -716,9 +716,9 @@ class LeftScreen(ShapeWidget):
         header = self.table.horizontalHeader()
         header.setFont(QFont("Segoe UI", 13, QFont.Weight.Bold))
         header.setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
-        header.setSectionResizeMode(1, QHeaderView.ResizeMode.ResizeToContents)
-        header.setSectionResizeMode(2, QHeaderView.ResizeMode.ResizeToContents)
-        header.setSectionResizeMode(3, QHeaderView.ResizeMode.ResizeToContents)
+        header.setSectionResizeMode(1, QHeaderView.ResizeMode.Interactive)
+        header.setSectionResizeMode(2, QHeaderView.ResizeMode.Fixed)
+        header.setSectionResizeMode(3, QHeaderView.ResizeMode.Fixed)
 
         self.set_documents(self._documents)
 
@@ -812,8 +812,14 @@ class LeftScreen(ShapeWidget):
         self._set_document_row(row, updated)
 
     def _set_document_row(self, row: int, doc: Document) -> None:
-        for column, value in enumerate((doc.name, doc.category, doc.pages, doc.status)):
+        for column, value in enumerate(
+            (doc.name, doc.category, doc.pages, self._status_badge(doc.status))
+        ):
             item = QTableWidgetItem(value)
+            if column == 0:
+                item.setToolTip(doc.name)
+            if column in {2, 3}:
+                item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
             if doc.proposed_destination is not None:
                 action = doc.proposed_operation_action or "operation"
                 tooltip = f"Proposed {action} target: {doc.proposed_destination}"
@@ -827,18 +833,35 @@ class LeftScreen(ShapeWidget):
                         f"{doc.lineage_preview.plan_fingerprint[:12]}"
                     )
                 item.setToolTip(tooltip)
+            if column == 3:
+                item.setToolTip(f"Status: {doc.status}")
             if doc.review_decision_id is not None:
                 item.setToolTip(
                     f"{item.toolTip()}\nReview decision: {doc.review_decision_id}"
                 )
             if column == 3:
-                item.setForeground(
-                    WARNING
-                    if doc.status in {"ATTENTION", "REVIEW", "REJECTED"}
-                    else ACCENT
-                )
+                item.setForeground(self._status_color(doc.status))
             self.table.setItem(row, column, item)
         self.table.setRowHeight(row, 42)
+
+    @staticmethod
+    def _status_badge(status: str) -> str:
+        return {
+            "READY": "●",
+            "REVIEW": "● R",
+            "ATTENTION": "● !",
+            "REJECTED": "● X",
+            "APPROVED": "● A",
+            "MOVED": "● M",
+        }.get(status, "●")
+
+    @staticmethod
+    def _status_color(status: str) -> QColor:
+        if status in {"ATTENTION", "REJECTED"}:
+            return QColor("#FF5E5B")
+        if status == "REVIEW":
+            return WARNING
+        return ACCENT
 
     def count_status(self, status: str) -> int:
         """Count current visible document states."""
@@ -899,6 +922,9 @@ class LeftScreen(ShapeWidget):
             content_width,
             hint_y - table_top - 30,
         )
+        self.table.setColumnWidth(1, max(96, int(content_width * 0.31)))
+        self.table.setColumnWidth(2, 24)
+        self.table.setColumnWidth(3, 42)
         self.hint.setGeometry(
             46,
             hint_y,
