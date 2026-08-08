@@ -7,8 +7,9 @@ import json
 import sys
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
+from enum import StrEnum
 from pathlib import Path
-from typing import Literal
+from typing import Literal, Protocol
 from uuid import UUID, uuid5
 
 from docweave.analysis.confidence import compute_uncalibrated_confidence
@@ -23,9 +24,6 @@ from docweave.extraction import ExtractionStatus, PdfExtractionRequest, extract_
 from docweave.operations import classification_proposal_fingerprint
 from docweave.operations.organization import propose_safe_organization_copy
 from docweave.persistence import (
-    ClassificationPipelineError,
-    ClassificationPipelineErrorCode,
-    ClassificationRunIdentity,
     CockroachSimpleMemoryRepository,
     CockroachTransactionRunner,
     PersistenceDisposition,
@@ -40,6 +38,49 @@ _IDENTITY_NAMESPACE = UUID("7f5461df-2c2f-4f8d-b504-83ddf8e0d00a")
 _MAX_BATCH_SIZE = 1_000
 
 BatchItemStatus = Literal["succeeded", "failed"]
+
+
+class ClassificationGateway(Protocol):
+    """Validated model gateway surface required by the CLI."""
+
+    def classify(self, pages):
+        """Return one validated, non-authoritative proposal."""
+
+
+class ClassificationPipelineErrorCode(StrEnum):
+    """Content-free classification failure categories."""
+
+    EXTRACTION_NOT_CLASSIFIABLE = "extraction_not_classifiable"
+
+
+class ClassificationPipelineError(RuntimeError):
+    """Fail-closed error that retains no path or document content."""
+
+    def __init__(
+        self,
+        code: ClassificationPipelineErrorCode,
+        *,
+        extraction_status: ExtractionStatus,
+    ) -> None:
+        super().__init__(code.value)
+        self.code = code
+        self.extraction_status = extraction_status
+
+
+@dataclass(frozen=True, slots=True)
+class ClassificationRunIdentity:
+    """Stable caller-authorized identities for one classification attempt."""
+
+    workspace_id: UUID
+    document_id: UUID
+    document_version_id: UUID
+    taxonomy_version_id: UUID
+    approved_by_actor_id: UUID
+    agent_run_id: UUID
+    proposal_id: UUID
+    version_number: int
+    idempotency_key: str
+    prompt_version: str
 
 
 @dataclass(frozen=True, slots=True)

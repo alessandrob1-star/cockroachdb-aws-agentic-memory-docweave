@@ -33,6 +33,7 @@ from uuid import UUID, uuid4
 
 from PySide6.QtCore import (
     QEasingCurve,
+    QEvent,
     QObject,
     QPoint,
     QPointF,
@@ -115,7 +116,7 @@ from docweave.memory_evidence_report import (
     MemoryEvidenceReport,
     collect_memory_evidence,
 )
-from docweave.persistence import ClassificationPipelineError
+from docweave.classification_cli import ClassificationPipelineError
 from docweave.review_cli import (
     ReviewDecisionCommandInput,
     ReviewDecisionCommandResult,
@@ -1441,6 +1442,7 @@ class CenterPreview(ShapeWidget):
         self.filename.setText(path.name)
         self.counter.setText("Loading")
         self._document.close()
+        self.page.setDocument(self._document)
         load_error = self._document.load(str(path))
         if load_error is not QPdfDocument.Error.None_:
             self.counter.setText("Blocked")
@@ -1572,6 +1574,25 @@ class CenterPreview(ShapeWidget):
 
         self._geometry_animation.start()
         self.opacity_animation.start()
+
+    def release_document_handle(self) -> None:
+        """Release the previewed PDF before an approved local move."""
+        old_document = self._document
+        self.page.setDocument(None)
+        old_document.close()
+        try:
+            old_document.statusChanged.disconnect(self._handle_document_status)
+            old_document.pageCountChanged.disconnect(self._update_page_counter)
+        except RuntimeError:
+            pass
+        old_document.deleteLater()
+        QApplication.sendPostedEvents(old_document, QEvent.Type.DeferredDelete)
+        QApplication.processEvents()
+        self._document = QPdfDocument(self)
+        self._document.statusChanged.connect(self._handle_document_status)
+        self._document.pageCountChanged.connect(self._update_page_counter)
+        self.page.setDocument(self._document)
+        self.counter.setText("Closed")
 
 
 class CurvedConsoleButton(QPushButton):
@@ -3082,6 +3103,7 @@ class CockpitWindow(QMainWindow):
                     approved_at_utc=approved_at,
                     expires_at_utc=approved_at + timedelta(minutes=15),
                 )
+                self.center.release_document_handle()
                 execution = execute_file_operation(
                     plan,
                     approval,

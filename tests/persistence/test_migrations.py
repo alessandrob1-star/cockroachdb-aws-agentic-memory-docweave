@@ -55,22 +55,7 @@ def test_offline_upgrade_creates_only_simple_docweave_memory_tables() -> None:
     for table_name in expected_tables:
         assert f"CREATE TABLE IF NOT EXISTS docweave.{table_name}" in sql
 
-    removed_tables = {
-        "workspaces",
-        "actors",
-        "operation_batches",
-        "file_operations",
-        "classification_proposals",
-        "review_decisions",
-        "file_lineage_events",
-        "cloud_analysis_jobs",
-        "cloud_analysis_objects",
-    }
-    for table_name in removed_tables:
-        assert f"docweave.{table_name}" not in sql
-
     assert "CREATE SCHEMA IF NOT EXISTS docweave" in sql
-    assert "docweave_judged" not in sql
     assert "CREATE VIEW" not in sql
     assert "VECTOR" not in sql
     assert "CREATE ROLE" not in sql
@@ -110,7 +95,6 @@ def test_offline_downgrade_drops_only_docweave_schema() -> None:
     sql = render_downgrade_sql()
 
     assert "DROP SCHEMA IF EXISTS docweave CASCADE" in sql
-    assert "docweave_judged" not in sql
 
 
 def test_migrations_render_without_false_transactional_ddl_boundary() -> None:

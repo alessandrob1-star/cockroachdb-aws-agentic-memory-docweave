@@ -25,7 +25,6 @@ dependencies = [
 docweave-classify-batch = "docweave.classification_cli:batch_main"
 docweave-classify-pdf = "docweave.classification_cli:main"
 docweave-desktop = "docweave.desktop.application:main"
-docweave-file-lineage = "docweave.lineage_cli:main"
 docweave-live-memory-validation = "docweave.live_memory_validation:main"
 docweave-memory-evidence = "docweave.memory_evidence_report:main"
 docweave-memory-schema = "docweave.memory_schema_report:main"

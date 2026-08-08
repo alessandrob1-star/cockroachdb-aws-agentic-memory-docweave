@@ -101,7 +101,7 @@ def collect_offline_evidence() -> OfflineMigrationEvidence:
     present_tables = {
         table_name
         for table_name in REQUIRED_TABLES
-        if f"CREATE TABLE docweave.{table_name}" in sql
+        if f"CREATE TABLE IF NOT EXISTS docweave.{table_name}" in sql
     }
     present_views = {
         view_name

@@ -14,9 +14,6 @@ from docweave.application_runtime import (
     build_configured_review_decision_runtime,
 )
 from docweave.operations import (
-    AuditActorType,
-    AuditEventType,
-    ProposalReviewDecision,
     ProposalReviewDecisionRequest,
     ReviewDecisionAction,
     ReviewDecisionValidationReason,
@@ -24,9 +21,7 @@ from docweave.operations import (
     create_proposal_review_decision_from_fingerprint,
     validate_proposal_review_decision_fingerprint,
 )
-from docweave.persistence import AuditAppend, PersistReviewDecision
 from docweave.persistence.contracts import PersistenceDisposition
-from docweave.persistence.operation_repository import PersistenceConflictError
 from docweave.persistence.simple_memory_repository import (
     CockroachSimpleMemoryRepository,
     PersistHumanDecision,
@@ -165,7 +160,7 @@ def main(argv: list[str] | None = None) -> int:
             file=sys.stderr,
         )
         return 2
-    except (PersistenceConflictError, ValueError) as error:
+    except ValueError as error:
         print(f"Review decision failed: {type(error).__name__}", file=sys.stderr)
         return 3
 
@@ -176,51 +171,8 @@ def main(argv: list[str] | None = None) -> int:
     return 0
 
 
-def _persist_command(
-    configured: ConfiguredReviewDecisionRuntime,
-    decision: ProposalReviewDecision,
-) -> PersistReviewDecision:
-    return PersistReviewDecision(
-        workspace_id=configured.config.workspace_id,
-        proposal_id=UUID(decision.proposal_id),
-        review_decision_id=UUID(decision.review_decision_id),
-        reviewer_actor_id=UUID(decision.reviewer_actor_id),
-        action=decision.action,
-        proposal_fingerprint=decision.proposal_fingerprint,
-        operation_plan_fingerprint=decision.operation_plan_fingerprint,
-        reason=decision.reason,
-        decided_at_utc=decision.decided_at_utc,
-        audit_event=AuditAppend(
-            event_id=uuid4(),
-            workspace_id=configured.config.workspace_id,
-            actor_id=configured.config.approved_by_actor_id,
-            actor_type=AuditActorType.HUMAN,
-            correlation_id=f"review-decision:{decision.review_decision_id}",
-            event_type=AuditEventType.REVIEW_DECISION_RECORDED,
-            subject_kind="classification_proposal",
-            subject_id=decision.proposal_id,
-            occurred_at_utc=decision.decided_at_utc,
-            previous_state="needs_review",
-            new_state=_proposal_status(decision.action),
-            reason=decision.reason,
-            plan_sha256=(
-                None
-                if decision.operation_plan_fingerprint is None
-                else bytes.fromhex(decision.operation_plan_fingerprint)
-            ),
-        ),
-    )
-
-
 def _validation_error_message(reason: ReviewDecisionValidationReason) -> str:
     return f"review decision validation blocked: {reason.value}"
-
-
-def _proposal_status(action: ReviewDecisionAction) -> str:
-    return {
-        ReviewDecisionAction.APPROVE: "approved",
-        ReviewDecisionAction.REJECT: "rejected",
-    }[action]
 
 
 if __name__ == "__main__":
