@@ -7,11 +7,13 @@ import json
 import sys
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
+from decimal import Decimal
 from enum import StrEnum
 from pathlib import Path
 from typing import Literal, Protocol
 from uuid import UUID, uuid5
 
+from docweave.analysis import BedrockClassificationRun
 from docweave.analysis.confidence import compute_uncalibrated_confidence
 from docweave.application_runtime import (
     ConfiguredClassificationRuntime,
@@ -20,7 +22,12 @@ from docweave.application_runtime import (
     build_configured_classification_runtime,
 )
 from docweave.core.fingerprints import compute_sha256_fingerprint
-from docweave.extraction import ExtractionStatus, PdfExtractionRequest, extract_pdf_text
+from docweave.extraction import (
+    ExtractedPage,
+    ExtractionStatus,
+    PdfExtractionRequest,
+    extract_pdf_text,
+)
 from docweave.operations import classification_proposal_fingerprint
 from docweave.operations.organization import propose_safe_organization_copy
 from docweave.persistence import (
@@ -43,7 +50,7 @@ BatchItemStatus = Literal["succeeded", "failed"]
 class ClassificationGateway(Protocol):
     """Validated model gateway surface required by the CLI."""
 
-    def classify(self, pages):
+    def classify(self, pages: tuple[ExtractedPage, ...]) -> BedrockClassificationRun:
         """Return one validated, non-authoritative proposal."""
 
 
@@ -571,7 +578,7 @@ def batch_main(argv: list[str] | None = None) -> int:
 
 
 def _command_result_from_run(  # noqa: PLR0913
-    model_run,
+    model_run: BedrockClassificationRun,
     *,
     document_id: UUID | None = None,
     proposal_id: UUID | None = None,
@@ -635,8 +642,8 @@ def _persist_simple_analysis(  # noqa: PLR0913
     identity: ClassificationRunIdentity,
     source_sha256: str,
     extraction_page_count: int,
-    model_run,
-    raw_confidence,
+    model_run: BedrockClassificationRun,
+    raw_confidence: Decimal,
 ) -> PersistenceDisposition:
     source = request.source_path.resolve(strict=True)
     root = request.authorized_root.resolve(strict=True)
@@ -699,11 +706,11 @@ def _persist_simple_analysis(  # noqa: PLR0913
     )
 
 
-def _evidence_summary(model_run) -> str:
+def _evidence_summary(model_run: BedrockClassificationRun) -> str:
     if model_run.proposal.evidence:
         first = model_run.proposal.evidence[0]
         return f"Page {first.page_index + 1}: {first.quote}"
-    return model_run.proposal.rationale
+    return str(model_run.proposal.rationale)
 
 
 if __name__ == "__main__":

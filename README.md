@@ -1,22 +1,45 @@
 # DocWeave
 
-**Hackathon submission in one sentence:** DocWeave is an agentic document
-cockpit that uses **CockroachDB Cloud as persistent memory**, proves
-CockroachDB tool use with **`ccloud` Command-Line Interface (CLI)** and the
-**CockroachDB Agent Skills repository**, and runs a real **Amazon Web Services
-(AWS)** path with **Amazon Bedrock, AWS Lambda, Amazon Simple Storage Service
-(Amazon S3), Amazon Simple Queue Service (Amazon SQS), Amazon API Gateway,
-Amazon CloudWatch Logs, and AWS Secrets Manager dynamic references**.
-
-DocWeave solves a concrete workflow: a user has a folder full of badly named
-Portable Document Format (PDF) files like `scan_000184.pdf`. The dashboard lets
-the user choose that folder, analyze the PDFs with a Large Language Model
-(LLM), review safer names and folders, approve the move, and then prove exactly
-where every renamed file originally came from.
+**DocWeave is an agentic document cockpit for the CockroachDB x AWS hackathon.**
+It turns a folder of badly named Portable Document Format (PDF) files, such as
+`scan_000184.pdf`, into a human-approved archive where every renamed document
+still remembers its original filename, original directory, model rationale, and
+approval history.
 
 ```text
 Choose folder -> Bedrock analysis -> CockroachDB memory -> human approval -> safe rename/move -> original path still visible
 ```
+
+The agent does not just chat about documents. Amazon Bedrock reads extracted
+PDF text and proposes a document class, evidence, destination folder, and safer
+filename. The dashboard keeps the human in control: the user reviews the PDF,
+the evidence, and the proposed move before any file is changed. CockroachDB is
+the persistent operational, semantic, episodic, and preference memory that
+survives after the local folder has been reorganized.
+
+DocWeave uses the required hackathon tools directly:
+
+- **CockroachDB Tool #1: `ccloud` Command-Line Interface (CLI).** The project
+  uses `ccloud` to verify the live CockroachDB Cloud cluster
+  `docweave-memory`, its AWS region, serverless plan, version, and SQL users
+  without exposing database passwords.
+- **CockroachDB Tool #2: CockroachDB Agent Skills repository.** The schema and
+  transaction path were reviewed with the `cockroachdb-sql` and
+  `designing-application-transactions` skills, then applied to the six-table
+  memory design, idempotent writes, `FOR UPDATE` proposal locking, and bounded
+  `40001` serialization retry handling.
+- **AWS services.** The deployed cloud slice uses Amazon Bedrock for document
+  reasoning, AWS Lambda for the HTTP API and analysis worker, Amazon Simple
+  Storage Service (Amazon S3) for PDF/result artifacts, Amazon Simple Queue
+  Service (Amazon SQS) for queued analysis jobs, Amazon API Gateway for the
+  public endpoint, Amazon CloudWatch Logs for operational evidence, and AWS
+  Secrets Manager dynamic references for the CockroachDB runtime URL.
+
+The visible product surface is the **glass-effect desktop cockpit**. A judge
+can choose a folder, scan documents, inspect an embedded PDF preview, run
+analysis, approve or reject the proposed rename, and then select the moved PDF
+to see exactly what it used to be called and where it came from. That is the
+core product loop: **LLM understanding + human control + durable path memory**.
 
 ## Submission Fit
 
@@ -30,12 +53,6 @@ Choose folder -> Bedrock analysis -> CockroachDB memory -> human approval -> saf
 | Demo must show memory layer | The dashboard and SQL queries show original filename, current filename, proposal, human decision, and file history in CockroachDB. |
 | Open-source license | MIT license in [`LICENSE`](LICENSE). |
 | Testing instructions | [`docs/submission/testing-instructions.md`](docs/submission/testing-instructions.md). |
-
-The distinctive product surface is the **glass-effect desktop cockpit**. It is
-not a generic chat wrapper: the PySide6 dashboard shows folder scanning,
-embedded PDF preview, Bedrock evidence, approval controls, CockroachDB memory
-status, and original/current path history in one visual workflow. A judge can
-understand the product from the screen before reading logs.
 
 ## AWS Services Used
 

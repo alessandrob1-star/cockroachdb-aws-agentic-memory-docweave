@@ -20,6 +20,7 @@ from docweave.persistence import (
     CockroachSimpleMemoryRepository,
     CockroachTransactionRunner,
 )
+from docweave.persistence.simple_memory_repository import SerializableTransactionRunner
 
 WORKSPACE_ID = "11111111-1111-4111-8111-111111111111"
 TAXONOMY_VERSION_ID = "22222222-2222-4222-8222-222222222222"
@@ -118,7 +119,7 @@ def test_configured_review_decision_runtime_composition_is_lazy() -> None:
         return cast(CockroachTransactionRunner, object())
 
     def fake_repository_factory(
-        transaction_runner: CockroachTransactionRunner,
+        transaction_runner: SerializableTransactionRunner,
     ) -> CockroachSimpleMemoryRepository:
         assert transaction_runner is not None
         calls.append("simple_memory_repository")
