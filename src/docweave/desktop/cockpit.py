@@ -156,6 +156,7 @@ TEXT = QColor("#EAF5F1")
 MUTED = QColor("#8FAAA1")
 ACCENT = QColor("#67D8B0")
 WARNING = QColor("#E1AB4D")
+DEFAULT_DEMO_DOCUMENT_FOLDER = Path(__file__).parents[3] / "pdf_sintetici"
 
 
 @dataclass(frozen=True)
@@ -2667,6 +2668,8 @@ class CockpitWindow(QMainWindow):
         authorized_root = self.authorized_root
         if authorized_root is not None:
             return str(authorized_root)
+        if DEFAULT_DEMO_DOCUMENT_FOLDER.is_dir():
+            return str(DEFAULT_DEMO_DOCUMENT_FOLDER)
         remembered = self._folder_memory.last_authorized_folder()
         if remembered is None:
             return ""

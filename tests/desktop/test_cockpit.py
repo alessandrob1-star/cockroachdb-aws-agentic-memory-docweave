@@ -275,16 +275,47 @@ def test_cockpit_sanitizes_memory_evidence_failures(
     close_cockpit_window(window)
 
 
-def test_cockpit_folder_picker_reopens_remembered_directory(
+def test_cockpit_folder_picker_reuses_active_authorized_directory(
     tmp_path: Path,
     qt_application: object,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    remembered = tmp_path / "pdf_sintetici"
+    active = tmp_path / "active"
     selected = tmp_path / "selected"
-    remembered.mkdir()
+    active.mkdir()
     selected.mkdir()
-    memory = _InMemoryFolderMemory(remembered.resolve())
+    memory = _InMemoryFolderMemory(None)
+    dialog_directories: list[str] = []
+
+    def choose_directory(
+        _parent: object,
+        _caption: str,
+        directory: str,
+    ) -> str:
+        dialog_directories.append(directory)
+        return str(selected)
+
+    window = CockpitWindow(folder_memory=memory)
+    window.set_authorized_root(active)
+    monkeypatch.setattr(QFileDialog, "getExistingDirectory", choose_directory)
+
+    window._choose_folder()
+
+    assert dialog_directories == [str(active.resolve())]
+    assert window.authorized_root == selected.resolve()
+    assert memory.saved == [active.resolve(), selected.resolve()]
+
+    close_cockpit_window(window)
+
+
+def test_cockpit_folder_picker_defaults_to_synthetic_pdf_directory(
+    tmp_path: Path,
+    qt_application: object,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    selected = tmp_path / "selected"
+    selected.mkdir()
+    memory = _InMemoryFolderMemory(None)
     dialog_directories: list[str] = []
 
     def choose_directory(
@@ -300,9 +331,8 @@ def test_cockpit_folder_picker_reopens_remembered_directory(
 
     window._choose_folder()
 
-    assert dialog_directories == [str(remembered.resolve())]
+    assert dialog_directories == [str(Path("pdf_sintetici").resolve(strict=True))]
     assert window.authorized_root == selected.resolve()
-    assert memory.saved == [selected.resolve()]
 
     close_cockpit_window(window)
 
