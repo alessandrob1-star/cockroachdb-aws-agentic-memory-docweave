@@ -667,14 +667,6 @@ class ShapeWidget(QWidget):
                 QPointF(point.x() + 1.8, point.y()),
             )
 
-        led = QPointF(bounds.right() - 34, bounds.top() + 18)
-        painter.setPen(Qt.PenStyle.NoPen)
-        pulse = 0.5 + 0.5 * math.sin(self._pulse_phase / 40 * math.tau)
-        painter.setBrush(QColor(80, 255, 185, int(150 + 70 * pulse)))
-        painter.drawEllipse(led, 3.2, 3.2)
-        painter.setBrush(QColor(80, 255, 185, int(24 + 34 * pulse)))
-        painter.drawEllipse(led, 7.5, 7.5)
-
 
 class LeftScreen(ShapeWidget):
     document_selected = Signal(int)
@@ -1261,14 +1253,6 @@ class CenterPreview(ShapeWidget):
             int(bounds.bottom() - bounds.height() * 0.06),
         )
 
-        # Red illuminated glass labels.
-        painter.setPen(Qt.PenStyle.NoPen)
-        led = QPointF(bounds.left() + 20, bounds.top() + 17)
-        painter.setBrush(QColor(255, 35, 35, 210))
-        painter.drawEllipse(led, 3.5, 3.5)
-        painter.setBrush(QColor(255, 35, 35, 45))
-        painter.drawEllipse(led, 8.0, 8.0)
-
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
 
@@ -1292,10 +1276,14 @@ class CenterPreview(ShapeWidget):
         self.title = QLabel("PDF PREVIEW", self)
         self.title.setObjectName("screenTitle")
 
+        self.program_name = QLabel("DOC WEAVE", self)
+        self.program_name.setObjectName("centerBrand")
+        self.program_name.setAlignment(Qt.AlignmentFlag.AlignCenter)
+
         self.filename = QLabel("No document selected", self)
         self.filename.setObjectName("muted")
 
-        for label in (self.title, self.filename):
+        for label in (self.title, self.program_name, self.filename):
             glow = QGraphicsDropShadowEffect(label)
             glow.setBlurRadius(14)
             glow.setOffset(0, 0)
@@ -1432,6 +1420,7 @@ class CenterPreview(ShapeWidget):
 
         # Header remains on the glass.
         self.title.setGeometry(28, 16, 180, 27)
+        self.program_name.setGeometry((w - 190) // 2, 14, 190, 30)
         self.filename.setGeometry(28, 43, w - 200, 22)
         self.lower_button.setGeometry(w - 96, 16, 68, 29)
 
@@ -2342,6 +2331,13 @@ class CockpitWindow(QMainWindow):
                 font-size: 19px;
                 font-weight: 800;
                 letter-spacing: 0.4px;
+                background: transparent;
+            }
+
+            QLabel#centerBrand {
+                color: #FF3030;
+                font-size: 22px;
+                font-weight: 900;
                 background: transparent;
             }
 
