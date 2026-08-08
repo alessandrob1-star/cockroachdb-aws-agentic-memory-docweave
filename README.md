@@ -28,6 +28,8 @@ Choose folder -> Bedrock analysis -> CockroachDB memory -> human approval -> saf
 | AWS services identified | Amazon Bedrock; AWS Lambda; Amazon S3; Amazon SQS; Amazon API Gateway; Amazon CloudWatch Logs; AWS Secrets Manager dynamic references. |
 | CockroachDB tools identified | `ccloud` CLI inspects the live `docweave-memory` CockroachDB Cloud cluster; CockroachDB Agent Skills review schema and transaction design. |
 | Demo must show memory layer | The dashboard and SQL queries show original filename, current filename, proposal, human decision, and file history in CockroachDB. |
+| Open-source license | MIT license in [`LICENSE`](LICENSE). |
+| Testing instructions | [`docs/submission/testing-instructions.md`](docs/submission/testing-instructions.md). |
 
 The distinctive product surface is the **glass-effect desktop cockpit**. It is
 not a generic chat wrapper: the PySide6 dashboard shows folder scanning,
@@ -113,6 +115,15 @@ python -m venv .venv
 
 On this workstation, `launch-docweave-dashboard.cmd` delegates to the approved
 runtime launcher when present so runtime values stay outside the repository.
+
+## Functional Demo Endpoint
+
+```text
+https://76824l7ub1.execute-api.eu-central-1.amazonaws.com/dev/health
+```
+
+Testing instructions for judges are in
+[`docs/submission/testing-instructions.md`](docs/submission/testing-instructions.md).
 
 ## Validate The Memory Path
 

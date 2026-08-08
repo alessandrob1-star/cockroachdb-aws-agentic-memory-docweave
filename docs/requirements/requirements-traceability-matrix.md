@@ -13,18 +13,21 @@
 | CockroachDB stores visible agent memory | Six-table `docweave` schema and `src/docweave/persistence/simple_memory_repository.py` | Implemented |
 | Human approves before file mutation | Dashboard approve/reject controls and review CLI | Implemented |
 | Approved files keep original path memory | `docweave.documents` stores original/current path; `docweave.file_history` stores before/after events | Implemented |
-| AWS powers the cloud path | CloudFormation template, Lambda API/worker, S3, SQS, API Gateway, CloudWatch, Bedrock | Implemented in source; updated worker requires redeploy for latest persistence path |
+| At least two CockroachDB tools are meaningfully used | `ccloud` CLI inspects the live `docweave-memory` cluster; CockroachDB Agent Skills repository reviewed schema and transaction design | Implemented; evidence in `docs/operations/hackathon-requirement-evidence.md` |
+| AWS powers the cloud path | CloudFormation template, Lambda API/worker, S3, SQS, API Gateway, CloudWatch, Bedrock | Implemented and deployed; live stack is `UPDATE_COMPLETE` |
 | AWS worker can persist to CockroachDB | Worker writes cloud classifications to `docweave.documents`, `agent_runs`, and `proposals` when `DOCWEAVE_DATABASE_URL` is configured | Implemented and deployed; live health shows CockroachDB secret missing, so cloud persistence remains blocked until the secret ARN is configured |
+| Repository includes open-source license | `LICENSE` contains the MIT license | Implemented |
+| Repository includes testing instructions | `docs/submission/testing-instructions.md` | Implemented |
 | No fake intelligence | Tests and code keep Bedrock/model path separate from deterministic validation; no canned success is used | Implemented |
 | Schema is simple enough for judging | One `docweave` schema with six tables and one migration | Implemented |
 
 ## Current Verification
 
 ```text
-ruff: passed on touched source and tests
-pytest: 34 local schema/runtime tests passed
-pytest: 18 cloud API/memory tests passed
-cloudformation validate-template: passed
+ruff: passed on full `src`, `services`, and `tests` tree
+pytest: 463 passed
+ccloud evidence: passed against live `docweave-memory` cluster
+cloudformation stack: `docweave-cloud-dev` is `UPDATE_COMPLETE`
 ```
 
 ## Remaining Release Gates
@@ -32,9 +35,10 @@ cloudformation validate-template: passed
 | Gate | Needed before final submission |
 | --- | --- |
 | Cloud CockroachDB proof | Configure `CockroachDbSecretArn`, run a live cloud analysis, and show rows in `docweave`. |
+| Public repository visibility | Make the GitHub repository public before Devpost submission if it is still private. |
+| Functional demo URL | Use the AWS health/demo endpoint for cloud access and the local desktop build for dashboard evaluation. |
 | Demo recording | Record the dashboard folder -> Analyze -> Approve -> CockroachDB path-history loop. |
 | Submission text | Lead with one focused workflow and the six-table memory evidence. |
-| License | Select and commit a competition-compatible open-source license before public release. |
 
 ## Explicit Non-Claims
 

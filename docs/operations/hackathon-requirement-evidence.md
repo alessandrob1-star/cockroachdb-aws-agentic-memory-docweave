@@ -76,6 +76,7 @@ Stack:
 ```text
 docweave-cloud-dev
 status: UPDATE_COMPLETE
+lambda artifact: lambda/docweave-cloud-api-6866f23e2332.zip
 ```
 
 Services used:
@@ -94,6 +95,18 @@ Observed endpoint:
 
 ```text
 https://76824l7ub1.execute-api.eu-central-1.amazonaws.com/dev
+```
+
+Observed `/health` capabilities after the 2026-08-08 deployment:
+
+```text
+health
+presigned_pdf_upload
+queued_analysis_request
+worker_s3_artifact_verification
+worker_bedrock_document_classification
+analysis_result_artifacts
+simple_cockroachdb_memory_persistence
 ```
 
 Current live health limitation:
