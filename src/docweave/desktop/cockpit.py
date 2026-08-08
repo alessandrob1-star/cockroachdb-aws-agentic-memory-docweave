@@ -74,6 +74,7 @@ from PySide6.QtWidgets import (
     QGraphicsScene,
     QGraphicsView,
     QHeaderView,
+    QHBoxLayout,
     QLabel,
     QMainWindow,
     QPushButton,
@@ -1178,6 +1179,11 @@ class PdfPageMock(QWidget):
 
 
 class CenterPreview(ShapeWidget):
+    review_approve_requested = Signal(int)
+    review_reject_requested = Signal(int)
+    review_preview_requested = Signal(int)
+    review_approve_all_requested = Signal()
+
     def paintEvent(self, event) -> None:
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing, True)
@@ -1248,7 +1254,11 @@ class CenterPreview(ShapeWidget):
         self.filename = QLabel("No document selected", self)
         self.filename.setObjectName("muted")
 
-        for label in (self.title, self.filename):
+        self.review_title = QLabel("BATCH REVIEW", self)
+        self.review_title.setObjectName("screenTitle")
+        self.review_title.hide()
+
+        for label in (self.title, self.filename, self.review_title):
             glow = QGraphicsDropShadowEffect(label)
             glow.setBlurRadius(14)
             glow.setOffset(0, 0)
@@ -1298,6 +1308,28 @@ class CenterPreview(ShapeWidget):
         self.memory_detail = QLabel("", self.memory_panel)
         self.memory_detail.setObjectName("muted")
         self.memory_detail.setWordWrap(True)
+
+        self.review_approve_all = QPushButton("APPROVE ALL", self)
+        self.review_approve_all.setObjectName("smallButton")
+        self.review_approve_all.hide()
+        self.review_approve_all.clicked.connect(self.review_approve_all_requested)
+
+        self.review_table = QTableWidget(0, 3, self)
+        self.review_table.setObjectName("reviewTable")
+        self.review_table.setHorizontalHeaderLabels(
+            ["ORIGINAL DIRECTORY / NAME", "PROPOSED DIRECTORY / NAME", ""]
+        )
+        self.review_table.verticalHeader().setVisible(False)
+        self.review_table.setShowGrid(False)
+        self.review_table.setSelectionMode(QTableWidget.SelectionMode.NoSelection)
+        self.review_table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
+        self.review_table.setFont(QFont("Segoe UI", 12, QFont.Weight.Medium))
+        review_header = self.review_table.horizontalHeader()
+        review_header.setFont(QFont("Segoe UI", 12, QFont.Weight.Bold))
+        review_header.setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
+        review_header.setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
+        review_header.setSectionResizeMode(2, QHeaderView.ResizeMode.Fixed)
+        self.review_table.hide()
 
         self._document = QPdfDocument(self)
         self.page = SecurePdfView(self)
@@ -1362,6 +1394,34 @@ class CenterPreview(ShapeWidget):
         self.zoom_in.clicked.connect(self.zoom_in_pdf)
         self.fit.clicked.connect(self.fit_pdf_width)
 
+    def _review_action_widget(self, row: int) -> QWidget:
+        box = QWidget(self.review_table)
+        layout = QHBoxLayout(box)
+        layout.setContentsMargins(4, 3, 4, 3)
+        layout.setSpacing(5)
+        approve = QPushButton("✓", box)
+        reject = QPushButton("×", box)
+        preview = QPushButton("PDF", box)
+        for button in (approve, reject, preview):
+            button.setObjectName("smallButton")
+            button.setFixedSize(42, 28)
+        approve.setToolTip("Approve this proposed rename.")
+        reject.setToolTip("Reject this proposed rename.")
+        preview.setToolTip("Open the PDF preview for this row.")
+        approve.clicked.connect(
+            lambda _checked=False, row=row: self.review_approve_requested.emit(row)
+        )
+        reject.clicked.connect(
+            lambda _checked=False, row=row: self.review_reject_requested.emit(row)
+        )
+        preview.clicked.connect(
+            lambda _checked=False, row=row: self.review_preview_requested.emit(row)
+        )
+        layout.addWidget(approve)
+        layout.addWidget(reject)
+        layout.addWidget(preview)
+        return box
+
     def shape_path(self) -> QPainterPath:
         r = self.rect().adjusted(3, 3, -3, -3)
         x, y, w, h = map(float, (r.x(), r.y(), r.width(), r.height()))
@@ -1393,6 +1453,10 @@ class CenterPreview(ShapeWidget):
         self.zoom_in.setGeometry(178, 72, 62, 30)
         self.fit.setGeometry(248, 72, 62, 30)
         self.counter.setGeometry(w - 98, 75, 70, 25)
+        self.review_title.setGeometry(28, 112, 210, 27)
+        self.review_approve_all.setGeometry(w - 148, 112, 120, 30)
+        self.review_table.setGeometry(18, 150, w - 36, h - 166)
+        self.review_table.setColumnWidth(2, 148)
 
         top = 112
         if self.analysis_panel.isVisible():
@@ -1416,6 +1480,17 @@ class CenterPreview(ShapeWidget):
         self._target_rect = QRect(rect)
 
     def open_document(self, path: Path) -> None:
+        self.review_title.hide()
+        self.review_approve_all.hide()
+        self.review_table.hide()
+        self.page.show()
+        self.title.show()
+        self.filename.show()
+        self.zoom_out.show()
+        self.zoom_value.show()
+        self.zoom_in.show()
+        self.fit.show()
+        self.counter.show()
         self.filename.setText(path.name)
         self.counter.setText("Loading")
         self._document.close()
@@ -1450,6 +1525,38 @@ class CenterPreview(ShapeWidget):
 
         self._geometry_animation.start()
         self.opacity_animation.start()
+
+    def show_review_table(self, rows: list[tuple[int, str, str]]) -> None:
+        """Replace the PDF preview with a batch decision table."""
+        self._document.close()
+        self.page.hide()
+        self.title.hide()
+        self.filename.hide()
+        self.zoom_out.hide()
+        self.zoom_value.hide()
+        self.zoom_in.hide()
+        self.fit.hide()
+        self.counter.hide()
+        self.analysis_panel.hide()
+        self.memory_panel.hide()
+        self.review_title.show()
+        self.review_approve_all.show()
+        self.review_table.show()
+        self.review_table.setRowCount(len(rows))
+        for table_row, (document_row, original, proposed) in enumerate(rows):
+            original_item = QTableWidgetItem(original)
+            proposed_item = QTableWidgetItem(proposed)
+            original_item.setToolTip(original)
+            proposed_item.setToolTip(proposed)
+            self.review_table.setItem(table_row, 0, original_item)
+            self.review_table.setItem(table_row, 1, proposed_item)
+            self.review_table.setCellWidget(
+                table_row,
+                2,
+                self._review_action_widget(document_row),
+            )
+            self.review_table.setRowHeight(table_row, 48)
+        self.resizeEvent(None)
 
     def show_classification_result(self, result: ClassificationCommandResult) -> None:
         """Surface validated model proposal details without replacing the preview."""
@@ -2259,15 +2366,19 @@ class CockpitWindow(QMainWindow):
         self.console.buttons[1].clicked.connect(self.start_scan)
         self.console.buttons[2].clicked.connect(self.cancel_scan)
         self.console.buttons[3].clicked.connect(self._analyze_selected_document)
-        self.console.buttons[4].clicked.connect(self._approve_selected_review)
+        self.console.buttons[4].clicked.connect(self._open_batch_review)
         self.console.buttons[5].clicked.connect(self._reject_selected_review)
+        self.center.review_approve_requested.connect(self._approve_review_row)
+        self.center.review_reject_requested.connect(self._reject_review_row)
+        self.center.review_preview_requested.connect(self._preview_review_row)
+        self.center.review_approve_all_requested.connect(self._approve_all_review_rows)
         self.console.buttons[3].setEnabled(False)
         self.console.buttons[3].setToolTip(
             "Run configured classification for ready PDFs."
         )
         self.console.buttons[4].setEnabled(False)
         self.console.buttons[4].setToolTip(
-            "Approve the selected review proposal without moving files."
+            "Open the batch review table for proposed renames."
         )
         self.console.buttons[5].setEnabled(False)
         self.console.buttons[5].setToolTip(
@@ -2413,6 +2524,33 @@ class CockpitWindow(QMainWindow):
                 font-size: 12px;
                 font-weight: 900;
                 padding: 4px;
+            }
+
+            QTableWidget#reviewTable {
+                background: rgba(4, 8, 8, 238);
+                border: 1px solid rgba(125, 240, 200, 120);
+                border-radius: 6px;
+                color: #F3FFF9;
+                gridline-color: rgba(103, 216, 176, 60);
+                alternate-background-color: rgba(22, 36, 32, 180);
+                font-size: 12px;
+                font-weight: 700;
+                outline: none;
+            }
+
+            QTableWidget#reviewTable::item {
+                border-bottom: 1px solid rgba(89, 198, 162, 30);
+                padding: 7px;
+            }
+
+            QTableWidget#reviewTable QHeaderView::section {
+                background: rgba(20, 26, 24, 240);
+                border: none;
+                border-bottom: 1px solid rgba(103, 216, 176, 125);
+                color: #67D8B0;
+                font-size: 12px;
+                font-weight: 900;
+                padding: 5px;
             }
 
             QPushButton {
@@ -3036,6 +3174,75 @@ class CockpitWindow(QMainWindow):
         self._record_selected_review_decision(ReviewDecisionAction.APPROVE)
 
     @Slot()
+    def _open_batch_review(self) -> None:
+        rows = self._batch_review_rows()
+        if not rows:
+            self._set_status("No review proposals are ready for batch approval.")
+            return
+        self.center.show_review_table(rows)
+        self._set_status(
+            f"Batch review ready: {len(rows)} proposed rename(s) awaiting decision."
+        )
+        self.right.set_events(
+            [
+                ("REVIEW", f"{len(rows)} pending proposals"),
+                ("ACTION", "Approve, reject, or preview per row"),
+                ("MEMORY", "Decisions remain append-only"),
+            ]
+        )
+
+    def _batch_review_rows(self) -> list[tuple[int, str, str]]:
+        rows: list[tuple[int, str, str]] = []
+        for row in range(self.left.document_count):
+            document = self.left.document_at(row)
+            if document is None or document.status != "REVIEW":
+                continue
+            original = _review_original_path_label(document.lineage_preview)
+            proposed = _review_proposed_path_label(document.lineage_preview)
+            if original == "Original path unavailable":
+                original = document.name
+            if proposed == "Proposed path unavailable":
+                proposed = document.proposed_destination or document.name
+            rows.append((row, original, proposed))
+        return rows
+
+    @Slot(int)
+    def _approve_review_row(self, row: int) -> None:
+        self._selected_document_row = row
+        self._record_selected_review_decision(ReviewDecisionAction.APPROVE)
+        self._open_batch_review()
+
+    @Slot(int)
+    def _reject_review_row(self, row: int) -> None:
+        self._selected_document_row = row
+        self._record_selected_review_decision(
+            ReviewDecisionAction.REJECT,
+            reason="Reviewer rejected the local proposal.",
+        )
+        self._open_batch_review()
+
+    @Slot(int)
+    def _preview_review_row(self, row: int) -> None:
+        self._open_document_row(row)
+
+    @Slot()
+    def _approve_all_review_rows(self) -> None:
+        rows = [row for row, _original, _proposed in self._batch_review_rows()]
+        if not rows:
+            self._set_status("No review proposals remain to approve.")
+            return
+        approved = 0
+        for row in rows:
+            document = self.left.document_at(row)
+            if document is None or document.status != "REVIEW":
+                continue
+            self._selected_document_row = row
+            self._record_selected_review_decision(ReviewDecisionAction.APPROVE)
+            approved += 1
+        self._open_batch_review()
+        self._set_status(f"Batch approval completed: {approved} proposal(s) approved.")
+
+    @Slot()
     def _reject_selected_review(self) -> None:
         self._record_selected_review_decision(
             ReviewDecisionAction.REJECT,
@@ -3229,7 +3436,10 @@ class CockpitWindow(QMainWindow):
         analysis_ready = (
             _classification_preflight_block(self._runtime_preflight_report) is None
         )
-        review_ready = self._selected_review_document() is not None and not blocked
+        batch_review_ready = self.left.count_status("REVIEW") > 0 and not blocked
+        selected_review_ready = (
+            self._selected_review_document() is not None and not blocked
+        )
         self.console.buttons[0].setEnabled(not blocked)
         self.console.buttons[1].setEnabled(
             not blocked and self.authorized_root is not None
@@ -3246,15 +3456,19 @@ class CockpitWindow(QMainWindow):
             self.console.buttons[3].setToolTip(
                 "Retry runtime preflight and analyze when configuration is ready."
             )
-        self.console.buttons[4].setEnabled(review_ready)
-        self.console.buttons[5].setEnabled(review_ready)
-        if review_ready:
-            self.console.buttons[4].setToolTip("Approve the selected AI proposal.")
-            self.console.buttons[5].setToolTip("Reject the selected AI proposal.")
+        self.console.buttons[4].setEnabled(batch_review_ready)
+        self.console.buttons[5].setEnabled(selected_review_ready)
+        if batch_review_ready:
+            self.console.buttons[4].setToolTip(
+                "Open the batch review table for all proposed renames."
+            )
         else:
             self.console.buttons[4].setToolTip(
-                "Select a document in REVIEW before approving."
+                "Analyze documents before opening batch review."
             )
+        if selected_review_ready:
+            self.console.buttons[5].setToolTip("Reject the selected AI proposal.")
+        else:
             self.console.buttons[5].setToolTip(
                 "Select a document in REVIEW before rejecting."
             )
@@ -3757,6 +3971,18 @@ def _original_path_label(preview: CockpitLineagePreview | None) -> str:
         f"{preview.original_directory}/{preview.original_filename}",
         maximum=76,
     )
+
+
+def _review_original_path_label(preview: CockpitLineagePreview | None) -> str:
+    if preview is None:
+        return "Original path unavailable"
+    return f"{preview.original_directory}\n{preview.original_filename}"
+
+
+def _review_proposed_path_label(preview: CockpitLineagePreview | None) -> str:
+    if preview is None:
+        return "Proposed path unavailable"
+    return f"{preview.next_directory}\n{preview.next_filename}"
 
 
 def _current_path_label(document: Document) -> str:

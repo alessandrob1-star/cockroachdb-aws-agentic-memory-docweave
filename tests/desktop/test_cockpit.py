@@ -866,6 +866,79 @@ def test_cockpit_records_local_rejection_without_file_mutation(
     close_cockpit_window(window)
 
 
+def test_cockpit_opens_batch_review_table_from_approve_button(
+    qt_application: object,
+) -> None:
+    corpus = Path("pdf_sintetici").resolve(strict=True)
+    first_pdf, second_pdf = sorted(corpus.glob("*.pdf"))[:2]
+    window = CockpitWindow(runtime_preflight_function=ready_runtime_preflight_report)
+    window.set_authorized_root(corpus)
+    window.left.set_documents(
+        [
+            Document(
+                name=first_pdf.name,
+                category="invoice",
+                pages="2",
+                status="REVIEW",
+                path=first_pdf,
+                proposed_destination="DocWeave Organized/Invoices/first.pdf",
+                proposal_fingerprint="a" * 64,
+                lineage_preview=CockpitLineagePreview(
+                    action="rename_and_move",
+                    original_relative_path=first_pdf.name,
+                    previous_relative_path=first_pdf.name,
+                    next_relative_path="DocWeave Organized/Invoices/first.pdf",
+                    original_directory="",
+                    original_filename=first_pdf.name,
+                    next_directory="DocWeave Organized/Invoices",
+                    next_filename="first.pdf",
+                    plan_fingerprint="b" * 64,
+                ),
+            ),
+            Document(
+                name=second_pdf.name,
+                category="supplier_receipt",
+                pages="1",
+                status="REVIEW",
+                path=second_pdf,
+                proposed_destination="DocWeave Organized/Receipts/second.pdf",
+                proposal_fingerprint="c" * 64,
+                lineage_preview=CockpitLineagePreview(
+                    action="rename_and_move",
+                    original_relative_path=second_pdf.name,
+                    previous_relative_path=second_pdf.name,
+                    next_relative_path="DocWeave Organized/Receipts/second.pdf",
+                    original_directory="",
+                    original_filename=second_pdf.name,
+                    next_directory="DocWeave Organized/Receipts",
+                    next_filename="second.pdf",
+                    plan_fingerprint="d" * 64,
+                ),
+            ),
+        ]
+    )
+
+    window._selected_document_row = 0
+    window._set_busy(False)
+    window.console.buttons[4].click()
+
+    assert window.center.page.isHidden()
+    assert not window.center.review_table.isHidden()
+    assert window.center.review_table.rowCount() == 2
+    assert window.center.review_table.columnCount() == 3
+    original_item = window.center.review_table.item(0, 0)
+    proposed_item = window.center.review_table.item(0, 1)
+    assert original_item is not None
+    assert proposed_item is not None
+    assert first_pdf.name in original_item.text()
+    assert "DocWeave Organized/Invoices" in proposed_item.text()
+    assert "first.pdf" in proposed_item.text()
+    assert window.center.review_table.cellWidget(0, 2) is not None
+    assert "Batch review ready: 2 proposed rename" in window.console.log_text.text()
+
+    close_cockpit_window(window)
+
+
 def test_cockpit_records_durable_review_decision_when_proposal_id_is_available(
     qt_application: object,
     tmp_path: Path,
