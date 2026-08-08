@@ -2165,15 +2165,18 @@ class ConsolePanel(ShapeWidget):
         text_h = int(h * 0.205)
 
         self.status_title.setGeometry(int(w * 0.17), title_y, 170, 22)
-        self.log_title.setGeometry(int(w * 0.39), title_y - int(h * 0.085), 170, 22)
+        log_title_y = title_y - int(h * 0.135)
+        log_text_y = text_y - int(h * 0.155)
+
+        self.log_title.setGeometry(int(w * 0.39), log_title_y, 170, 22)
         self.action_title.setGeometry(int(w * 0.715), title_y, 170, 22)
 
         self.status_text.setGeometry(int(w * 0.17), text_y, 270, text_h)
         self.log_text.setGeometry(
             int(w * 0.39),
-            text_y - int(h * 0.105),
+            log_text_y,
             450,
-            int(h * 0.17),
+            int(h * 0.215),
         )
         self.quick_text.setGeometry(int(w * 0.715), text_y, 250, text_h)
 
