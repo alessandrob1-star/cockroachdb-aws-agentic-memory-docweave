@@ -10,6 +10,12 @@ Cloud API health endpoint:
 https://76824l7ub1.execute-api.eu-central-1.amazonaws.com/dev/health
 ```
 
+Public repository:
+
+```text
+https://github.com/alessandrob1-star/cockroachdb-aws-agentic-memory-docweave
+```
+
 Repository pull request with the current submission branch:
 
 ```text

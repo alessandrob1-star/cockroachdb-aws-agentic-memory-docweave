@@ -35,7 +35,6 @@ cloudformation stack: `docweave-cloud-dev` is `UPDATE_COMPLETE`
 | Gate | Needed before final submission |
 | --- | --- |
 | Cloud CockroachDB proof | Configure `CockroachDbSecretArn`, run a live cloud analysis, and show rows in `docweave`. |
-| Public repository visibility | Make the GitHub repository public before Devpost submission if it is still private. |
 | Functional demo URL | Use the AWS health/demo endpoint for cloud access and the local desktop build for dashboard evaluation. |
 | Demo recording | Record the dashboard folder -> Analyze -> Approve -> CockroachDB path-history loop. |
 | Submission text | Lead with one focused workflow and the six-table memory evidence. |
