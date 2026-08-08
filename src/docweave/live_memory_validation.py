@@ -24,7 +24,7 @@ from docweave.application_runtime import (
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
 ALEMBIC_CONFIG_PATH = REPOSITORY_ROOT / "alembic.ini"
-EXPECTED_HEAD = "0006_readable_file_path_history_view"
+EXPECTED_HEAD = "0007_judged_memory_schema"
 REQUIRED_TABLES = frozenset(
     {
         "workspaces",
@@ -48,6 +48,16 @@ REQUIRED_TABLES = frozenset(
     }
 )
 REQUIRED_VIEWS = frozenset({"file_path_history"})
+REQUIRED_JUDGED_TABLES = frozenset(
+    {
+        "documents",
+        "agent_runs",
+        "proposals",
+        "human_decisions",
+        "file_history",
+        "document_relationships",
+    }
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -61,6 +71,8 @@ class OfflineMigrationEvidence:
     required_tables_total: int
     required_views_present: int
     required_views_total: int
+    required_judged_tables_present: int
+    required_judged_tables_total: int
     contains_transaction_boundary: bool
     contains_connection_secret_marker: bool
 
@@ -71,6 +83,9 @@ class OfflineMigrationEvidence:
             self.head_revision == EXPECTED_HEAD
             and self.required_tables_present == self.required_tables_total
             and self.required_views_present == self.required_views_total
+            and (
+                self.required_judged_tables_present == self.required_judged_tables_total
+            )
             and not self.contains_transaction_boundary
             and not self.contains_connection_secret_marker
         )
@@ -87,6 +102,9 @@ class LiveSchemaEvidence:
     required_views_present: int
     required_views_total: int
     missing_views: tuple[str, ...]
+    required_judged_tables_present: int
+    required_judged_tables_total: int
+    missing_judged_tables: tuple[str, ...]
 
     @property
     def succeeded(self) -> bool:
@@ -95,8 +113,12 @@ class LiveSchemaEvidence:
             self.alembic_revision == EXPECTED_HEAD
             and not self.missing_tables
             and not self.missing_views
+            and not self.missing_judged_tables
             and self.required_tables_present == self.required_tables_total
             and self.required_views_present == self.required_views_total
+            and (
+                self.required_judged_tables_present == self.required_judged_tables_total
+            )
         )
 
 
@@ -120,6 +142,11 @@ def collect_offline_evidence() -> OfflineMigrationEvidence:
         for view_name in REQUIRED_VIEWS
         if f"CREATE VIEW docweave.{view_name}" in sql
     }
+    present_judged_tables = {
+        table_name
+        for table_name in REQUIRED_JUDGED_TABLES
+        if f"CREATE TABLE docweave_judged.{table_name}" in sql
+    }
     script = ScriptDirectory.from_config(alembic_config())
     heads = script.get_heads()
     head_revision = heads[0] if len(heads) == 1 else ",".join(heads)
@@ -132,6 +159,8 @@ def collect_offline_evidence() -> OfflineMigrationEvidence:
         required_tables_total=len(REQUIRED_TABLES),
         required_views_present=len(present_views),
         required_views_total=len(REQUIRED_VIEWS),
+        required_judged_tables_present=len(present_judged_tables),
+        required_judged_tables_total=len(REQUIRED_JUDGED_TABLES),
         contains_transaction_boundary=("begin;" in lowered or "commit;" in lowered),
         contains_connection_secret_marker=(
             DOCWEAVE_DATABASE_URL.casefold() in lowered
@@ -165,10 +194,15 @@ def collect_live_schema_evidence_from_engine(engine: Engine) -> LiveSchemaEviden
             existing_tables = _table_names(rows)
             view_rows = connection.execute(text(_DOCWEAVE_VIEWS_SQL))
             existing_views = _table_names(view_rows)
+            judged_rows = connection.execute(text(_JUDGED_TABLES_SQL))
+            existing_judged_tables = _table_names(judged_rows)
     except SQLAlchemyError as error:
         raise RuntimeError("live CockroachDB schema inspection failed") from error
     missing = tuple(sorted(REQUIRED_TABLES - existing_tables))
     missing_views = tuple(sorted(REQUIRED_VIEWS - existing_views))
+    missing_judged_tables = tuple(
+        sorted(REQUIRED_JUDGED_TABLES - existing_judged_tables)
+    )
     return LiveSchemaEvidence(
         alembic_revision=revision if isinstance(revision, str) else None,
         required_tables_present=len(REQUIRED_TABLES) - len(missing),
@@ -177,6 +211,11 @@ def collect_live_schema_evidence_from_engine(engine: Engine) -> LiveSchemaEviden
         required_views_present=len(REQUIRED_VIEWS) - len(missing_views),
         required_views_total=len(REQUIRED_VIEWS),
         missing_views=missing_views,
+        required_judged_tables_present=(
+            len(REQUIRED_JUDGED_TABLES) - len(missing_judged_tables)
+        ),
+        required_judged_tables_total=len(REQUIRED_JUDGED_TABLES),
+        missing_judged_tables=missing_judged_tables,
     )
 
 
@@ -254,6 +293,11 @@ def _print_offline_evidence(evidence: OfflineMigrationEvidence) -> None:
         f"{evidence.required_views_present}/{evidence.required_views_total}"
     )
     print(
+        "offline_required_judged_tables: "
+        f"{evidence.required_judged_tables_present}/"
+        f"{evidence.required_judged_tables_total}"
+    )
+    print(
         "offline_transaction_boundary: "
         f"{'present' if evidence.contains_transaction_boundary else 'absent'}"
     )
@@ -274,6 +318,11 @@ def _print_live_evidence(evidence: LiveSchemaEvidence) -> None:
         "live_required_views: "
         f"{evidence.required_views_present}/{evidence.required_views_total}"
     )
+    print(
+        "live_required_judged_tables: "
+        f"{evidence.required_judged_tables_present}/"
+        f"{evidence.required_judged_tables_total}"
+    )
     if evidence.missing_tables:
         print(f"live_missing_tables: {','.join(evidence.missing_tables)}")
     else:
@@ -282,6 +331,10 @@ def _print_live_evidence(evidence: LiveSchemaEvidence) -> None:
         print(f"live_missing_views: {','.join(evidence.missing_views)}")
     else:
         print("live_missing_views: none")
+    if evidence.missing_judged_tables:
+        print(f"live_missing_judged_tables: {','.join(evidence.missing_judged_tables)}")
+    else:
+        print("live_missing_judged_tables: none")
 
 
 def _table_names(rows: Any) -> set[str]:
@@ -311,6 +364,13 @@ SELECT table_name
 FROM information_schema.tables
 WHERE table_schema = 'docweave'
   AND table_type = 'VIEW'
+"""
+
+_JUDGED_TABLES_SQL = """
+SELECT table_name
+FROM information_schema.tables
+WHERE table_schema = 'docweave_judged'
+  AND table_type = 'BASE TABLE'
 """
 
 

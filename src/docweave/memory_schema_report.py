@@ -31,6 +31,7 @@ class MemoryForeignKeySchema:
     """One sanitized foreign-key edge."""
 
     column_name: str
+    foreign_table_schema: str
     foreign_table_name: str
     foreign_column_name: str
     constraint_name: str
@@ -40,6 +41,7 @@ class MemoryForeignKeySchema:
 class MemoryTableSchema:
     """One DocWeave memory table and its relational shape."""
 
+    schema_name: str
     table_name: str
     object_type: str
     columns: tuple[MemoryColumnSchema, ...]
@@ -70,9 +72,13 @@ def collect_memory_schema_from_engine(engine: Engine) -> MemorySchemaReport:
                 text(_ALEMBIC_REVISION_SQL)
             ).scalar_one_or_none()
             objects = tuple(
-                (str(row[0]), _normalize_object_type(str(row[1])))
+                (str(row[0]), str(row[1]), _normalize_object_type(str(row[2])))
                 for row in connection.execute(text(_TABLES_SQL))
-                if isinstance(row[0], str) and isinstance(row[1], str)
+                if (
+                    isinstance(row[0], str)
+                    and isinstance(row[1], str)
+                    and isinstance(row[2], str)
+                )
             )
             columns = _group_columns(connection.execute(text(_COLUMNS_SQL)))
             primary_keys = _group_primary_keys(
@@ -86,13 +92,14 @@ def collect_memory_schema_from_engine(engine: Engine) -> MemorySchemaReport:
 
     tables = tuple(
         MemoryTableSchema(
+            schema_name=schema_name,
             table_name=table_name,
             object_type=object_type,
-            columns=columns.get(table_name, ()),
-            primary_key_columns=primary_keys.get(table_name, ()),
-            foreign_keys=foreign_keys.get(table_name, ()),
+            columns=columns.get((schema_name, table_name), ()),
+            primary_key_columns=primary_keys.get((schema_name, table_name), ()),
+            foreign_keys=foreign_keys.get((schema_name, table_name), ()),
         )
-        for table_name, object_type in objects
+        for schema_name, table_name, object_type in objects
     )
     return MemorySchemaReport(
         alembic_revision=revision if isinstance(revision, str) else None,
@@ -138,70 +145,87 @@ def main(argv: list[str] | None = None) -> int:
     return 0
 
 
-def _group_columns(rows: Any) -> dict[str, tuple[MemoryColumnSchema, ...]]:
-    grouped: dict[str, list[MemoryColumnSchema]] = {}
+def _group_columns(rows: Any) -> dict[tuple[str, str], tuple[MemoryColumnSchema, ...]]:
+    grouped: dict[tuple[str, str], list[MemoryColumnSchema]] = {}
     for row in rows:
-        table_name, column_name, data_type, is_nullable = row[:4]
+        schema_name, table_name, column_name, data_type, is_nullable = row[:5]
         if not all(
             isinstance(value, str)
-            for value in (table_name, column_name, data_type, is_nullable)
+            for value in (
+                schema_name,
+                table_name,
+                column_name,
+                data_type,
+                is_nullable,
+            )
         ):
             continue
-        grouped.setdefault(table_name, []).append(
+        grouped.setdefault((schema_name, table_name), []).append(
             MemoryColumnSchema(
                 name=column_name,
                 data_type=data_type,
                 nullable=is_nullable.upper() == "YES",
             )
         )
-    return {table_name: tuple(columns) for table_name, columns in grouped.items()}
+    return {table: tuple(columns) for table, columns in grouped.items()}
 
 
-def _group_primary_keys(rows: Any) -> dict[str, tuple[str, ...]]:
-    grouped: dict[str, list[tuple[int, str]]] = {}
+def _group_primary_keys(rows: Any) -> dict[tuple[str, str], tuple[str, ...]]:
+    grouped: dict[tuple[str, str], list[tuple[int, str]]] = {}
     for row in rows:
-        table_name, column_name, ordinal_position = row[:3]
-        if not isinstance(table_name, str) or not isinstance(column_name, str):
+        schema_name, table_name, column_name, ordinal_position = row[:4]
+        if not all(
+            isinstance(value, str) for value in (schema_name, table_name, column_name)
+        ):
             continue
-        grouped.setdefault(table_name, []).append((int(ordinal_position), column_name))
+        grouped.setdefault((schema_name, table_name), []).append(
+            (int(ordinal_position), column_name)
+        )
     return {
-        table_name: tuple(column for _, column in sorted(columns))
-        for table_name, columns in grouped.items()
+        table: tuple(column for _, column in sorted(columns))
+        for table, columns in grouped.items()
     }
 
 
-def _group_foreign_keys(rows: Any) -> dict[str, tuple[MemoryForeignKeySchema, ...]]:
-    grouped: dict[str, list[MemoryForeignKeySchema]] = {}
+def _group_foreign_keys(
+    rows: Any,
+) -> dict[tuple[str, str], tuple[MemoryForeignKeySchema, ...]]:
+    grouped: dict[tuple[str, str], list[MemoryForeignKeySchema]] = {}
     for row in rows:
         (
+            schema_name,
             table_name,
             column_name,
+            foreign_table_schema,
             foreign_table_name,
             foreign_column_name,
             constraint_name,
-        ) = row[:5]
+        ) = row[:7]
         if not all(
             isinstance(value, str)
             for value in (
+                schema_name,
                 table_name,
                 column_name,
+                foreign_table_schema,
                 foreign_table_name,
                 foreign_column_name,
                 constraint_name,
             )
         ):
             continue
-        grouped.setdefault(table_name, []).append(
+        grouped.setdefault((schema_name, table_name), []).append(
             MemoryForeignKeySchema(
                 column_name=column_name,
+                foreign_table_schema=foreign_table_schema,
                 foreign_table_name=foreign_table_name,
                 foreign_column_name=foreign_column_name,
                 constraint_name=constraint_name,
             )
         )
     return {
-        table_name: tuple(sorted(keys, key=lambda key: key.constraint_name))
-        for table_name, keys in grouped.items()
+        table: tuple(sorted(keys, key=lambda key: key.constraint_name))
+        for table, keys in grouped.items()
     }
 
 
@@ -214,7 +238,7 @@ def _print_object_explorer_report(report: MemorySchemaReport) -> None:
     print("DocWeave CockroachDB Object Explorer")
     print(f"Revision: {report.alembic_revision or 'missing'}")
     print("Database: docweave")
-    print("Schema: docweave")
+    print("Schemas: docweave_judged, docweave")
     table_count = sum(1 for table in report.tables if table.object_type == "table")
     view_count = sum(1 for table in report.tables if table.object_type == "view")
     print(f"Tables: {table_count}")
@@ -222,7 +246,7 @@ def _print_object_explorer_report(report: MemorySchemaReport) -> None:
     for table in report.tables:
         primary_key_columns = set(table.primary_key_columns)
         print("")
-        print(f"[{table.object_type}] docweave.{table.table_name}")
+        print(f"[{table.object_type}] {table.schema_name}.{table.table_name}")
         primary_key = ", ".join(table.primary_key_columns) or "none"
         print(f"  [primary key] {primary_key}")
         print("  [columns]")
@@ -236,7 +260,8 @@ def _print_object_explorer_report(report: MemorySchemaReport) -> None:
                 print(
                     "    - "
                     f"{foreign_key.column_name} -> "
-                    f"docweave.{foreign_key.foreign_table_name}."
+                    f"{foreign_key.foreign_table_schema}."
+                    f"{foreign_key.foreign_table_name}."
                     f"{foreign_key.foreign_column_name} "
                     f"({foreign_key.constraint_name})"
                 )
@@ -252,7 +277,7 @@ def _print_flat_text_report(report: MemorySchemaReport) -> None:
     print(f"memory_schema_views: {view_count}")
     for table in report.tables:
         primary_key = ", ".join(table.primary_key_columns) or "none"
-        print(f"{table.object_type} docweave.{table.table_name}")
+        print(f"{table.object_type} {table.schema_name}.{table.table_name}")
         print(f"  primary_key: {primary_key}")
         print("  columns:")
         for column in table.columns:
@@ -264,7 +289,8 @@ def _print_flat_text_report(report: MemorySchemaReport) -> None:
                 print(
                     "    - "
                     f"{foreign_key.column_name} -> "
-                    f"docweave.{foreign_key.foreign_table_name}."
+                    f"{foreign_key.foreign_table_schema}."
+                    f"{foreign_key.foreign_table_name}."
                     f"{foreign_key.foreign_column_name} "
                     f"({foreign_key.constraint_name})"
                 )
@@ -278,6 +304,7 @@ def _report_json(report: MemorySchemaReport) -> dict[str, object]:
         "tables": [
             {
                 "table_name": table.table_name,
+                "schema_name": table.schema_name,
                 "object_type": table.object_type,
                 "primary_key_columns": list(table.primary_key_columns),
                 "columns": [
@@ -291,6 +318,7 @@ def _report_json(report: MemorySchemaReport) -> dict[str, object]:
                 "foreign_keys": [
                     {
                         "column_name": foreign_key.column_name,
+                        "foreign_table_schema": foreign_key.foreign_table_schema,
                         "foreign_table_name": foreign_key.foreign_table_name,
                         "foreign_column_name": foreign_key.foreign_column_name,
                         "constraint_name": foreign_key.constraint_name,
@@ -310,35 +338,39 @@ LIMIT 1
 """
 
 _TABLES_SQL = """
-SELECT table_name, table_type
+SELECT table_schema, table_name, table_type
 FROM information_schema.tables
-WHERE table_schema = 'docweave'
-ORDER BY table_name
+WHERE table_schema IN ('docweave_judged', 'docweave')
+ORDER BY
+    CASE table_schema WHEN 'docweave_judged' THEN 0 ELSE 1 END,
+    table_name
 """
 
 _COLUMNS_SQL = """
-SELECT table_name, column_name, data_type, is_nullable
+SELECT table_schema, table_name, column_name, data_type, is_nullable
 FROM information_schema.columns
-WHERE table_schema = 'docweave'
-ORDER BY table_name, ordinal_position
+WHERE table_schema IN ('docweave_judged', 'docweave')
+ORDER BY table_schema, table_name, ordinal_position
 """
 
 _PRIMARY_KEYS_SQL = """
-SELECT kcu.table_name, kcu.column_name, kcu.ordinal_position
+SELECT kcu.table_schema, kcu.table_name, kcu.column_name, kcu.ordinal_position
 FROM information_schema.table_constraints AS tc
 JOIN information_schema.key_column_usage AS kcu
     ON tc.constraint_name = kcu.constraint_name
     AND tc.table_schema = kcu.table_schema
     AND tc.table_name = kcu.table_name
 WHERE tc.constraint_type = 'PRIMARY KEY'
-    AND tc.table_schema = 'docweave'
-ORDER BY kcu.table_name, kcu.ordinal_position
+    AND tc.table_schema IN ('docweave_judged', 'docweave')
+ORDER BY kcu.table_schema, kcu.table_name, kcu.ordinal_position
 """
 
 _FOREIGN_KEYS_SQL = """
 SELECT
+    tc.table_schema,
     tc.table_name,
     kcu.column_name,
+    ccu.table_schema AS foreign_table_schema,
     ccu.table_name AS foreign_table_name,
     ccu.column_name AS foreign_column_name,
     tc.constraint_name
@@ -351,8 +383,8 @@ JOIN information_schema.constraint_column_usage AS ccu
     ON ccu.constraint_name = tc.constraint_name
     AND ccu.table_schema = tc.table_schema
 WHERE tc.constraint_type = 'FOREIGN KEY'
-    AND tc.table_schema = 'docweave'
-ORDER BY tc.table_name, tc.constraint_name, kcu.ordinal_position
+    AND tc.table_schema IN ('docweave_judged', 'docweave')
+ORDER BY tc.table_schema, tc.table_name, tc.constraint_name, kcu.ordinal_position
 """
 
 

@@ -434,6 +434,26 @@ of hidden model reasoning.
 
 ## 8. Review, operations, preferences, and audit
 
+### 8.0 Judged hackathon memory schema
+
+The judge-facing schema is `docweave_judged`. It is intentionally smaller than
+the internal technical schema so the CockroachDB memory story can be understood
+quickly during judging:
+
+| Table | Purpose |
+| --- | --- |
+| `documents` | Discovered PDF identity with original and current directory and filename. |
+| `agent_runs` | Amazon Bedrock analysis attempt, model, task, status, output JSON, and summary. |
+| `proposals` | AI-proposed category, destination folder, filename, confidence, and evidence summary. |
+| `human_decisions` | Human approve, reject, or request-change decision. |
+| `file_history` | Before-and-after path memory for scan, proposal, approval, rename, move, restore, or blocked events. |
+| `document_relationships` | AI-suggested links such as purchase order to invoice or invoice to payment. |
+
+This schema is the primary hackathon demonstration surface. The broader
+`docweave` schema remains available as internal implementation scaffolding, but
+the judged workflow should first prove the simple loop from document discovery
+to agent proposal, human decision, and file history.
+
 ### 8.1 `review_decisions`
 
 An append-only decision references one proposal and one authorized human actor.

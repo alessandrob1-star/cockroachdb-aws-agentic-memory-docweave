@@ -174,6 +174,7 @@ def _database_checks(engine: Engine) -> tuple[PreflightCheck, ...]:
             connection.execute(text("SELECT 1"))
             existing_tables = _docweave_tables(connection)
             existing_views = _docweave_views(connection)
+            judged_tables = _judged_tables(connection)
     except SQLAlchemyError:
         return (
             PreflightCheck(
@@ -199,13 +200,24 @@ def _database_checks(engine: Engine) -> tuple[PreflightCheck, ...]:
     }
     missing = sorted(required_tables - existing_tables)
     missing_views = sorted({"file_path_history"} - existing_views)
+    required_judged_tables = {
+        "documents",
+        "agent_runs",
+        "proposals",
+        "human_decisions",
+        "file_history",
+        "document_relationships",
+    }
+    missing_judged = sorted(required_judged_tables - judged_tables)
     checks = [PreflightCheck("cockroachdb_connection", PreflightState.OK, "reachable")]
-    if missing or missing_views:
+    if missing or missing_views or missing_judged:
         missing_parts = []
         if missing:
             missing_parts.append(f"tables:{','.join(missing)}")
         if missing_views:
             missing_parts.append(f"views:{','.join(missing_views)}")
+        if missing_judged:
+            missing_parts.append(f"judged:{','.join(missing_judged)}")
         checks.append(
             PreflightCheck(
                 "docweave_schema",
@@ -311,6 +323,25 @@ def _docweave_views(connection: Connection) -> set[str]:
         if isinstance(value, str):
             view_names.add(value)
     return view_names
+
+
+def _judged_tables(connection: Connection) -> set[str]:
+    rows = connection.execute(
+        text(
+            """
+            SELECT table_name
+            FROM information_schema.tables
+            WHERE table_schema = 'docweave_judged'
+              AND table_type = 'BASE TABLE'
+            """
+        )
+    )
+    table_names: set[str] = set()
+    for row in rows:
+        value: Any = row[0]
+        if isinstance(value, str):
+            table_names.add(value)
+    return table_names
 
 
 if __name__ == "__main__":
