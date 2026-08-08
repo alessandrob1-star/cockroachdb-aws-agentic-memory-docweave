@@ -331,11 +331,28 @@ processing-batch limit.
 
 ## CockroachDB schema map
 
-DocWeave stores the currently implemented memory tables in the `docweave`
-database under the `docweave` SQL schema. In CockroachDB Cloud, tables may not
-appear if the console is focused on `defaultdb`, `public`, or only the query
-builder output. Select the `docweave` database and inspect the `docweave`
-schema, or run the schema-qualified inspection commands below.
+DocWeave now exposes a judged hackathon memory schema under
+`docweave_judged`. This is the schema to show first in CockroachDB Cloud and in
+the demo video. It deliberately uses a small set of obvious tables that map
+directly to the product loop:
+
+```text
+PDF scan -> Bedrock agent run -> proposal -> human decision -> file history
+```
+
+Judged schema:
+
+| Table | What a judge should see |
+| --- | --- |
+| `docweave_judged.documents` | One row per discovered PDF, with original and current directory and filename. |
+| `docweave_judged.agent_runs` | One row per Amazon Bedrock analysis attempt, with model, task, status, input hash, output JSON, and summary. |
+| `docweave_judged.proposals` | The AI-proposed category, destination folder, filename, confidence, and evidence summary. |
+| `docweave_judged.human_decisions` | The human approve, reject, or request-change decision for a proposal. |
+| `docweave_judged.file_history` | The required before-and-after path memory: previous directory/name, next directory/name, operation, status, and time. |
+| `docweave_judged.document_relationships` | AI-suggested links such as purchase order to invoice or invoice to payment. |
+
+The older `docweave` schema remains an internal technical schema while the
+submission is being rescued. It is not the first judge-facing memory story.
 
 For the clearest project-owned view, run:
 
@@ -347,7 +364,7 @@ Expected shape:
 
 ```text
 DocWeave CockroachDB Object Explorer
-Revision: 0006_readable_file_path_history_view
+Revision: 0007_judged_memory_schema
 Database: docweave
 Schema: docweave
 Tables: ...
@@ -375,36 +392,38 @@ Views: ...
 SHOW DATABASES;
 USE docweave;
 SHOW SCHEMAS;
+SHOW TABLES FROM docweave_judged;
+SHOW COLUMNS FROM docweave_judged.documents;
+SHOW COLUMNS FROM docweave_judged.file_history;
 SHOW TABLES FROM docweave;
 SHOW COLUMNS FROM docweave.file_path_history;
 SHOW COLUMNS FROM docweave.documents;
 SHOW CONSTRAINTS FROM docweave.documents;
 ```
 
-For the specific path-memory requirement, inspect the readable view directly:
+For the specific path-memory requirement, inspect the judged table directly:
 
 ```sql
 SELECT
-    logical_document_key,
-    lineage_sequence,
-    action,
+    d.original_directory,
+    d.original_filename,
+    h.event_sequence,
+    h.operation,
     status,
-    original_directory,
-    original_filename,
-    previous_directory,
-    previous_filename,
-    next_directory,
-    next_filename,
-    occurred_at
-FROM docweave.file_path_history
-ORDER BY logical_document_key, lineage_sequence;
+    h.previous_directory,
+    h.previous_filename,
+    h.next_directory,
+    h.next_filename,
+    h.occurred_at
+FROM docweave_judged.file_history AS h
+JOIN docweave_judged.documents AS d
+    ON d.document_id = h.document_id
+ORDER BY d.original_filename, h.event_sequence;
 ```
 
-`docweave.file_path_history` is intentionally a view over
-`docweave.file_lineage_events`, not a second writable table. The append-only
-table remains the source of truth; the view exists so a human reviewer can see
-the path history in CockroachDB Cloud without decoding the full technical audit
-shape.
+This query is the core CockroachDB memory demo: it shows what the file was
+called, where it was, what the agent proposed or the human approved, and what
+the next directory and filename became.
 
 The same table inventory can be checked through `information_schema`:
 
@@ -438,8 +457,8 @@ WHERE tc.constraint_type = 'FOREIGN KEY'
 ORDER BY tc.table_name, kcu.ordinal_position;
 ```
 
-The implemented physical schema, as of Alembic revision
-`0006_readable_file_path_history_view`, is:
+The broader internal technical schema, as of Alembic revision
+`0007_judged_memory_schema`, is:
 
 ```mermaid
 erDiagram
