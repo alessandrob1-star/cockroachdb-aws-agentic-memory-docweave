@@ -482,7 +482,28 @@ The table does not overwrite the active file instance. It is a chronological
 memory trail that lets the application explain how a document moved from its
 original location to every later approved or blocked state.
 
-### 8.5 `cloud_analysis_jobs` and `cloud_analysis_objects`
+### 8.5 `file_path_history`
+
+`file_path_history` is a read-only CockroachDB view over
+`file_lineage_events`. It exists to make the path-memory requirement directly
+inspectable in CockroachDB Cloud without requiring a reviewer to decode every
+technical audit column.
+
+The view exposes the columns a human expects first:
+
+- logical document key and lineage sequence;
+- action, status, and occurrence time;
+- original directory and filename;
+- previous directory and filename;
+- next directory and filename;
+- original, previous, and next relative paths; and
+- optional operation, file-operation, proposal, and lineage event identifiers.
+
+The view is not a second source of truth and is not writable by DocWeave. The
+append-only table remains authoritative so every rename, move, copy, blocked
+attempt, and restore transition can be replayed without overwriting history.
+
+### 8.6 `cloud_analysis_jobs` and `cloud_analysis_objects`
 
 Cloud analysis memory records the AWS worker observation layer before final
 canonical promotion. `cloud_analysis_jobs` stores one workspace-scoped worker
@@ -501,7 +522,7 @@ the cloud worker prove that Bedrock analysis happened and that CockroachDB
 remembered the observation, while later review and promotion workflows can
 decide what becomes authoritative.
 
-### 8.6 `preference_rules`
+### 8.7 `preference_rules`
 
 Controlled preference memory includes scope, version, rule type, structured
 condition, structured outcome, provenance decisions, confidence, status,
@@ -511,7 +532,7 @@ Preference conditions and outcomes may use validated `JSONB` because their
 shape is versioned and rule-specific. Their authority, scope, status, and
 provenance remain typed relational columns.
 
-### 8.7 `audit_events`
+### 8.8 `audit_events`
 
 Append-only material events contain:
 
@@ -546,6 +567,7 @@ Only indexes required by approved workflows enter the first migration:
 | `agent_runs` | Workflow trace, document trace, and cost reporting |
 | `file_operations` | Idempotency, executable state, and reconciliation queue |
 | `file_lineage_events` | Per-document path history and current-path lookup |
+| `file_path_history` | Human-readable path-history inspection view |
 | `cloud_analysis_jobs` | Cloud worker status and result-artifact lookup |
 | `cloud_analysis_objects` | Per-object cloud analysis observation and class lookup |
 | `preference_rules` | Active rules by workspace and scope |

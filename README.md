@@ -131,16 +131,19 @@ transaction.
 
 A fourth non-vector CockroachDB migration now defines append-only
 `file_lineage_events` memory for original, previous, and next directory and
-filename state. A typed repository persists one lineage row atomically and
-idempotently with optional proposal, operation batch, and file-operation
-references. The `docweave-file-lineage` command composes the same configured
-runtime and can record or list lineage rows against a migrated CockroachDB
-target without exposing connection values. The cockpit now retains the
+filename state. A readable `file_path_history` CockroachDB view exposes the
+same append-only rows with the exact original, previous, and next directory and
+filename columns needed for console inspection and demo evidence. A typed
+repository persists one lineage row atomically and idempotently with optional
+proposal, operation batch, and file-operation references. The
+`docweave-file-lineage` command composes the same configured runtime and can
+record or list lineage rows against a migrated CockroachDB target without
+exposing connection values. The cockpit now retains the
 operation-preview lineage state for each reviewed proposal, including
 original, previous, and next relative paths plus the plan fingerprint, and
 surfaces that memory preview when the reviewer selects a proposal. This is
 offline schema, adapter, command, and cockpit-preview evidence only: the
-migration has not yet been applied to the live CockroachDB cluster, and
+lineage write path is not yet exercised by a full live UI execution flow, and
 cockpit approval or execution is not yet wired to persist lineage rows
 automatically.
 
@@ -344,10 +347,11 @@ Expected shape:
 
 ```text
 DocWeave CockroachDB Object Explorer
-Revision: 0005_cloud_analysis_memory
+Revision: 0006_readable_file_path_history_view
 Database: docweave
 Schema: docweave
 Tables: ...
+Views: ...
 
 [table] docweave.documents
   [primary key] document_id
@@ -355,6 +359,16 @@ Tables: ...
     - document_id: UUID NOT NULL PK
   [foreign keys]
     - ...
+
+[view] docweave.file_path_history
+  [primary key] none
+  [columns]
+    - original_directory: STRING NULL
+    - original_filename: STRING NULL
+    - previous_directory: STRING NULL
+    - previous_filename: STRING NULL
+    - next_directory: STRING NULL
+    - next_filename: STRING NULL
 ```
 
 ```sql
@@ -362,14 +376,40 @@ SHOW DATABASES;
 USE docweave;
 SHOW SCHEMAS;
 SHOW TABLES FROM docweave;
+SHOW COLUMNS FROM docweave.file_path_history;
 SHOW COLUMNS FROM docweave.documents;
 SHOW CONSTRAINTS FROM docweave.documents;
 ```
 
+For the specific path-memory requirement, inspect the readable view directly:
+
+```sql
+SELECT
+    logical_document_key,
+    lineage_sequence,
+    action,
+    status,
+    original_directory,
+    original_filename,
+    previous_directory,
+    previous_filename,
+    next_directory,
+    next_filename,
+    occurred_at
+FROM docweave.file_path_history
+ORDER BY logical_document_key, lineage_sequence;
+```
+
+`docweave.file_path_history` is intentionally a view over
+`docweave.file_lineage_events`, not a second writable table. The append-only
+table remains the source of truth; the view exists so a human reviewer can see
+the path history in CockroachDB Cloud without decoding the full technical audit
+shape.
+
 The same table inventory can be checked through `information_schema`:
 
 ```sql
-SELECT table_schema, table_name
+SELECT table_schema, table_name, table_type
 FROM information_schema.tables
 WHERE table_schema = 'docweave'
 ORDER BY table_name;
@@ -399,7 +439,7 @@ ORDER BY tc.table_name, kcu.ordinal_position;
 ```
 
 The implemented physical schema, as of Alembic revision
-`0005_cloud_analysis_memory`, is:
+`0006_readable_file_path_history_view`, is:
 
 ```mermaid
 erDiagram
@@ -470,6 +510,7 @@ Implemented tables and their main relational role:
 | `docweave.proposal_evidence` | `proposal_evidence_id` | `(workspace_id, proposal_id)` to `proposals` | Minimized evidence excerpts and validation evidence for a proposal. |
 | `docweave.review_decisions` | `review_decision_id` | `(workspace_id, proposal_id)` to `proposals`, `reviewer_actor_id` to `actors` | Append-only human approve, reject, request-change, or escalation decision. |
 | `docweave.file_lineage_events` | `file_lineage_event_id` | `workspace_id` to `workspaces`, batch and file-operation IDs to operation tables, `proposal_id` to `proposals` | Append-only original, previous, and next directory and filename memory. |
+| `docweave.file_path_history` | none; read-only view | Reads from `file_lineage_events` | Human-readable path-history view for CockroachDB Console inspection with original, previous, and next directory and filename columns. |
 | `docweave.cloud_analysis_jobs` | `cloud_analysis_job_id` | `workspace_id` to `workspaces` | AWS worker job memory for cloud analysis status and result-artifact location. |
 | `docweave.cloud_analysis_objects` | `cloud_analysis_object_id` | `(workspace_id, cloud_analysis_job_id)` to `cloud_analysis_jobs` | Per-S3-object cloud analysis observations with content hash, byte size, Bedrock model, proposed class, validated proposal JSON, and usage JSON. |
 

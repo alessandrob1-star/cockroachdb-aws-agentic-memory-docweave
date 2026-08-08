@@ -31,8 +31,9 @@ class FakeRow:
 
 
 class FakeConnection:
-    def __init__(self, tables: set[str]) -> None:
+    def __init__(self, tables: set[str], views: set[str]) -> None:
         self._tables = tables
+        self._views = views
         self.queries: list[str] = []
 
     def __enter__(self) -> "FakeConnection":
@@ -46,12 +47,17 @@ class FakeConnection:
         self.queries.append(raw_statement)
         if "information_schema.tables" not in raw_statement:
             return ()
+        if "table_type = 'VIEW'" in raw_statement:
+            return tuple(FakeRow(view) for view in sorted(self._views))
         return tuple(FakeRow(table) for table in sorted(self._tables))
 
 
 class FakeEngine:
-    def __init__(self, tables: set[str]) -> None:
-        self.connection = FakeConnection(tables)
+    def __init__(self, tables: set[str], views: set[str] | None = None) -> None:
+        self.connection = FakeConnection(
+            tables,
+            {"file_path_history"} if views is None else views,
+        )
 
     def connect(self) -> FakeConnection:
         return self.connection
@@ -66,8 +72,8 @@ def _config() -> RuntimeEnvironmentConfig:
     )
 
 
-def _runtime(tables: set[str]) -> FakeRuntime:
-    return FakeRuntime(config=_config(), engine=cast(Engine, FakeEngine(tables)))
+def _runtime(tables: set[str], views: set[str] | None = None) -> FakeRuntime:
+    return FakeRuntime(config=_config(), engine=cast(Engine, FakeEngine(tables, views)))
 
 
 def _required_tables() -> set[str]:
@@ -215,6 +221,17 @@ def test_preflight_fails_database_when_required_schema_is_incomplete() -> None:
     assert not report.succeeded
     assert report.checks[-1].state is PreflightState.FAIL
     assert "classification_proposals" in report.checks[-1].detail
+
+
+def test_preflight_fails_database_when_readable_path_history_view_is_missing() -> None:
+    report = run_preflight(
+        check_database=True,
+        runtime_builder=lambda: _runtime(_required_tables(), views=set()),
+    )
+
+    assert not report.succeeded
+    assert report.checks[-1].state is PreflightState.FAIL
+    assert "views:file_path_history" in report.checks[-1].detail
 
 
 def test_main_returns_failure_for_failed_preflight(

@@ -41,6 +41,7 @@ class MemoryTableSchema:
     """One DocWeave memory table and its relational shape."""
 
     table_name: str
+    object_type: str
     columns: tuple[MemoryColumnSchema, ...]
     primary_key_columns: tuple[str, ...]
     foreign_keys: tuple[MemoryForeignKeySchema, ...]
@@ -68,10 +69,10 @@ def collect_memory_schema_from_engine(engine: Engine) -> MemorySchemaReport:
             revision = connection.execute(
                 text(_ALEMBIC_REVISION_SQL)
             ).scalar_one_or_none()
-            table_names = tuple(
-                str(row[0])
+            objects = tuple(
+                (str(row[0]), _normalize_object_type(str(row[1])))
                 for row in connection.execute(text(_TABLES_SQL))
-                if isinstance(row[0], str)
+                if isinstance(row[0], str) and isinstance(row[1], str)
             )
             columns = _group_columns(connection.execute(text(_COLUMNS_SQL)))
             primary_keys = _group_primary_keys(
@@ -86,11 +87,12 @@ def collect_memory_schema_from_engine(engine: Engine) -> MemorySchemaReport:
     tables = tuple(
         MemoryTableSchema(
             table_name=table_name,
+            object_type=object_type,
             columns=columns.get(table_name, ()),
             primary_key_columns=primary_keys.get(table_name, ()),
             foreign_keys=foreign_keys.get(table_name, ()),
         )
-        for table_name in table_names
+        for table_name, object_type in objects
     )
     return MemorySchemaReport(
         alembic_revision=revision if isinstance(revision, str) else None,
@@ -203,16 +205,24 @@ def _group_foreign_keys(rows: Any) -> dict[str, tuple[MemoryForeignKeySchema, ..
     }
 
 
+def _normalize_object_type(table_type: str) -> str:
+    normalized = table_type.casefold().replace("base ", "")
+    return "view" if normalized == "view" else "table"
+
+
 def _print_object_explorer_report(report: MemorySchemaReport) -> None:
     print("DocWeave CockroachDB Object Explorer")
     print(f"Revision: {report.alembic_revision or 'missing'}")
     print("Database: docweave")
     print("Schema: docweave")
-    print(f"Tables: {len(report.tables)}")
+    table_count = sum(1 for table in report.tables if table.object_type == "table")
+    view_count = sum(1 for table in report.tables if table.object_type == "view")
+    print(f"Tables: {table_count}")
+    print(f"Views: {view_count}")
     for table in report.tables:
         primary_key_columns = set(table.primary_key_columns)
         print("")
-        print(f"[table] docweave.{table.table_name}")
+        print(f"[{table.object_type}] docweave.{table.table_name}")
         primary_key = ", ".join(table.primary_key_columns) or "none"
         print(f"  [primary key] {primary_key}")
         print("  [columns]")
@@ -236,10 +246,13 @@ def _print_object_explorer_report(report: MemorySchemaReport) -> None:
 
 def _print_flat_text_report(report: MemorySchemaReport) -> None:
     print(f"memory_schema_revision: {report.alembic_revision or 'missing'}")
-    print(f"memory_schema_tables: {len(report.tables)}")
+    table_count = sum(1 for table in report.tables if table.object_type == "table")
+    view_count = sum(1 for table in report.tables if table.object_type == "view")
+    print(f"memory_schema_tables: {table_count}")
+    print(f"memory_schema_views: {view_count}")
     for table in report.tables:
         primary_key = ", ".join(table.primary_key_columns) or "none"
-        print(f"table docweave.{table.table_name}")
+        print(f"{table.object_type} docweave.{table.table_name}")
         print(f"  primary_key: {primary_key}")
         print("  columns:")
         for column in table.columns:
@@ -265,6 +278,7 @@ def _report_json(report: MemorySchemaReport) -> dict[str, object]:
         "tables": [
             {
                 "table_name": table.table_name,
+                "object_type": table.object_type,
                 "primary_key_columns": list(table.primary_key_columns),
                 "columns": [
                     {
@@ -296,10 +310,9 @@ LIMIT 1
 """
 
 _TABLES_SQL = """
-SELECT table_name
+SELECT table_name, table_type
 FROM information_schema.tables
 WHERE table_schema = 'docweave'
-  AND table_type = 'BASE TABLE'
 ORDER BY table_name
 """
 
