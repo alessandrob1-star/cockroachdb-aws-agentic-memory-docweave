@@ -710,10 +710,10 @@ class LeftScreen(ShapeWidget):
         self.table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
         self.table.setSelectionMode(QTableWidget.SelectionMode.SingleSelection)
         self.table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
-        self.table.setFont(QFont("Segoe UI", 11, QFont.Weight.Medium))
+        self.table.setFont(QFont("Segoe UI", 13, QFont.Weight.Medium))
 
         header = self.table.horizontalHeader()
-        header.setFont(QFont("Segoe UI", 11, QFont.Weight.Bold))
+        header.setFont(QFont("Segoe UI", 13, QFont.Weight.Bold))
         header.setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
         header.setSectionResizeMode(1, QHeaderView.ResizeMode.ResizeToContents)
         header.setSectionResizeMode(2, QHeaderView.ResizeMode.ResizeToContents)
@@ -837,7 +837,7 @@ class LeftScreen(ShapeWidget):
                     else ACCENT
                 )
             self.table.setItem(row, column, item)
-        self.table.setRowHeight(row, 34)
+        self.table.setRowHeight(row, 42)
 
     def count_status(self, status: str) -> int:
         """Count current visible document states."""
@@ -966,6 +966,7 @@ class RightScreen(ShapeWidget):
         self.memory_table.setObjectName("memoryTable")
         self.memory_table.setAccessibleName("CockroachDB memory table evidence")
         self.memory_table.setHorizontalHeaderLabels(["TABLE", "ROWS"])
+        self.memory_table.setFont(QFont("Segoe UI", 13, QFont.Weight.Medium))
         self.memory_table.verticalHeader().hide()
         self.memory_table.horizontalHeader().setSectionResizeMode(
             0,
@@ -1048,7 +1049,7 @@ class RightScreen(ShapeWidget):
             count_item.setToolTip(f"{table_name}: {row_count}")
             self.memory_table.setItem(row_index, 0, table_item)
             self.memory_table.setItem(row_index, 1, count_item)
-            self.memory_table.setRowHeight(row_index, 22)
+            self.memory_table.setRowHeight(row_index, 32)
 
     def shape_path(self) -> QPainterPath:
         r = self.rect().adjusted(3, 3, -3, -3)
@@ -1087,27 +1088,27 @@ class RightScreen(ShapeWidget):
         metric_w = int((content_width - metric_gap * 2) / 3)
         x = content_left
         for frame in self.metric_frames:
-            frame.setGeometry(x, metric_top, metric_w, 78)
-            frame.number.setGeometry(11, 9, metric_w - 22, 31)
-            frame.caption.setGeometry(11, 44, metric_w - 22, 20)
+            frame.setGeometry(x, metric_top, metric_w, 84)
+            frame.number.setGeometry(11, 8, metric_w - 22, 36)
+            frame.caption.setGeometry(11, 48, metric_w - 22, 24)
             x += metric_w + metric_gap
 
-        memory_y = metric_top + 92
-        self.memory_label.setGeometry(content_left, memory_y, content_width, 21)
+        memory_y = metric_top + 98
+        self.memory_label.setGeometry(content_left, memory_y, content_width, 24)
         self.memory_text.setGeometry(
             content_left + 12,
-            memory_y + 24,
+            memory_y + 28,
             content_width - 24,
-            40,
+            48,
         )
         self.memory_table.setGeometry(
             content_left,
-            memory_y + 70,
+            memory_y + 82,
             content_width,
-            116,
+            128,
         )
 
-        stream_top = memory_y + 196
+        stream_top = memory_y + 210
         self.stream_label.setGeometry(
             content_left,
             stream_top,
@@ -1116,7 +1117,7 @@ class RightScreen(ShapeWidget):
         )
 
         row_y = stream_top + 30
-        row_height = 40
+        row_height = 44
         row_gap = 5
         for frame in self.event_rows:
             frame.setGeometry(
@@ -1125,17 +1126,17 @@ class RightScreen(ShapeWidget):
                 content_width,
                 row_height,
             )
-            frame.event_name.setGeometry(12, 5, content_width - 24, 16)
-            frame.event_text.setGeometry(12, 21, content_width - 24, 17)
+            frame.event_name.setGeometry(12, 6, content_width - 24, 18)
+            frame.event_text.setGeometry(12, 25, content_width - 24, 20)
             row_y += row_height + row_gap
 
         restore_y = row_y + 4
-        self.restore_label.setGeometry(content_left, restore_y, content_width, 21)
+        self.restore_label.setGeometry(content_left, restore_y, content_width, 24)
         self.restore_text.setGeometry(
             content_left + 12,
-            restore_y + 24,
+            restore_y + 28,
             content_width - 24,
-            46,
+            54,
         )
 
 
@@ -1728,8 +1729,8 @@ class CurvedConsoleButton(QPushButton):
         )
 
         painter.setPen(QColor("#EAF5F1"))
-        font = QFont("Segoe UI", 8, QFont.Weight.Bold)
-        font.setLetterSpacing(QFont.SpacingType.AbsoluteSpacing, 1.1)
+        font = QFont("Segoe UI", 10, QFont.Weight.Bold)
+        font.setLetterSpacing(QFont.SpacingType.AbsoluteSpacing, 0)
         painter.setFont(font)
         painter.drawText(
             QRectF(bounds),
@@ -2238,8 +2239,8 @@ class CockpitWindow(QMainWindow):
         self.right_proxy = self.side_scene.addWidget(self.right)
 
         # Strong, visible outward inclination.
-        self.left_proxy.setRotation(-10.5)
-        self.right_proxy.setRotation(10.5)
+        self.left_proxy.setRotation(-6.0)
+        self.right_proxy.setRotation(6.0)
 
         self.center = CenterPreview(self.root)
         self.console = ConsolePanel(self.root)
@@ -2274,58 +2275,58 @@ class CockpitWindow(QMainWindow):
 
             QLabel#brand {
                 color: #FF3B3B;
-                font-size: 17px;
-                font-weight: 700;
+                font-size: 20px;
+                font-weight: 800;
                 letter-spacing: 0.7px;
                 background: transparent;
             }
 
             QLabel#screenTitle {
                 color: #FF3B3B;
-                font-size: 16px;
-                font-weight: 700;
+                font-size: 19px;
+                font-weight: 800;
                 letter-spacing: 0.4px;
                 background: transparent;
             }
 
             QLabel#sectionLabel {
                 color: #FF4C4C;
-                font-size: 12px;
-                font-weight: 700;
+                font-size: 15px;
+                font-weight: 800;
                 letter-spacing: 0.5px;
                 background: transparent;
             }
 
             QLabel#online {
                 color: #FF3B3B;
-                font-size: 11px;
+                font-size: 13px;
                 font-weight: 800;
                 background: transparent;
             }
 
             QLabel#muted {
                 color: #FF6A6A;
-                font-size: 11px;
+                font-size: 13px;
                 font-weight: 700;
                 background: transparent;
             }
 
             QLabel#consoleText {
-                color: #E8F2EE;
-                font-size: 10px;
-                font-weight: 500;
-                letter-spacing: 0.1px;
+                color: #F4FFFB;
+                font-size: 13px;
+                font-weight: 700;
+                letter-spacing: 0;
             }
 
             QTableWidget#documentTable {
-                background: rgba(7, 10, 10, 215);
-                border: 1px solid rgba(140, 245, 205, 92);
+                background: rgba(4, 8, 8, 235);
+                border: 1px solid rgba(170, 255, 225, 132);
                 border-radius: 8px;
                 color: #F1FBF7;
                 outline: none;
                 selection-background-color: rgba(73, 179, 144, 75);
                 selection-color: #FFFFFF;
-                font-size: 12px;
+                font-size: 13px;
             }
 
             QTableWidget#documentTable::item {
@@ -2337,8 +2338,8 @@ class CockpitWindow(QMainWindow):
                 background: rgba(20, 26, 24, 230);
                 border: none;
                 border-bottom: 1px solid rgba(89, 198, 162, 80);
-                color: #A8C2B8;
-                font-size: 12px;
+                color: #D7F4EA;
+                font-size: 13px;
                 font-weight: 800;
                 padding: 8px;
             }
@@ -2356,37 +2357,37 @@ class CockpitWindow(QMainWindow):
             }
 
             QLabel#metricLabel {
-                color: #7EA496;
-                font-size: 10px;
+                color: #BDE7D8;
+                font-size: 12px;
                 font-weight: 800;
             }
 
             QFrame#eventRow {
-                background: rgba(12, 18, 17, 205);
+                background: rgba(5, 10, 9, 228);
                 border-left: 2px solid rgba(125, 240, 200, 165);
                 border-radius: 5px;
             }
 
             QLabel#eventName {
                 color: #67D8B0;
-                font-size: 12px;
+                font-size: 13px;
                 font-weight: 800;
             }
 
             QLabel#eventText {
                 color: #EDF7F3;
-                font-size: 12px;
+                font-size: 13px;
                 font-weight: 700;
             }
 
             QTableWidget#memoryTable {
-                background: rgba(7, 11, 10, 222);
+                background: rgba(4, 8, 8, 238);
                 border: 1px solid rgba(125, 240, 200, 120);
                 border-radius: 6px;
                 color: #F3FFF9;
                 gridline-color: rgba(103, 216, 176, 60);
                 alternate-background-color: rgba(22, 36, 32, 180);
-                font-size: 11px;
+                font-size: 13px;
                 font-weight: 700;
                 outline: none;
             }
@@ -2400,7 +2401,7 @@ class CockpitWindow(QMainWindow):
                 border: none;
                 border-bottom: 1px solid rgba(103, 216, 176, 125);
                 color: #67D8B0;
-                font-size: 10px;
+                font-size: 12px;
                 font-weight: 900;
                 padding: 4px;
             }
@@ -2441,8 +2442,8 @@ class CockpitWindow(QMainWindow):
                 border: 1px solid rgba(145, 245, 210, 125);
                 border-bottom: 3px solid rgba(0, 10, 8, 185);
                 border-radius: 13px;
-                letter-spacing: 1px;
-                font-size: 10px;
+                letter-spacing: 0;
+                font-size: 12px;
                 padding-top: 2px;
             }
 
@@ -3399,8 +3400,8 @@ class CockpitWindow(QMainWindow):
         margin_x = int(w * 0.075)
         top = int(h * 0.085)
 
-        side_w = int(w * 0.225)
-        side_h = int(h * 0.585)
+        side_w = int(w * 0.245)
+        side_h = int(h * 0.685)
 
         center_w = int(w * 0.43)
         center_h = int(h * 0.61)
