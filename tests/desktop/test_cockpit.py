@@ -144,12 +144,9 @@ def assert_visible_classification_proposal(window: CockpitWindow) -> None:
     assert "Classification batch complete: 30 of 30" in log_text
 
     proposed_class_item = window.left.table.item(0, 1)
-    review_status_item = window.left.table.item(0, 3)
     assert proposed_class_item is not None
-    assert review_status_item is not None
+    assert window.left.table.columnCount() == 2
     assert proposed_class_item.text() == "invoice"
-    assert review_status_item.text() == "● R"
-    assert review_status_item.toolTip() == "Status: REVIEW"
     assert "Proposed rename_and_move target: DocWeave Organized/Invoices/" in (
         proposed_class_item.toolTip()
     )
