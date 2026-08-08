@@ -41,6 +41,31 @@ analysis, approve or reject the proposed rename, and then select the moved PDF
 to see exactly what it used to be called and where it came from. That is the
 core product loop: **LLM understanding + human control + durable path memory**.
 
+## Hackathon Integration
+
+**CockroachDB**
+
+- **Persistent agent memory:** `documents -> agent_runs -> proposals ->
+  human_decisions -> file_history` records what the agent saw, proposed, and
+  what the human approved.
+- **Required CockroachDB Tool #1: `ccloud` CLI:** used to inspect and prove the
+  live CockroachDB Cloud serverless cluster `docweave-memory` on AWS
+  `eu-central-1`.
+- **Required CockroachDB Tool #2: CockroachDB Agent Skills repository:** used to
+  review and shape schema design, idempotent writes, proposal locking, and
+  serializable transaction retry behavior.
+
+**AWS**
+
+- **Amazon Bedrock:** document reasoning and structured rename proposals.
+- **AWS Lambda:** cloud API and asynchronous analysis worker.
+- **Amazon S3:** PDF upload artifacts and JSON result artifacts.
+- **Amazon SQS:** queued analysis jobs between API and worker.
+- **Amazon API Gateway:** public demo endpoint.
+- **Amazon CloudWatch Logs:** operational execution evidence.
+- **AWS Secrets Manager dynamic references:** runtime CockroachDB URL wiring
+  without committing secrets.
+
 ## Submission Fit
 
 | Requirement | DocWeave evidence |
