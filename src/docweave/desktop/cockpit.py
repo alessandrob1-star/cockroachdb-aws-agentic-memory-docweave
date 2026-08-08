@@ -685,7 +685,7 @@ class LeftScreen(ShapeWidget):
         self.min_button.setObjectName("windowButton")
         self.min_button.clicked.connect(window.showMinimized)
 
-        self.brand = QLabel("DOCWEAVE", self)
+        self.brand = QLabel("DOC WEAVE", self)
         self.brand.setObjectName("brand")
 
         self.local = QLabel("● LOCAL", self)
@@ -888,7 +888,7 @@ class LeftScreen(ShapeWidget):
         # Header and footer labels remain on the glass frame.
         self.close_button.setGeometry(34, 18, 31, 29)
         self.min_button.setGeometry(71, 18, 31, 29)
-        self.brand.setGeometry(112, 16, 165, 32)
+        self.brand.setGeometry(112, 16, 190, 32)
         self.local.setGeometry(w - 94, 20, 72, 24)
 
         # Carbon content area: extra lower/side clearance keeps the table
@@ -1276,14 +1276,10 @@ class CenterPreview(ShapeWidget):
         self.title = QLabel("PDF PREVIEW", self)
         self.title.setObjectName("screenTitle")
 
-        self.program_name = QLabel("DOC WEAVE", self)
-        self.program_name.setObjectName("centerBrand")
-        self.program_name.setAlignment(Qt.AlignmentFlag.AlignCenter)
-
         self.filename = QLabel("No document selected", self)
         self.filename.setObjectName("muted")
 
-        for label in (self.title, self.program_name, self.filename):
+        for label in (self.title, self.filename):
             glow = QGraphicsDropShadowEffect(label)
             glow.setBlurRadius(14)
             glow.setOffset(0, 0)
@@ -1420,7 +1416,6 @@ class CenterPreview(ShapeWidget):
 
         # Header remains on the glass.
         self.title.setGeometry(28, 16, 180, 27)
-        self.program_name.setGeometry((w - 190) // 2, 14, 190, 30)
         self.filename.setGeometry(28, 43, w - 200, 22)
         self.lower_button.setGeometry(w - 96, 16, 68, 29)
 
@@ -2331,13 +2326,6 @@ class CockpitWindow(QMainWindow):
                 font-size: 19px;
                 font-weight: 800;
                 letter-spacing: 0.4px;
-                background: transparent;
-            }
-
-            QLabel#centerBrand {
-                color: #FF3030;
-                font-size: 22px;
-                font-weight: 900;
                 background: transparent;
             }
 
