@@ -27,6 +27,10 @@ from docweave.operations import (
 from docweave.persistence import AuditAppend, PersistReviewDecision
 from docweave.persistence.contracts import PersistenceDisposition
 from docweave.persistence.operation_repository import PersistenceConflictError
+from docweave.persistence.simple_memory_repository import (
+    CockroachSimpleMemoryRepository,
+    PersistHumanDecision,
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -50,6 +54,14 @@ class ReviewDecisionCommandInput:
     operation_plan_fingerprint: str | None = None
     review_decision_id: UUID | None = None
     decided_at_utc: datetime | None = None
+    document_id: UUID | None = None
+    operation: str | None = None
+    previous_directory: str | None = None
+    previous_filename: str | None = None
+    next_directory: str | None = None
+    next_filename: str | None = None
+    file_status: str | None = None
+    note: str | None = None
 
 
 def persist_review_decision(
@@ -89,8 +101,24 @@ def _persist_review_decision_with_runtime(
     )
     if validation.status is not ReviewDecisionValidationStatus.VALID:
         raise ValueError(_validation_error_message(validation.reason))
-    disposition = configured.repository.persist(
-        _persist_command(configured, decision),
+    repository = CockroachSimpleMemoryRepository(configured.transaction_runner)
+    disposition = repository.persist_human_decision(
+        PersistHumanDecision(
+            proposal_id=command_input.proposal_id,
+            human_decision_id=review_decision_id,
+            actor_label="local-cockpit-reviewer",
+            decision=decision.action.value,
+            reason=decision.reason,
+            decided_at_utc=decision.decided_at_utc,
+            document_id=command_input.document_id,
+            operation=command_input.operation,
+            previous_directory=command_input.previous_directory,
+            previous_filename=command_input.previous_filename,
+            next_directory=command_input.next_directory,
+            next_filename=command_input.next_filename,
+            file_status=command_input.file_status,
+            note=command_input.note,
+        )
     )
     return ReviewDecisionCommandResult(
         action=decision.action.value,

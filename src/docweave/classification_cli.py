@@ -6,6 +6,7 @@ import argparse
 import json
 import sys
 from dataclasses import dataclass
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Literal
 from uuid import UUID, uuid5
@@ -18,12 +19,21 @@ from docweave.application_runtime import (
     build_configured_classification_runtime,
 )
 from docweave.core.fingerprints import compute_sha256_fingerprint
-from docweave.extraction import PdfExtractionRequest
+from docweave.extraction import ExtractionStatus, PdfExtractionRequest, extract_pdf_text
 from docweave.operations import classification_proposal_fingerprint
+from docweave.operations.organization import propose_safe_organization_copy
 from docweave.persistence import (
     ClassificationPipelineError,
+    ClassificationPipelineErrorCode,
     ClassificationRunIdentity,
-    PersistedClassificationRun,
+    CockroachSimpleMemoryRepository,
+    CockroachTransactionRunner,
+    PersistenceDisposition,
+    PersistSimpleAnalysis,
+)
+from docweave.persistence.simple_memory_repository import (
+    simple_output_json,
+    split_relative_path,
 )
 
 _IDENTITY_NAMESPACE = UUID("7f5461df-2c2f-4f8d-b504-83ddf8e0d00a")
@@ -62,6 +72,7 @@ class ClassificationCommandResult:
     output_tokens: int
     total_tokens: int
     estimated_cost_usd: str | None
+    document_id: UUID | None = None
     proposal_id: UUID | None = None
     document_language: str = "und"
     rationale: str = ""
@@ -348,14 +359,36 @@ def _classify_pdf_once_with_runtime(
         source_sha256=fingerprint_hex,
         idempotency_key=idempotency_key,
     )
-    persisted = configured.runtime.classify_and_persist(
-        PdfExtractionRequest(
-            source_path=source_path,
-            authorized_root=authorized_root,
-        ),
-        identity=identity,
+    request = PdfExtractionRequest(
+        source_path=source_path,
+        authorized_root=authorized_root,
     )
-    return _command_result(persisted, proposal_id=identity.proposal_id)
+    extraction = extract_pdf_text(request)
+    if extraction.status is not ExtractionStatus.COMPLETED or not extraction.pages:
+        raise ClassificationPipelineError(
+            ClassificationPipelineErrorCode.EXTRACTION_NOT_CLASSIFIABLE,
+            extraction_status=extraction.status,
+        )
+    model_run = configured.gateway.classify(extraction.pages)
+    confidence = compute_uncalibrated_confidence(model_run.proposal, extraction)
+    disposition = _persist_simple_analysis(
+        configured,
+        request=request,
+        identity=identity,
+        source_sha256=fingerprint_hex,
+        extraction_page_count=extraction.document_page_count or len(extraction.pages),
+        model_run=model_run,
+        raw_confidence=confidence.raw,
+    )
+    return _command_result_from_run(
+        model_run,
+        proposal_id=identity.proposal_id,
+        document_id=identity.document_id,
+        proposal_disposition=disposition,
+        raw_confidence=str(confidence.raw),
+        classification_confidence=str(confidence.classification),
+        metadata_confidence=str(confidence.metadata),
+    )
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -496,25 +529,30 @@ def batch_main(argv: list[str] | None = None) -> int:
     return 1 if result.failed_count else 0
 
 
-def _command_result(
-    persisted: PersistedClassificationRun,
+def _command_result_from_run(  # noqa: PLR0913
+    model_run,
     *,
+    document_id: UUID | None = None,
     proposal_id: UUID | None = None,
+    proposal_disposition: PersistenceDisposition,
+    raw_confidence: str | None,
+    classification_confidence: str | None,
+    metadata_confidence: str | None,
 ) -> ClassificationCommandResult:
-    provenance = persisted.model_run.provenance
-    proposal = persisted.model_run.proposal
+    provenance = model_run.provenance
+    proposal = model_run.proposal
     usage = provenance.usage
     estimated_cost = provenance.estimated_cost_usd
-    confidence = compute_uncalibrated_confidence(proposal, persisted.extraction)
     return ClassificationCommandResult(
         proposed_class=proposal.proposed_class.value,
-        document_disposition=persisted.document_disposition.value,
-        taxonomy_disposition=persisted.taxonomy_disposition.value,
-        proposal_disposition=persisted.proposal_disposition.value,
+        document_disposition=proposal_disposition.value,
+        taxonomy_disposition="simple_schema",
+        proposal_disposition=proposal_disposition.value,
         input_tokens=usage.input_tokens,
         output_tokens=usage.output_tokens,
         total_tokens=usage.total_tokens,
         estimated_cost_usd=str(estimated_cost) if estimated_cost is not None else None,
+        document_id=document_id,
         proposal_id=proposal_id,
         document_language=proposal.document_language,
         rationale=proposal.rationale,
@@ -541,12 +579,90 @@ def _command_result(
             if not proposal.alternative_classes
             else proposal.alternative_classes[0].class_code.value
         ),
-        raw_confidence=str(confidence.raw),
-        classification_confidence=str(confidence.classification),
-        metadata_confidence=str(confidence.metadata),
+        raw_confidence=raw_confidence,
+        classification_confidence=classification_confidence,
+        metadata_confidence=metadata_confidence,
         proposal_fingerprint=classification_proposal_fingerprint(proposal),
         retry_attempts=provenance.retry_attempts,
     )
+
+
+def _persist_simple_analysis(  # noqa: PLR0913
+    configured: ConfiguredClassificationRuntime,
+    *,
+    request: PdfExtractionRequest,
+    identity: ClassificationRunIdentity,
+    source_sha256: str,
+    extraction_page_count: int,
+    model_run,
+    raw_confidence,
+) -> PersistenceDisposition:
+    source = request.source_path.resolve(strict=True)
+    root = request.authorized_root.resolve(strict=True)
+    original_directory, original_filename = split_relative_path(
+        source.relative_to(root).as_posix()
+    )
+    metadata = {
+        item.name: item.value
+        for item in model_run.proposal.candidate_metadata
+        if item.value.strip()
+    }
+    organization = propose_safe_organization_copy(
+        source_path=source,
+        authorized_root=root,
+        proposed_class=model_run.proposal.proposed_class,
+        metadata=metadata,
+    )
+    proposed_directory, proposed_filename = split_relative_path(
+        organization.destination_relative_path
+    )
+    completed_at = datetime.now(UTC)
+    started_at = completed_at - timedelta(
+        milliseconds=model_run.provenance.observed_duration_ms
+    )
+    repository = CockroachSimpleMemoryRepository(
+        CockroachTransactionRunner(configured.engine)
+    )
+    return repository.persist_analysis(
+        PersistSimpleAnalysis(
+            workspace_label=str(configured.config.workspace_id),
+            document_id=identity.document_id,
+            agent_run_id=identity.agent_run_id,
+            proposal_id=identity.proposal_id,
+            original_directory=original_directory,
+            original_filename=original_filename,
+            content_sha256=bytes.fromhex(source_sha256),
+            page_count=extraction_page_count,
+            provider="amazon_bedrock",
+            model_id=model_run.provenance.model_id,
+            task="classify_and_propose_file_organization",
+            status="succeeded",
+            started_at_utc=started_at,
+            completed_at_utc=completed_at,
+            input_sha256=bytes.fromhex(source_sha256),
+            output_json=simple_output_json(
+                {
+                    "proposed_class": model_run.proposal.proposed_class.value,
+                    "rationale": model_run.proposal.rationale,
+                    "candidate_metadata": metadata,
+                    "evidence_count": len(model_run.proposal.evidence),
+                }
+            ),
+            summary=model_run.proposal.rationale,
+            proposed_category=model_run.proposal.proposed_class.value,
+            proposed_directory=proposed_directory,
+            proposed_filename=proposed_filename,
+            confidence=raw_confidence,
+            evidence_summary=_evidence_summary(model_run),
+        )
+    )
+
+
+def _evidence_summary(model_run) -> str:
+    if model_run.proposal.evidence:
+        first = model_run.proposal.evidence[0]
+        return f"Page {first.page_index + 1}: {first.quote}"
+    return model_run.proposal.rationale
 
 
 if __name__ == "__main__":

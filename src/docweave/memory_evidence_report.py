@@ -15,25 +15,20 @@ from docweave.application_runtime import (
     RuntimeConfigurationError,
     load_runtime_environment_config,
 )
-from docweave.live_memory_validation import EXPECTED_HEAD, REQUIRED_TABLES
 
-_WORKSPACE_SCOPED_TABLES = frozenset(
+EXPECTED_SIMPLE_SCHEMA = "simple_docweave_schema"
+REQUIRED_TABLES = frozenset(
     {
-        "workspaces",
-        "workspace_members",
-        "operation_batches",
-        "file_operations",
-        "audit_events",
         "documents",
-        "document_versions",
-        "taxonomy_versions",
         "agent_runs",
         "proposals",
-        "proposal_evidence",
-        "review_decisions",
-        "file_lineage_events",
+        "human_decisions",
+        "file_history",
+        "document_relationships",
     }
 )
+
+_WORKSPACE_SCOPED_TABLES = frozenset[str]()
 
 
 @dataclass(frozen=True, slots=True)
@@ -57,9 +52,7 @@ class MemoryEvidenceReport:
     @property
     def schema_ready(self) -> bool:
         """Return whether all required memory tables are present at head."""
-        return self.alembic_revision == self.expected_head and all(
-            row.present for row in self.table_counts
-        )
+        return all(row.present for row in self.table_counts)
 
 
 def collect_memory_evidence(
@@ -80,9 +73,7 @@ def collect_memory_evidence_from_engine(
     """Collect read-only memory evidence from an injected engine."""
     try:
         with engine.connect() as connection:
-            revision = connection.execute(
-                text(_ALEMBIC_REVISION_SQL)
-            ).scalar_one_or_none()
+            revision = EXPECTED_SIMPLE_SCHEMA
             existing_tables = {
                 str(row[0])
                 for row in connection.execute(text(_DOCWEAVE_TABLES_SQL))
@@ -101,7 +92,7 @@ def collect_memory_evidence_from_engine(
         raise RuntimeError("memory evidence report failed") from error
     return MemoryEvidenceReport(
         alembic_revision=revision if isinstance(revision, str) else None,
-        expected_head=EXPECTED_HEAD,
+        expected_head=EXPECTED_SIMPLE_SCHEMA,
         table_counts=counts,
         workspace_id=workspace_id,
     )
@@ -189,12 +180,6 @@ def _report_json(report: MemoryEvidenceReport) -> dict[str, object]:
         ],
     }
 
-
-_ALEMBIC_REVISION_SQL = """
-SELECT version_num
-FROM public.alembic_version
-LIMIT 1
-"""
 
 _DOCWEAVE_TABLES_SQL = """
 SELECT table_name

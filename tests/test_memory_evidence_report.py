@@ -7,8 +7,9 @@ from uuid import UUID
 
 from sqlalchemy.engine import Engine
 
-from docweave.live_memory_validation import EXPECTED_HEAD, REQUIRED_TABLES
 from docweave.memory_evidence_report import (
+    EXPECTED_SIMPLE_SCHEMA,
+    REQUIRED_TABLES,
     collect_memory_evidence_from_engine,
     main,
 )
@@ -38,7 +39,7 @@ class _FakeConnection:
         self,
         *,
         tables: set[str],
-        revision: str | None = EXPECTED_HEAD,
+        revision: str | None = EXPECTED_SIMPLE_SCHEMA,
     ) -> None:
         self.tables = tables
         self.revision = revision
@@ -57,12 +58,10 @@ class _FakeConnection:
         parameters: dict[str, object] | None = None,
     ) -> object:
         sql = str(statement)
-        if "alembic_version" in sql:
-            return _FakeScalarResult(self.revision)
         if "information_schema.tables" in sql:
             return _FakeRows((name,) for name in sorted(self.tables))
         if "SELECT count(*) FROM docweave." in sql:
-            table_name = sql.split("docweave.", 1)[1].split()[0]
+            table_name = sql.split("docweave.", 1)[1].split(maxsplit=1)[0]
             if parameters and "workspace_id" in parameters:
                 self.workspace_filtered_tables.append(table_name)
             return _FakeScalarResult(self.counts.get(table_name, 0))
@@ -80,8 +79,8 @@ class _FakeEngine:
 def test_collects_read_only_memory_table_counts() -> None:
     connection = _FakeConnection(tables=set(REQUIRED_TABLES))
     connection.counts["proposals"] = 3
-    connection.counts["review_decisions"] = 2
-    connection.counts["file_lineage_events"] = 5
+    connection.counts["human_decisions"] = 2
+    connection.counts["file_history"] = 5
 
     report = collect_memory_evidence_from_engine(
         cast(Engine, _FakeEngine(connection)),
@@ -90,13 +89,13 @@ def test_collects_read_only_memory_table_counts() -> None:
     assert report.schema_ready
     counts = {row.table_name: row.row_count for row in report.table_counts}
     assert counts["proposals"] == 3
-    assert counts["review_decisions"] == 2
-    assert counts["file_lineage_events"] == 5
+    assert counts["human_decisions"] == 2
+    assert counts["file_history"] == 5
 
 
 def test_reports_missing_memory_tables_without_claiming_readiness() -> None:
     tables = set(REQUIRED_TABLES)
-    tables.remove("file_lineage_events")
+    tables.remove("file_history")
 
     report = collect_memory_evidence_from_engine(
         cast(Engine, _FakeEngine(_FakeConnection(tables=tables))),
@@ -104,7 +103,7 @@ def test_reports_missing_memory_tables_without_claiming_readiness() -> None:
 
     missing = [row for row in report.table_counts if not row.present]
     assert not report.schema_ready
-    assert [row.table_name for row in missing] == ["file_lineage_events"]
+    assert [row.table_name for row in missing] == ["file_history"]
     assert missing[0].row_count is None
 
 
@@ -117,11 +116,7 @@ def test_workspace_scope_filters_only_tables_with_workspace_id() -> None:
         workspace_id=workspace_id,
     )
 
-    assert "actors" not in connection.workspace_filtered_tables
-    assert "classification_proposals" not in connection.workspace_filtered_tables
-    assert "taxonomy_classes" not in connection.workspace_filtered_tables
-    assert "proposals" in connection.workspace_filtered_tables
-    assert "file_lineage_events" in connection.workspace_filtered_tables
+    assert connection.workspace_filtered_tables == []
 
 
 def test_main_fails_closed_without_database_url(monkeypatch: Any, capsys: Any) -> None:
@@ -160,5 +155,5 @@ def test_json_report_contains_only_sanitized_fields(
     payload = json.loads(output)
     assert result == 0
     assert payload["schema_ready"] is True
-    assert payload["alembic_revision"] == EXPECTED_HEAD
+    assert payload["alembic_revision"] == EXPECTED_SIMPLE_SCHEMA
     assert "DOCWEAVE_DATABASE_URL" not in output

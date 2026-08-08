@@ -25,10 +25,12 @@ from docweave.extraction import (
     PdfExtractionResult,
     extract_pdf_text,
 )
+from docweave.operations.organization import propose_safe_organization_copy
 from docweave.persistence.classification_repository import (
     ClassificationPersistenceIdentity,
     ClassificationScores,
     CockroachClassificationRepository,
+    PersistClassificationProposal,
     map_bedrock_classification_run,
 )
 from docweave.persistence.confidence_provider import (
@@ -39,6 +41,12 @@ from docweave.persistence.memory_foundation_repository import (
     CockroachMemoryFoundationRepository,
     EnsureApprovedTaxonomy,
     RegisterDocumentVersion,
+)
+from docweave.persistence.simple_memory_repository import (
+    CockroachSimpleMemoryRepository,
+    PersistSimpleAnalysis,
+    simple_output_json,
+    split_relative_path,
 )
 from docweave.persistence.transactions import (
     CockroachTransactionRunner,
@@ -63,6 +71,16 @@ class ClassificationGateway(Protocol):
         pages: tuple[ExtractedPage, ...],
     ) -> BedrockClassificationRun:
         """Return one validated, non-authoritative proposal."""
+
+
+class SimpleMemoryRepository(Protocol):
+    """Optional readable memory sink for Analyze results."""
+
+    def persist_analysis(
+        self,
+        command: PersistSimpleAnalysis,
+    ) -> PersistenceDisposition:
+        """Persist one analysis into the simple DocWeave schema."""
 
 
 class ClassificationPipelineErrorCode(StrEnum):
@@ -119,6 +137,7 @@ class PersistedClassificationRun:
     document_disposition: PersistenceDisposition
     taxonomy_disposition: PersistenceDisposition
     proposal_disposition: PersistenceDisposition
+    simple_memory_disposition: PersistenceDisposition | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -138,6 +157,7 @@ class ClassificationRuntime:
     gateway: ClassificationGateway
     foundation_repository: CockroachMemoryFoundationRepository
     classification_repository: CockroachClassificationRepository
+    simple_memory_repository: SimpleMemoryRepository | None = None
     score_provider: ScoreProvider = provide_uncalibrated_confidence_v0
     extractor: Extractor = extract_pdf_text
     clock: Clock = lambda: datetime.now(UTC)
@@ -200,12 +220,24 @@ class ClassificationRuntime:
         proposal_disposition = self.classification_repository.persist(
             persistence_command
         )
+        simple_memory_disposition = None
+        if self.simple_memory_repository is not None:
+            simple_memory_disposition = self.simple_memory_repository.persist_analysis(
+                _map_simple_analysis(
+                    request=request,
+                    identity=identity,
+                    extraction=extraction,
+                    model_run=model_run,
+                    persistence_command=persistence_command,
+                )
+            )
         return PersistedClassificationRun(
             extraction=extraction,
             model_run=model_run,
             document_disposition=document_disposition,
             taxonomy_disposition=taxonomy_disposition,
             proposal_disposition=proposal_disposition,
+            simple_memory_disposition=simple_memory_disposition,
         )
 
 
@@ -232,6 +264,7 @@ def build_classification_runtime(
         gateway=gateway,
         foundation_repository=CockroachMemoryFoundationRepository(transaction_runner),
         classification_repository=CockroachClassificationRepository(transaction_runner),
+        simple_memory_repository=CockroachSimpleMemoryRepository(transaction_runner),
         score_provider=score_provider,
         extractor=runtime_options.extractor,
         clock=runtime_options.clock,
@@ -309,6 +342,76 @@ def _classification_request_digest(
         allow_nan=False,
     ).encode()
     return sha256(canonical).digest()
+
+
+def _map_simple_analysis(
+    *,
+    request: PdfExtractionRequest,
+    identity: ClassificationRunIdentity,
+    extraction: PdfExtractionResult,
+    model_run: BedrockClassificationRun,
+    persistence_command: PersistClassificationProposal,
+) -> PersistSimpleAnalysis:
+    source = request.source_path.resolve(strict=True)
+    root = request.authorized_root.resolve(strict=True)
+    original_relative_path = source.relative_to(root).as_posix()
+    original_directory, original_filename = split_relative_path(original_relative_path)
+    metadata = {
+        item.name: item.value
+        for item in model_run.proposal.candidate_metadata
+        if item.value.strip()
+    }
+    organization = propose_safe_organization_copy(
+        source_path=source,
+        authorized_root=root,
+        proposed_class=model_run.proposal.proposed_class,
+        metadata=metadata,
+    )
+    proposed_directory, proposed_filename = split_relative_path(
+        organization.destination_relative_path
+    )
+    evidence_summary = _evidence_summary(model_run)
+    return PersistSimpleAnalysis(
+        workspace_label=str(identity.workspace_id),
+        document_id=identity.document_id,
+        agent_run_id=identity.agent_run_id,
+        proposal_id=identity.proposal_id,
+        original_directory=original_directory,
+        original_filename=original_filename,
+        content_sha256=_required_digest(extraction),
+        page_count=_required_page_count(extraction),
+        provider="amazon_bedrock",
+        model_id=model_run.provenance.model_id,
+        task="classify_and_propose_file_organization",
+        status="succeeded",
+        started_at_utc=persistence_command.started_at_utc,
+        completed_at_utc=persistence_command.completed_at_utc,
+        input_sha256=persistence_command.request_sha256,
+        output_json=simple_output_json(
+            {
+                "contract_version": model_run.proposal.contract_version,
+                "taxonomy_version": model_run.proposal.taxonomy_version,
+                "proposed_class": model_run.proposal.proposed_class.value,
+                "rationale": model_run.proposal.rationale,
+                "candidate_metadata": metadata,
+                "evidence_count": len(model_run.proposal.evidence),
+            }
+        ),
+        summary=model_run.proposal.rationale,
+        proposed_category=model_run.proposal.proposed_class.value,
+        proposed_directory=proposed_directory,
+        proposed_filename=proposed_filename,
+        confidence=persistence_command.scores.raw,
+        evidence_summary=evidence_summary,
+    )
+
+
+def _evidence_summary(run: BedrockClassificationRun) -> str:
+    proposal = run.proposal
+    if proposal.evidence:
+        first = proposal.evidence[0]
+        return f"Page {first.page_index + 1}: {first.quote}"
+    return proposal.rationale
 
 
 def _as_utc(value: datetime) -> datetime:

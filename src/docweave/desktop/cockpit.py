@@ -27,7 +27,7 @@ import math
 import sys
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from uuid import UUID, uuid4
 
@@ -132,6 +132,13 @@ from docweave.operations import (
     create_proposal_review_decision_from_fingerprint,
     validate_proposal_review_decision_fingerprint,
 )
+from docweave.operations.approval import approve_operation_plan
+from docweave.operations.execution import execute_file_operation
+from docweave.operations.planning import (
+    FileOperation,
+    FileOperationRequest,
+    plan_file_operation,
+)
 from docweave.runtime_preflight import (
     PreflightCheck,
     PreflightState,
@@ -174,6 +181,7 @@ class Document:
     path: Path | None = None
     proposed_destination: str | None = None
     proposed_operation_action: str | None = None
+    document_id: str | None = None
     proposal_id: str | None = None
     proposal_fingerprint: str | None = None
     review_decision_id: str | None = None
@@ -744,6 +752,7 @@ class LeftScreen(ShapeWidget):
         proposed_class: str,
         proposed_destination: str | None = None,
         proposal_id: str | None = None,
+        document_id: str | None = None,
         proposal_fingerprint: str | None = None,
         lineage_preview: CockpitLineagePreview | None = None,
     ) -> None:
@@ -761,6 +770,7 @@ class LeftScreen(ShapeWidget):
             proposed_operation_action=(
                 "rename_and_move" if proposed_destination is not None else None
             ),
+            document_id=document_id,
             proposal_id=proposal_id,
             proposal_fingerprint=proposal_fingerprint,
             review_decision_id=None,
@@ -775,19 +785,22 @@ class LeftScreen(ShapeWidget):
         *,
         status: str,
         review_decision_id: str,
+        path: Path | None = None,
+        name: str | None = None,
     ) -> None:
         """Update one proposal row after an append-only local review decision."""
         if not 0 <= row < len(self._documents):
             return
         current = self._documents[row]
         updated = Document(
-            name=current.name,
+            name=current.name if name is None else name,
             category=current.category,
             pages=current.pages,
             status=status,
-            path=current.path,
+            path=current.path if path is None else path,
             proposed_destination=current.proposed_destination,
             proposed_operation_action=current.proposed_operation_action,
+            document_id=current.document_id,
             proposal_id=current.proposal_id,
             proposal_fingerprint=current.proposal_fingerprint,
             review_decision_id=review_decision_id,
@@ -2644,7 +2657,7 @@ class CockpitWindow(QMainWindow):
             return
 
     @Slot(int)
-    def _open_document_row(self, row: int) -> None:
+    def _open_document_row(self, row: int) -> None:  # noqa: PLR0911
         document = self.left.document_at(row)
         root = self.authorized_root
         if document is None or document.path is None or root is None:
@@ -2684,8 +2697,33 @@ class CockpitWindow(QMainWindow):
                 ]
             )
             return
+        if document.status in {"APPROVED", "MOVED"}:
+            try:
+                validated_path = validate_pdf_for_open(document.path, root)
+            except PdfOpenValidationError as error:
+                self._set_status(
+                    f"PDF preview blocked safely ({error.category.value})."
+                )
+                return
+            self.center.open_document(validated_path)
+            self.center.show_memory_trace(
+                summary=_review_memory_trace_summary(document),
+                detail=_review_memory_trace_detail(document),
+            )
+            self._set_busy(False)
+            self._set_status("Approved PDF selected; original path history is visible.")
+            self.right.set_events(
+                [
+                    ("CURRENT", document.path.name if document.path else document.name),
+                    ("ORIGINAL", _original_path_label(document.lineage_preview)),
+                    ("CURRENT DIR", _current_path_label(document)),
+                    ("MEMORY", "CockroachDB file_history recorded"),
+                    ("SECURITY", "Original path remains traceable"),
+                ]
+            )
+            return
         if document.status != "READY":
-            self._set_status("Only ready PDFs can be previewed safely.")
+            self._set_status("Only ready or approved PDFs can be previewed safely.")
             return
         try:
             validated_path = validate_pdf_for_open(document.path, root)
@@ -2776,6 +2814,7 @@ class CockpitWindow(QMainWindow):
             raw_progress.row,
             proposed_class=result.proposed_class,
             proposed_destination=proposed_destination,
+            document_id=None if result.document_id is None else str(result.document_id),
             proposal_id=None if result.proposal_id is None else str(result.proposal_id),
             proposal_fingerprint=result.proposal_fingerprint,
             lineage_preview=lineage_preview,
@@ -2970,7 +3009,7 @@ class CockpitWindow(QMainWindow):
             reason="Reviewer rejected the local proposal.",
         )
 
-    def _record_selected_review_decision(
+    def _record_selected_review_decision(  # noqa: PLR0911
         self,
         action: ReviewDecisionAction,
         *,
@@ -3011,6 +3050,66 @@ class CockpitWindow(QMainWindow):
         if not validation.is_valid:
             self._set_status(f"Review decision blocked safely ({validation.reason}).")
             return
+        moved_path: Path | None = None
+        file_history_kwargs: dict[str, object] = {}
+        if action is ReviewDecisionAction.APPROVE:
+            root = self.authorized_root
+            if (
+                root is None
+                or document.path is None
+                or document.lineage_preview is None
+                or document.document_id is None
+            ):
+                self._set_status(
+                    "Approve blocked: selected proposal has no complete move history."
+                )
+                return
+            try:
+                plan = plan_file_operation(
+                    FileOperationRequest(
+                        operation=FileOperation.MOVE,
+                        source_root=root,
+                        source_relative_path=document.lineage_preview.previous_relative_path,
+                        destination_root=root,
+                        destination_relative_path=document.lineage_preview.next_relative_path,
+                    )
+                )
+                approved_at = datetime.now(UTC)
+                approval = approve_operation_plan(
+                    plan,
+                    approval_id=review_decision_id,
+                    approved_by_user_id="local-cockpit-reviewer",
+                    approved_at_utc=approved_at,
+                    expires_at_utc=approved_at + timedelta(minutes=15),
+                )
+                execution = execute_file_operation(
+                    plan,
+                    approval,
+                    execution_id=review_decision_id,
+                    now_utc=approved_at,
+                )
+            except (OSError, ValueError) as error:
+                self._set_status(
+                    f"Approve blocked before moving file ({error.__class__.__name__})."
+                )
+                return
+            if not execution.succeeded or plan.destination_path is None:
+                self._set_status(
+                    "Approve blocked: move/rename did not succeed "
+                    f"({execution.reason.value})."
+                )
+                return
+            moved_path = plan.destination_path
+            file_history_kwargs = {
+                "document_id": UUID(document.document_id),
+                "operation": "rename_and_move",
+                "previous_directory": document.lineage_preview.original_directory,
+                "previous_filename": document.lineage_preview.original_filename,
+                "next_directory": document.lineage_preview.next_directory,
+                "next_filename": document.lineage_preview.next_filename,
+                "file_status": "succeeded",
+                "note": "Dashboard approval executed local move/rename.",
+            }
         durable_result = None
         if document.proposal_id is not None:
             try:
@@ -3022,6 +3121,7 @@ class CockpitWindow(QMainWindow):
                         reason=reason,
                         review_decision_id=UUID(review_decision_id),
                         decided_at_utc=decision.decided_at_utc,
+                        **file_history_kwargs,
                     )
                 )
             except (RuntimeConfigurationError, ValueError) as error:
@@ -3036,8 +3136,10 @@ class CockpitWindow(QMainWindow):
         )
         self.left.record_review_decision(
             row,
-            status=next_status,
+            status="MOVED" if moved_path is not None else next_status,
             review_decision_id=review_decision_id,
+            path=moved_path,
+            name=None if moved_path is None else moved_path.name,
         )
         self.right.set_metrics(
             self.left.document_count,
@@ -3066,7 +3168,11 @@ class CockpitWindow(QMainWindow):
             detail=(
                 f"{memory_label}; proposal {decision.proposal_id}; "
                 f"fingerprint {document.proposal_fingerprint[:12]}; "
-                "no file mutation executed."
+                + (
+                    f"moved to {moved_path.name} with original path retained."
+                    if moved_path is not None
+                    else "no file mutation executed."
+                )
             ),
         )
         self.right.set_events(
@@ -3075,9 +3181,12 @@ class CockpitWindow(QMainWindow):
                 ("DECISION", review_decision_id[:8]),
                 ("HISTORY", f"{decision_count} append-only decision(s)"),
                 ("MEMORY", memory_label),
-                ("OPERATION", "No copy or move executed"),
+                (
+                    "OPERATION",
+                    "Move/rename executed" if moved_path is not None else "No move",
+                ),
                 ("LINEAGE", _lineage_preview_label(document.lineage_preview)),
-                ("SECURITY", "No file mutation performed"),
+                ("ORIGINAL", _original_path_label(document.lineage_preview)),
             ]
         )
 
@@ -3595,6 +3704,21 @@ def _lineage_preview_label(preview: CockpitLineagePreview | None) -> str:
         f"{preview.next_relative_path}",
         maximum=76,
     )
+
+
+def _original_path_label(preview: CockpitLineagePreview | None) -> str:
+    if preview is None:
+        return "Original path unavailable"
+    return _compact_console_text(
+        f"{preview.original_directory}/{preview.original_filename}",
+        maximum=76,
+    )
+
+
+def _current_path_label(document: Document) -> str:
+    if document.path is None:
+        return document.proposed_destination or "Current path unavailable"
+    return _compact_console_text(str(document.path.parent), maximum=76)
 
 
 def _preflight_check(

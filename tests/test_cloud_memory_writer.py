@@ -24,7 +24,10 @@ class _FakeConnection:
 
     def execute(self, statement: object, parameters: object | None = None) -> object:
         self.calls.append((str(statement), parameters))
-        return object()
+        return self
+
+    def scalar_one(self) -> object:
+        return "00000000-0000-4000-8000-000000000001"
 
 
 class _FakeBegin:
@@ -79,20 +82,24 @@ def test_cloud_memory_writer_persists_job_and_objects_with_bound_parameters() ->
 
     assert result == {
         "configured": True,
-        "memory_table": "docweave.cloud_analysis_objects",
+        "memory_table": "docweave.proposals",
         "persisted_count": 1,
     }
-    job_sql, job_parameters = engine.connection.calls[0]
-    object_sql, object_parameters = engine.connection.calls[1]
-    assert "INSERT INTO docweave.cloud_analysis_jobs" in job_sql
-    assert "ON CONFLICT (workspace_id, job_id) DO UPDATE" in job_sql
-    assert isinstance(job_parameters, dict)
-    assert job_parameters["job_id"] == JOB_ID
-    assert "INSERT INTO docweave.cloud_analysis_objects" in object_sql
-    assert "CAST(:proposal_json AS JSONB)" in object_sql
-    assert isinstance(object_parameters, list)
-    assert object_parameters[0]["proposed_class"] == "invoice"
-    assert object_parameters[0]["confidence_signal"] == "strong"
+    document_sql, document_parameters = engine.connection.calls[0]
+    run_sql, run_parameters = engine.connection.calls[1]
+    proposal_sql, proposal_parameters = engine.connection.calls[2]
+    assert "INSERT INTO docweave.documents" in document_sql
+    assert "ON CONFLICT (workspace_label, content_sha256) DO UPDATE" in document_sql
+    assert isinstance(document_parameters, dict)
+    assert document_parameters["original_filename"] == "document.pdf"
+    assert "INSERT INTO docweave.agent_runs" in run_sql
+    assert "CAST(:output_json AS JSONB)" in run_sql
+    assert isinstance(run_parameters, dict)
+    assert run_parameters["document_id"] == "00000000-0000-4000-8000-000000000001"
+    assert "INSERT INTO docweave.proposals" in proposal_sql
+    assert isinstance(proposal_parameters, dict)
+    assert proposal_parameters["proposed_class"] == "invoice"
+    assert proposal_parameters["confidence"] == "0.850000"
 
 
 @pytest.mark.parametrize(

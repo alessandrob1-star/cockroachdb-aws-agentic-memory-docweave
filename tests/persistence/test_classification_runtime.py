@@ -33,9 +33,11 @@ from docweave.persistence import (
     ClassificationScores,
     CockroachClassificationRepository,
     CockroachMemoryFoundationRepository,
+    CockroachSimpleMemoryRepository,
     EnsureApprovedTaxonomy,
     PersistClassificationProposal,
     PersistenceDisposition,
+    PersistSimpleAnalysis,
     RegisterDocumentVersion,
     build_classification_runtime,
     provide_uncalibrated_confidence_v0,
@@ -92,6 +94,20 @@ class FakeClassificationRepository:
         command: PersistClassificationProposal,
     ) -> PersistenceDisposition:
         self.events.append("persist")
+        self.command = command
+        return PersistenceDisposition.APPLIED
+
+
+class FakeSimpleMemoryRepository:
+    def __init__(self, events: list[str]) -> None:
+        self.events = events
+        self.command: PersistSimpleAnalysis | None = None
+
+    def persist_analysis(
+        self,
+        command: PersistSimpleAnalysis,
+    ) -> PersistenceDisposition:
+        self.events.append("simple_memory")
         self.command = command
         return PersistenceDisposition.APPLIED
 
@@ -216,12 +232,18 @@ def request() -> PdfExtractionRequest:
     )
 
 
-def test_runs_boundaries_in_order_and_persists_explicit_scores() -> None:
+def test_runs_boundaries_in_order_and_persists_explicit_scores(
+    tmp_path: Path,
+) -> None:
     events: list[str] = []
     foundation = FakeFoundationRepository(events)
     classification = FakeClassificationRepository(events)
+    simple_memory = FakeSimpleMemoryRepository(events)
     gateway = FakeGateway(events, model_run())
     supplied_scores = scores()
+    source = tmp_path / "incoming" / "invoice.pdf"
+    source.parent.mkdir()
+    source.write_bytes(b"%PDF-1.7\n%%EOF\n")
 
     def extract(_: PdfExtractionRequest) -> PdfExtractionResult:
         events.append("extract")
@@ -244,15 +266,31 @@ def test_runs_boundaries_in_order_and_persists_explicit_scores() -> None:
             CockroachClassificationRepository,
             classification,
         ),
+        simple_memory_repository=cast(
+            CockroachSimpleMemoryRepository,
+            simple_memory,
+        ),
         score_provider=score,
         extractor=extract,
         clock=lambda: NOW,
     )
 
-    result = runtime.classify_and_persist(request(), identity=identity())
+    result = runtime.classify_and_persist(
+        PdfExtractionRequest(source_path=source, authorized_root=tmp_path),
+        identity=identity(),
+    )
 
-    assert events == ["extract", "register", "taxonomy", "model", "score", "persist"]
+    assert events == [
+        "extract",
+        "register",
+        "taxonomy",
+        "model",
+        "score",
+        "persist",
+        "simple_memory",
+    ]
     assert result.proposal_disposition is PersistenceDisposition.APPLIED
+    assert result.simple_memory_disposition is PersistenceDisposition.APPLIED
     assert gateway.pages == PAGES
     assert foundation.document_command is not None
     assert foundation.document_command.sha256 == bytes.fromhex(DIGEST_HEX)
@@ -263,6 +301,11 @@ def test_runs_boundaries_in_order_and_persists_explicit_scores() -> None:
         classification.command.proposed_class_id
         == (foundation.taxonomy_command.class_ids[TaxonomyClass.INVOICE])
     )
+    assert simple_memory.command is not None
+    assert simple_memory.command.original_directory == "incoming"
+    assert simple_memory.command.original_filename == "invoice.pdf"
+    assert simple_memory.command.proposed_category == "invoice"
+    assert simple_memory.command.proposed_directory == "DocWeave Organized/Invoices"
 
 
 def test_composes_runtime_without_database_or_model_io() -> None:

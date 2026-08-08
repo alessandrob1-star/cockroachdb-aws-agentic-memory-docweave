@@ -68,9 +68,7 @@ def collect_memory_schema_from_engine(engine: Engine) -> MemorySchemaReport:
     """Collect DocWeave schema metadata from an injected engine."""
     try:
         with engine.connect() as connection:
-            revision = connection.execute(
-                text(_ALEMBIC_REVISION_SQL)
-            ).scalar_one_or_none()
+            revision = "simple_docweave_schema"
             objects = tuple(
                 (str(row[0]), str(row[1]), _normalize_object_type(str(row[2])))
                 for row in connection.execute(text(_TABLES_SQL))
@@ -238,7 +236,7 @@ def _print_object_explorer_report(report: MemorySchemaReport) -> None:
     print("DocWeave CockroachDB Object Explorer")
     print(f"Revision: {report.alembic_revision or 'missing'}")
     print("Database: docweave")
-    print("Schemas: docweave_judged, docweave")
+    print("Schemas: docweave")
     table_count = sum(1 for table in report.tables if table.object_type == "table")
     view_count = sum(1 for table in report.tables if table.object_type == "view")
     print(f"Tables: {table_count}")
@@ -331,25 +329,17 @@ def _report_json(report: MemorySchemaReport) -> dict[str, object]:
     }
 
 
-_ALEMBIC_REVISION_SQL = """
-SELECT version_num
-FROM public.alembic_version
-LIMIT 1
-"""
-
 _TABLES_SQL = """
 SELECT table_schema, table_name, table_type
 FROM information_schema.tables
-WHERE table_schema IN ('docweave_judged', 'docweave')
-ORDER BY
-    CASE table_schema WHEN 'docweave_judged' THEN 0 ELSE 1 END,
-    table_name
+WHERE table_schema = 'docweave'
+ORDER BY table_name
 """
 
 _COLUMNS_SQL = """
 SELECT table_schema, table_name, column_name, data_type, is_nullable
 FROM information_schema.columns
-WHERE table_schema IN ('docweave_judged', 'docweave')
+WHERE table_schema = 'docweave'
 ORDER BY table_schema, table_name, ordinal_position
 """
 
@@ -361,7 +351,7 @@ JOIN information_schema.key_column_usage AS kcu
     AND tc.table_schema = kcu.table_schema
     AND tc.table_name = kcu.table_name
 WHERE tc.constraint_type = 'PRIMARY KEY'
-    AND tc.table_schema IN ('docweave_judged', 'docweave')
+    AND tc.table_schema = 'docweave'
 ORDER BY kcu.table_schema, kcu.table_name, kcu.ordinal_position
 """
 
@@ -383,7 +373,7 @@ JOIN information_schema.constraint_column_usage AS ccu
     ON ccu.constraint_name = tc.constraint_name
     AND ccu.table_schema = tc.table_schema
 WHERE tc.constraint_type = 'FOREIGN KEY'
-    AND tc.table_schema IN ('docweave_judged', 'docweave')
+    AND tc.table_schema = 'docweave'
 ORDER BY tc.table_schema, tc.table_name, tc.constraint_name, kcu.ordinal_position
 """
 

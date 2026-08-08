@@ -34,12 +34,8 @@ class FakeConnection:
     def __init__(
         self,
         tables: set[str],
-        views: set[str],
-        judged_tables: set[str],
     ) -> None:
         self._tables = tables
-        self._views = views
-        self._judged_tables = judged_tables
         self.queries: list[str] = []
 
     def __enter__(self) -> "FakeConnection":
@@ -53,10 +49,6 @@ class FakeConnection:
         self.queries.append(raw_statement)
         if "information_schema.tables" not in raw_statement:
             return ()
-        if "table_type = 'VIEW'" in raw_statement:
-            return tuple(FakeRow(view) for view in sorted(self._views))
-        if "docweave_judged" in raw_statement:
-            return tuple(FakeRow(table) for table in sorted(self._judged_tables))
         return tuple(FakeRow(table) for table in sorted(self._tables))
 
 
@@ -64,14 +56,8 @@ class FakeEngine:
     def __init__(
         self,
         tables: set[str],
-        views: set[str] | None = None,
-        judged_tables: set[str] | None = None,
     ) -> None:
-        self.connection = FakeConnection(
-            tables,
-            {"file_path_history"} if views is None else views,
-            _required_judged_tables() if judged_tables is None else judged_tables,
-        )
+        self.connection = FakeConnection(tables)
 
     def connect(self) -> FakeConnection:
         return self.connection
@@ -88,33 +74,14 @@ def _config() -> RuntimeEnvironmentConfig:
 
 def _runtime(
     tables: set[str],
-    views: set[str] | None = None,
-    judged_tables: set[str] | None = None,
 ) -> FakeRuntime:
     return FakeRuntime(
         config=_config(),
-        engine=cast(Engine, FakeEngine(tables, views, judged_tables)),
+        engine=cast(Engine, FakeEngine(tables)),
     )
 
 
 def _required_tables() -> set[str]:
-    return {
-        "workspaces",
-        "actors",
-        "documents",
-        "document_versions",
-        "agent_runs",
-        "proposals",
-        "classification_proposals",
-        "proposal_evidence",
-        "review_decisions",
-        "file_lineage_events",
-        "cloud_analysis_jobs",
-        "cloud_analysis_objects",
-    }
-
-
-def _required_judged_tables() -> set[str]:
     return {
         "documents",
         "agent_runs",
@@ -247,37 +214,12 @@ def test_preflight_passes_database_when_required_schema_exists() -> None:
 def test_preflight_fails_database_when_required_schema_is_incomplete() -> None:
     report = run_preflight(
         check_database=True,
-        runtime_builder=lambda: _runtime({"workspaces", "actors"}),
+        runtime_builder=lambda: _runtime({"documents", "agent_runs"}),
     )
 
     assert not report.succeeded
     assert report.checks[-1].state is PreflightState.FAIL
-    assert "classification_proposals" in report.checks[-1].detail
-
-
-def test_preflight_fails_database_when_readable_path_history_view_is_missing() -> None:
-    report = run_preflight(
-        check_database=True,
-        runtime_builder=lambda: _runtime(_required_tables(), views=set()),
-    )
-
-    assert not report.succeeded
-    assert report.checks[-1].state is PreflightState.FAIL
-    assert "views:file_path_history" in report.checks[-1].detail
-
-
-def test_preflight_fails_database_when_judged_schema_is_missing() -> None:
-    report = run_preflight(
-        check_database=True,
-        runtime_builder=lambda: _runtime(
-            _required_tables(),
-            judged_tables={"documents"},
-        ),
-    )
-
-    assert not report.succeeded
-    assert report.checks[-1].state is PreflightState.FAIL
-    assert "judged:" in report.checks[-1].detail
+    assert "file_history" in report.checks[-1].detail
     assert "file_history" in report.checks[-1].detail
 
 

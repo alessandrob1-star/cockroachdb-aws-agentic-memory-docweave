@@ -75,6 +75,11 @@ from docweave.persistence.runtime import (
     DurableRuntimeOptions,
     build_durable_operation_runtime,
 )
+from docweave.persistence.simple_memory_repository import (
+    CockroachSimpleMemoryRepository,
+    PersistHumanDecision,
+    PersistSimpleAnalysis,
+)
 from docweave.persistence.transactions import (
     CockroachTransactionRunner,
     TransactionExecutionError,
@@ -102,6 +107,7 @@ __all__ = [
     "CockroachOperationRepository",
     "CockroachRestoreAuditRepository",
     "CockroachReviewDecisionRepository",
+    "CockroachSimpleMemoryRepository",
     "CockroachTransactionRunner",
     "CreateBatch",
     "DurableExecutionLedger",
@@ -118,7 +124,9 @@ __all__ = [
     "OperationResultMapping",
     "PersistClassificationProposal",
     "PersistFileLineageEvent",
+    "PersistHumanDecision",
     "PersistReviewDecision",
+    "PersistSimpleAnalysis",
     "PersistedClassificationRun",
     "PersistedOperationExecution",
     "PersistenceConflictError",
