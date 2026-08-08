@@ -1,44 +1,56 @@
 # DocWeave
 
-**DocWeave turns a messy Portable Document Format (PDF) folder into a
-human-approved, CockroachDB-backed memory trail.**
+**Hackathon submission in one sentence:** DocWeave is an agentic document
+cockpit that uses **CockroachDB Cloud as persistent memory** and runs a real
+**Amazon Web Services (AWS)** path with **Amazon Bedrock, AWS Lambda, Amazon
+Simple Storage Service (Amazon S3), Amazon Simple Queue Service (Amazon SQS),
+Amazon API Gateway, Amazon CloudWatch Logs, and AWS Secrets Manager dynamic
+references**.
 
-Most document automation demos stop at "the model classified this PDF."
-DocWeave goes one step further: it lets a user pick a real folder, ask a Large
-Language Model (LLM) to understand the documents, approve safer names and
-folders, and then prove where every moved file originally came from.
-
-The product is built around one judge-friendly loop:
+DocWeave solves a concrete workflow: a user has a folder full of badly named
+Portable Document Format (PDF) files like `scan_000184.pdf`. The dashboard lets
+the user choose that folder, analyze the PDFs with a Large Language Model
+(LLM), review safer names and folders, approve the move, and then prove exactly
+where every renamed file originally came from.
 
 ```text
-Open dashboard -> choose folder -> analyze PDFs -> approve rename/move -> inspect CockroachDB memory
+Choose folder -> Bedrock analysis -> CockroachDB memory -> human approval -> safe rename/move -> original path still visible
 ```
 
-The distinctive part is not a chat box. It is the **glass-effect desktop
-cockpit**: a PySide6 dashboard with an embedded PDF preview, scan state,
-model evidence, approval controls, and a memory panel in one surface. The user
-interface (UI) is designed so a judge can see the workflow without reading
-logs: original file, Artificial Intelligence (AI) proposal, human decision,
-final path, and database memory are all visible from the dashboard.
+## Submission Fit
 
-DocWeave uses real Amazon Web Services (AWS) infrastructure:
+| Requirement | DocWeave evidence |
+| --- | --- |
+| Agentic application | Bedrock reads extracted PDF text and proposes class, metadata, evidence, destination folder, and filename. |
+| CockroachDB as persistent memory | CockroachDB stores documents, Bedrock runs, proposals, human decisions, and before/after file history. |
+| Deployed on AWS | CloudFormation deploys Lambda API/worker, S3 artifacts, SQS queue, API Gateway, CloudWatch Logs, Bedrock permissions, and Secrets Manager dynamic references. |
+| AWS services identified | Amazon Bedrock; AWS Lambda; Amazon S3; Amazon SQS; Amazon API Gateway; Amazon CloudWatch Logs; AWS Secrets Manager dynamic references. |
+| CockroachDB tools identified | Current repo evidence covers CockroachDB Cloud memory. `ccloud`/Managed MCP evidence must be added before final submission if claiming the required second CockroachDB tool. |
+| Demo must show memory layer | The dashboard and SQL queries show original filename, current filename, proposal, human decision, and file history in CockroachDB. |
 
-- **Amazon Bedrock** reads extracted PDF text and returns structured document
-  proposals with class, evidence, metadata, confidence signal, and rationale.
-- **Amazon S3** stores cloud PDF artifacts and analysis result artifacts.
-- **Amazon SQS** queues cloud analysis work so uploads and model calls are not
-  the same blocking request.
-- **AWS Lambda** runs the HTTP API and asynchronous analysis worker.
-- **Amazon API Gateway** exposes the cloud API.
-- **Amazon CloudWatch Logs** keeps operational evidence for the Lambda path.
-- **AWS Secrets Manager dynamic references** are wired in CloudFormation for
-  the CockroachDB runtime URL when a secret ARN is supplied.
-- **CockroachDB Cloud** is the durable memory layer shared by local dashboard,
-  command-line validation, and the AWS worker.
+The distinctive product surface is the **glass-effect desktop cockpit**. It is
+not a generic chat wrapper: the PySide6 dashboard shows folder scanning,
+embedded PDF preview, Bedrock evidence, approval controls, CockroachDB memory
+status, and original/current path history in one visual workflow. A judge can
+understand the product from the screen before reading logs.
+
+## AWS Services Used
+
+- **Amazon Bedrock** - model reasoning for document class, evidence, metadata,
+  rationale, confidence signal, destination folder, and filename proposal.
+- **AWS Lambda** - serverless HTTP API and asynchronous analysis worker.
+- **Amazon S3** - uploaded PDF artifacts and JSON analysis-result artifacts.
+- **Amazon SQS** - queued analysis jobs between upload/API and worker.
+- **Amazon API Gateway** - public HTTP boundary for health, upload requests,
+  analysis requests, and result lookup.
+- **Amazon CloudWatch Logs** - operational evidence for Lambda execution.
+- **AWS Secrets Manager dynamic references** - CloudFormation wiring for the
+  CockroachDB runtime URL when a secret ARN is supplied.
+
+## CockroachDB Memory
 
 CockroachDB is intentionally simple. There is one schema, `docweave`, and six
-tables. No hidden judge schema. No demo-only table family. The same tables a
-judge sees in CockroachDB are the tables the dashboard writes:
+judge-visible tables. No hidden judge schema. No demo-only table family.
 
 | Table | What It Proves |
 | --- | --- |
@@ -49,16 +61,16 @@ judge sees in CockroachDB are the tables the dashboard writes:
 | `file_history` | Before/after path memory for an approved move or rename. |
 | `document_relationships` | Optional lightweight links between related documents. |
 
-In a four-minute demo, the story is:
+In a four-minute demo:
 
-1. Start the cockpit and choose a folder full of badly named PDFs.
-2. Click Analyze. DocWeave extracts text, calls Bedrock, and writes proposals to
-   CockroachDB.
-3. Open a PDF row. The dashboard shows the document, proposed class, proposed
-   destination, evidence, and memory status.
-4. Approve. The file is renamed and moved only after the human decision.
-5. Select the moved PDF. DocWeave still shows the original filename and original
-   directory because that path history is stored in CockroachDB.
+1. Start the cockpit and choose a messy PDF folder.
+2. Click Analyze. Bedrock produces a structured proposal and CockroachDB records
+   the run.
+3. Open a PDF row. The cockpit shows the PDF, model evidence, proposed class,
+   proposed destination, and memory status.
+4. Approve. The file moves only after the human decision.
+5. Select the moved PDF. DocWeave still shows the original filename and
+   original directory because CockroachDB retained the path history.
 
 ## Why This Is Not Just Another AI Wrapper
 
