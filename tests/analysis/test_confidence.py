@@ -4,9 +4,6 @@ from decimal import Decimal
 from docweave.analysis import (
     CONFIDENCE_METHOD_VERSION,
     AlternativeClass,
-    BedrockClassificationRun,
-    BedrockRunProvenance,
-    BedrockUsage,
     CandidateMetadata,
     ClassificationProposal,
     Contradiction,
@@ -21,7 +18,6 @@ from docweave.extraction import (
     ExtractionStatus,
     PdfExtractionResult,
 )
-from docweave.persistence import provide_uncalibrated_confidence_v0
 
 PAGES = (
     ExtractedPage(page_index=0, page_label="1", text="INVOICE INV-17"),
@@ -81,29 +77,6 @@ def extraction(
         source_bytes=42,
         document_page_count=page_count,
         extractor="qt_pdf",
-    )
-
-
-def run(value: ClassificationProposal) -> BedrockClassificationRun:
-    return BedrockClassificationRun(
-        proposal=value,
-        provenance=BedrockRunProvenance(
-            region_name="eu-central-1",
-            model_id="eu.amazon.nova-2-lite-v1:0",
-            contract_version="classification.v1",
-            taxonomy_version="docweave_mvp_v0_1",
-            stop_reason="tool_use",
-            usage=BedrockUsage(
-                input_tokens=500,
-                output_tokens=200,
-                total_tokens=700,
-            ),
-            service_latency_ms=321,
-            observed_duration_ms=350,
-            request_id="request-123",
-            retry_attempts=0,
-            estimated_cost_usd=Decimal("0.0072"),
-        ),
     )
 
 
@@ -207,8 +180,8 @@ def test_metadata_score_requires_evidence_for_each_candidate() -> None:
     assert absent.metadata == Decimal("0.00000")
 
 
-def test_persistence_provider_keeps_calibration_explicitly_null() -> None:
-    scores = provide_uncalibrated_confidence_v0(run(proposal()), extraction())
+def test_uncalibrated_confidence_keeps_calibration_explicitly_null() -> None:
+    scores = compute_uncalibrated_confidence(proposal(), extraction())
 
     assert scores.raw == Decimal("0.85000")
     assert scores.calibrated is None

@@ -1,4 +1,4 @@
-"""CockroachDB memory writer for DocWeave cloud analysis results."""
+"""CockroachDB writer for DocWeave cloud analysis results."""
 
 from __future__ import annotations
 
@@ -6,6 +6,7 @@ import json
 import os
 from collections.abc import Mapping, Sequence
 from datetime import UTC, datetime
+from pathlib import PurePosixPath
 from typing import Any, Protocol
 from uuid import UUID, uuid5
 
@@ -38,7 +39,7 @@ class _EngineLike(Protocol):
 
 
 class CloudCockroachMemoryWriter:
-    """Persist AWS worker analysis observations with bound SQL parameters."""
+    """Persist AWS worker analysis observations into the simple memory schema."""
 
     def __init__(self, engine: _EngineLike) -> None:
         self._engine = engine
@@ -59,38 +60,30 @@ class CloudCockroachMemoryWriter:
             raise ValueError("verified object count must match classifications")
 
         completed_at = datetime.now(UTC)
-        cloud_job_id = uuid5(_NAMESPACE, f"{workspace_uuid}:{safe_job_id}")
         object_rows = [
             _object_parameters(
                 workspace_id=workspace_uuid,
-                cloud_job_id=cloud_job_id,
                 job_id=safe_job_id,
                 sequence=index,
                 classification=classification,
             )
             for index, classification in enumerate(classifications, start=1)
         ]
-        job_parameters = {
-            "cloud_analysis_job_id": cloud_job_id,
-            "workspace_id": workspace_uuid,
-            "job_id": safe_job_id,
-            "status": "persisted",
-            "source_service": "aws_lambda_worker",
-            "result_artifact_key": (
-                f"workspaces/{workspace_uuid}/analysis-results/{safe_job_id}.json"
-            ),
-            "completed_at": completed_at,
-        }
-
         with self._engine.begin() as connection:
-            connection.execute(_UPSERT_JOB, job_parameters)
-            if object_rows:
-                connection.execute(_UPSERT_OBJECT, object_rows)
+            for row in object_rows:
+                parameters = {**row, "completed_at": completed_at}
+                stored_document_id = connection.execute(
+                    _UPSERT_DOCUMENT,
+                    parameters,
+                ).scalar_one()
+                parameters["document_id"] = stored_document_id
+                connection.execute(_UPSERT_RUN, parameters)
+                connection.execute(_UPSERT_PROPOSAL, parameters)
 
         return {
             "configured": True,
             "persisted_count": len(object_rows),
-            "memory_table": "docweave.cloud_analysis_objects",
+            "memory_table": "docweave.proposals",
         }
 
 
@@ -109,7 +102,6 @@ def build_cloud_memory_writer_from_environment(
 def _object_parameters(
     *,
     workspace_id: UUID,
-    cloud_job_id: UUID,
     job_id: str,
     sequence: int,
     classification: Mapping[str, object],
@@ -123,6 +115,7 @@ def _object_parameters(
         "content_sha256",
         str(classification.get("content_sha256", "")),
     )
+    _non_negative_int("byte_size", classification.get("byte_size"))
     proposal = _mapping_value("proposal", classification.get("proposal"))
     usage = _mapping_value("usage", classification.get("usage"))
     proposed_class = _required_text(
@@ -137,27 +130,55 @@ def _object_parameters(
     )
     if confidence_signal not in {"weak", "moderate", "strong"}:
         raise ValueError("confidence_signal is invalid")
+    original_directory, original_filename = _split_s3_original_path(object_key)
+    proposal_json = _json_object("proposal", proposal)
+    usage_json = _json_object("usage", usage)
+    document_id = uuid5(
+        _NAMESPACE,
+        f"{workspace_id}:document:{content_sha256.hex()}",
+    )
 
     return {
-        "cloud_analysis_object_id": uuid5(
+        "document_id": document_id,
+        "agent_run_id": uuid5(
             _NAMESPACE,
-            f"{workspace_id}:{job_id}:{sequence}:{object_key}:{content_sha256.hex()}",
+            f"{workspace_id}:{job_id}:{sequence}:agent-run:{content_sha256.hex()}",
         ),
-        "workspace_id": workspace_id,
-        "cloud_analysis_job_id": cloud_job_id,
-        "object_sequence": sequence,
-        "s3_object_key": object_key,
+        "proposal_id": uuid5(
+            _NAMESPACE,
+            f"{workspace_id}:{job_id}:{sequence}:proposal:{content_sha256.hex()}",
+        ),
+        "workspace_label": str(workspace_id),
+        "original_directory": original_directory,
+        "original_filename": original_filename,
         "content_sha256": content_sha256,
-        "byte_size": _non_negative_int("byte_size", classification.get("byte_size")),
+        "page_count": 1,
         "model_id": _required_text(
             "model_id",
             str(classification.get("model_id", "")),
             max_length=256,
         ),
+        "output_json": proposal_json,
+        "summary": _required_text(
+            "rationale",
+            str(proposal.get("rationale", "")),
+            max_length=1000,
+        ),
         "proposed_class": proposed_class,
-        "confidence_signal": confidence_signal,
-        "proposal_json": _json_object("proposal", proposal),
-        "usage_json": _json_object("usage", usage),
+        "proposed_directory": _proposed_directory(proposed_class),
+        "proposed_filename": _proposed_filename(
+            proposed_class=proposed_class,
+            original_filename=original_filename,
+            proposal=proposal,
+        ),
+        "confidence": _confidence_value(confidence_signal),
+        "evidence_summary": _required_text(
+            "rationale",
+            str(proposal.get("rationale", "")),
+            max_length=1000,
+        ),
+        "input_sha256": content_sha256,
+        "usage_json": usage_json,
     }
 
 
@@ -208,43 +229,106 @@ def _json_object(name: str, value: Mapping[str, object]) -> str:
     return encoded
 
 
-_UPSERT_JOB = text(
+def _split_s3_original_path(object_key: str) -> tuple[str, str]:
+    path = PurePosixPath(object_key)
+    filename = path.name
+    if not filename:
+        raise ValueError("object_key filename is missing")
+    parts = path.parts
+    try:
+        originals_index = parts.index("originals")
+    except ValueError:
+        directory = str(path.parent)
+    else:
+        relative_parts = parts[originals_index + 1 : -1]
+        directory = "/".join(relative_parts) if relative_parts else "."
+    return directory, filename
+
+
+def _proposed_directory(proposed_class: str) -> str:
+    words = proposed_class.replace("_", " ").title().replace(" ", "")
+    return f"DocWeave Organized/{words}"
+
+
+def _proposed_filename(
+    *,
+    proposed_class: str,
+    original_filename: str,
+    proposal: Mapping[str, object],
+) -> str:
+    metadata = proposal.get("candidate_metadata")
+    suffix = ""
+    if isinstance(metadata, list):
+        for item in metadata:
+            if isinstance(item, dict):
+                value = str(item.get("value", "")).strip()
+                if value:
+                    suffix = "-" + _safe_filename_token(value)
+                    break
+    stem = _safe_filename_token(proposed_class.replace("_", "-"))
+    extension = PurePosixPath(original_filename).suffix or ".pdf"
+    return f"{stem}{suffix}{extension.casefold()}"
+
+
+def _safe_filename_token(value: str) -> str:
+    token = "".join(character if character.isalnum() else "-" for character in value)
+    collapsed = "-".join(part for part in token.strip("-").split("-") if part)
+    return (collapsed or "document")[:80].casefold()
+
+
+def _confidence_value(signal: str) -> str:
+    return {
+        "weak": "0.350000",
+        "moderate": "0.650000",
+        "strong": "0.850000",
+    }[signal]
+
+
+_UPSERT_DOCUMENT = text(
     """
-    INSERT INTO docweave.cloud_analysis_jobs (
-        cloud_analysis_job_id, workspace_id, job_id, status, source_service,
-        result_artifact_key, completed_at
+    INSERT INTO docweave.documents (
+        document_id, workspace_label, original_directory, original_filename,
+        current_directory, current_filename, content_sha256, page_count,
+        status, discovered_at
     ) VALUES (
-        :cloud_analysis_job_id, :workspace_id, :job_id, :status, :source_service,
-        :result_artifact_key, :completed_at
+        :document_id, :workspace_label, :original_directory, :original_filename,
+        :original_directory, :original_filename, :content_sha256, :page_count,
+        'proposed', :completed_at
     )
-    ON CONFLICT (workspace_id, job_id) DO UPDATE SET
-        status = excluded.status,
-        result_artifact_key = excluded.result_artifact_key,
-        completed_at = excluded.completed_at
+    ON CONFLICT (workspace_label, content_sha256) DO UPDATE SET
+        current_directory = excluded.current_directory,
+        current_filename = excluded.current_filename,
+        page_count = excluded.page_count,
+        status = excluded.status
+    RETURNING document_id
     """
 )
 
-_UPSERT_OBJECT = text(
+_UPSERT_RUN = text(
     """
-    INSERT INTO docweave.cloud_analysis_objects (
-        cloud_analysis_object_id, workspace_id, cloud_analysis_job_id,
-        object_sequence, s3_object_key, content_sha256, byte_size, model_id,
-        proposed_class, confidence_signal, proposal, usage
+    INSERT INTO docweave.agent_runs (
+        agent_run_id, document_id, provider, model_id, task, status,
+        started_at, completed_at, input_sha256, output_json, summary
     ) VALUES (
-        :cloud_analysis_object_id, :workspace_id, :cloud_analysis_job_id,
-        :object_sequence, :s3_object_key, :content_sha256, :byte_size, :model_id,
-        :proposed_class, :confidence_signal, CAST(:proposal_json AS JSONB),
-        CAST(:usage_json AS JSONB)
+        :agent_run_id, :document_id, 'amazon_bedrock', :model_id,
+        'aws_worker_classify_uploaded_pdf', 'succeeded', :completed_at,
+        :completed_at, :input_sha256, CAST(:output_json AS JSONB), :summary
     )
-    ON CONFLICT (workspace_id, cloud_analysis_job_id, object_sequence) DO UPDATE SET
-        s3_object_key = excluded.s3_object_key,
-        content_sha256 = excluded.content_sha256,
-        byte_size = excluded.byte_size,
-        model_id = excluded.model_id,
-        proposed_class = excluded.proposed_class,
-        confidence_signal = excluded.confidence_signal,
-        proposal = excluded.proposal,
-        usage = excluded.usage,
-        persisted_at = now()
+    ON CONFLICT (agent_run_id) DO NOTHING
+    """
+)
+
+_UPSERT_PROPOSAL = text(
+    """
+    INSERT INTO docweave.proposals (
+        proposal_id, document_id, agent_run_id, proposed_category,
+        proposed_directory, proposed_filename, confidence, evidence_summary,
+        status, created_at
+    ) VALUES (
+        :proposal_id, :document_id, :agent_run_id, :proposed_class,
+        :proposed_directory, :proposed_filename, :confidence, :evidence_summary,
+        'needs_review', :completed_at
+    )
+    ON CONFLICT (proposal_id) DO NOTHING
     """
 )

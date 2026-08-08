@@ -15,7 +15,7 @@ from docweave.application_runtime import (
     RuntimeEnvironmentConfig,
 )
 from docweave.operations import ReviewDecisionAction
-from docweave.persistence import PersistReviewDecision
+from docweave.persistence import PersistHumanDecision
 from docweave.persistence.contracts import PersistenceDisposition
 from docweave.review_cli import _persist_review_decision_with_runtime
 
@@ -29,16 +29,18 @@ PROPOSAL_FINGERPRINT = "ab" * 32
 PLAN_FINGERPRINT = "cd" * 32
 
 
-class FakeReviewRepository:
+class FakeSimpleMemoryRepository:
     def __init__(self) -> None:
-        self.commands: list[PersistReviewDecision] = []
+        self.commands: list[PersistHumanDecision] = []
 
-    def persist(self, command: PersistReviewDecision) -> PersistenceDisposition:
+    def persist_human_decision(
+        self, command: PersistHumanDecision
+    ) -> PersistenceDisposition:
         self.commands.append(command)
         return PersistenceDisposition.APPLIED
 
 
-def _configured(repository: FakeReviewRepository) -> ConfiguredReviewDecisionRuntime:
+def _configured() -> ConfiguredReviewDecisionRuntime:
     return cast(
         ConfiguredReviewDecisionRuntime,
         SimpleNamespace(
@@ -48,16 +50,30 @@ def _configured(repository: FakeReviewRepository) -> ConfiguredReviewDecisionRun
                 taxonomy_version_id=TAXONOMY_VERSION_ID,
                 approved_by_actor_id=ACTOR_ID,
             ),
-            repository=repository,
+            transaction_runner=object(),
         ),
     )
 
 
-def test_persist_review_decision_binds_cli_fields_to_durable_command() -> None:
-    repository = FakeReviewRepository()
+def test_persist_review_decision_binds_cli_fields_to_simple_memory(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    repository = FakeSimpleMemoryRepository()
+
+    def fake_repository_factory(
+        transaction_runner: object,
+    ) -> FakeSimpleMemoryRepository:
+        assert transaction_runner is not None
+        return repository
+
+    monkeypatch.setattr(
+        review_cli,
+        "CockroachSimpleMemoryRepository",
+        fake_repository_factory,
+    )
 
     result = _persist_review_decision_with_runtime(
-        _configured(repository),
+        _configured(),
         review_cli.ReviewDecisionCommandInput(
             proposal_id=PROPOSAL_ID,
             action=ReviewDecisionAction.REJECT,
@@ -66,6 +82,14 @@ def test_persist_review_decision_binds_cli_fields_to_durable_command() -> None:
             reason="  wrong category  ",
             review_decision_id=REVIEW_DECISION_ID,
             decided_at_utc=NOW,
+            document_id=UUID("66666666-6666-4666-8666-666666666666"),
+            operation="reject_only",
+            previous_directory="Inbox",
+            previous_filename="old.pdf",
+            next_directory="Reviewed",
+            next_filename="new.pdf",
+            file_status="rejected",
+            note="operator note",
         ),
     )
 
@@ -74,22 +98,19 @@ def test_persist_review_decision_binds_cli_fields_to_durable_command() -> None:
     assert result.review_decision_id == REVIEW_DECISION_ID
     assert len(repository.commands) == 1
     command = repository.commands[0]
-    assert command.workspace_id == WORKSPACE_ID
     assert command.proposal_id == PROPOSAL_ID
-    assert command.review_decision_id == REVIEW_DECISION_ID
-    assert command.reviewer_actor_id == ACTOR_ID
-    assert command.action is ReviewDecisionAction.REJECT
+    assert command.human_decision_id == REVIEW_DECISION_ID
+    assert command.actor_label == "local-cockpit-reviewer"
+    assert command.decision == ReviewDecisionAction.REJECT.value
     assert command.reason == "wrong category"
-    assert command.proposal_fingerprint == PROPOSAL_FINGERPRINT
-    assert command.operation_plan_fingerprint == PLAN_FINGERPRINT
     assert command.decided_at_utc == NOW
-    assert command.audit_event is not None
-    assert command.audit_event.event_type.value == "review_decision_recorded"
-    assert command.audit_event.actor_id == ACTOR_ID
-    assert command.audit_event.subject_id == str(PROPOSAL_ID)
-    assert command.audit_event.previous_state == "needs_review"
-    assert command.audit_event.new_state == "rejected"
-    assert command.audit_event.plan_sha256 == bytes.fromhex(PLAN_FINGERPRINT)
+    assert command.operation == "reject_only"
+    assert command.previous_directory == "Inbox"
+    assert command.previous_filename == "old.pdf"
+    assert command.next_directory == "Reviewed"
+    assert command.next_filename == "new.pdf"
+    assert command.file_status == "rejected"
+    assert command.note == "operator note"
 
 
 def test_review_main_prints_sanitized_success(

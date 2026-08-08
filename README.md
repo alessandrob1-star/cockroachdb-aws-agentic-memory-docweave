@@ -1,653 +1,297 @@
 # DocWeave
 
-DocWeave is a human-governed multi-agent document-management system for the
-CockroachDB x AWS Hackathon — Build with Agentic Memory.
-
-The product is designed to discover large PDF collections, classify documents,
-propose meaningful names and destinations, identify related records, execute
-approved copy or move operations, and safely restore prior states. CockroachDB
-is the persistent operational, semantic, episodic, and preference memory. The
-complete judged product will run on Amazon Web Services.
-
-## Current status
-
-DocWeave is in the approved requirements and architecture phase with an initial
-local Python engineering scaffold, deterministic local filesystem discovery
-contracts, local content fingerprinting, PDF signature inspection, and
-deterministic intake records with duplicate grouping, and safe file-operation
-planning, approval, single-operation execution, bounded local batch execution,
-per-item results, in-memory idempotency, interrupted-operation reconciliation,
-and append-only local audit event contracts. A typed CockroachDB operation
-persistence adapter now defines atomic batch, execution-intent, terminal-result,
-and hash-chained audit writes with bounded serializable retry behavior. An
-optional lifecycle recorder now orders durable intent before filesystem
-mutation and durable results after mutation, failing closed at both
-boundaries. A restart-aware ledger can now load one workspace-scoped terminal
-result or execution claim, replay completed work, reject active leases, and
-route expired claims through filesystem reconciliation. A side-effect-free
-runtime composer now assembles the transaction runner, repository, ledger,
-recorder, and execution hooks around a caller-supplied engine without opening a
-connection. The first non-vector CockroachDB migration is validated offline and
-against a clean, isolated live validation database. No configured runtime
-engine connects these boundaries to that schema, so durable application
-persistence is not yet claimed. No runtime database integration, restore, AWS
-workload, complete review interface, or intelligent document analysis is
-claimed yet. The read-only PySide6 desktop entrypoint now opens the definitive
-cockpit surface supplied for DocWeave, preserving its transparent frameless
-console geometry while replacing demonstration content with compatible local
-DocWeave state. It exposes authorized-folder selection, non-blocking local
-discovery, deterministic intake counts, phase-aware progress, cooperative
-cancellation, explicit in-memory workspace state, a real discovered-PDF table,
-safe user-initiated opening of ready PDFs in the central embedded read-only
-preview, local remembrance of the last successfully authorized folder for the
-next folder picker, and confirmed and policy-validated delegation of eligible
-PDF hyperlinks to the user's default browser. The cockpit now performs a
-fail-closed read-only runtime preflight at startup when explicit runtime values
-are present, displays whether CockroachDB is reachable, and exposes a sanitized
-table-count grid for the configured CockroachDB memory schema without printing
-connection values. The
-`ANALYZE` control now builds a bounded batch from visible ready PDFs, validates
-each item under the authorized root, and dispatches the batch to a background
-classification worker using the same configured runtime path. Each accepted
-proposal moves its document into non-authoritative human review state in the
-cockpit, with progress and terminal batch status surfaced without changing any
-file. Per-item classification failures are reported without stopping the
-remaining visible ready documents, and failed items remain ready for a later
-explicit retry. The cockpit also prepares a deterministic, non-mutating mass
-rename/move preview from the model-proposed class, validated candidate metadata
-when available, and a sanitized original filename fallback, then binds it to
-the existing safe file-operation planner so unsafe paths remain blocked before
-any future approval. The shared operation core now exposes a file-lineage row
-contract that separates original directory and filename, previous directory and
-filename, and next directory and filename for each append-only operation
-transition. It also blocks duplicate destination targets inside the same mass
-preview before any human approval or file mutation. This is still a transparent
-planning layer, not free-form semantic Bedrock filename generation. The shared
-local operation core now includes explicit human review-decision contracts for
-non-authoritative classification proposals. Decisions are attributable, fingerprint-bound to the
-exact proposal and optional operation plan that was reviewed, and append-only in
-the local test ledger. The cockpit now exposes local APPROVE and REJECT controls
-for selected review rows, records the decision against the retained proposal
-fingerprint, and visibly confirms that no copy or move has been executed. These
-controls are not yet wired to CockroachDB and do not execute approved
-filesystem operations. A third non-vector CockroachDB migration and typed
-repository now define atomic, idempotent persistence for final approve/reject
-review decisions, binding each decision to the exact proposal fingerprint and
-optional operation-plan fingerprint while updating the proposal status in the
-same transaction. Automated tests exercise a 30-PDF cockpit batch with an
-injected non-cloud function, and live desktop classification remains dependent
-on runtime configuration and a migrated database.
-Document-controlled persistence values remain bound parameters rather than
-executable Structured Query Language.
-
-The shared core now also performs real page-level text extraction through the
-already pinned Qt PDF module. Each attempt runs in a disposable child process
-with authorized-root validation, source-digest verification, and explicit
-file, page, character, and timeout budgets. Malformed, encrypted, unsupported,
-changed, and text-free documents receive explicit states. This is parser
-failure isolation, not a malware scanner or operating-system sandbox. Extracted
-text is not yet sent to Bedrock or persisted in CockroachDB.
-
-The `classification.v1` boundary now builds bounded Converse request fields,
-uses a forced side-effect-free emission envelope, and validates classification
-proposals against deterministic evidence segments and exact local quotations,
-the approved taxonomy version, closed object shapes, and cross-reference
-rules. A pinned boto3 Bedrock Runtime gateway can submit that contract through
-an injected client and record observed tokens, latency, retries, stop reason,
-request identity, and an optional externally priced cost estimate. It is not
-wired into application startup. A bounded Nova 2 Lite run on one synthetic PDF
-completed real extraction, model invocation, evidence reconstruction, and
-validation. This proves the integration slice, not classification quality or
-production readiness.
-
-A second non-vector CockroachDB migration and typed repository define the
-atomic, idempotent persistence of a validated Bedrock agent run, one
-non-authoritative classification proposal, minimized evidence excerpts, and
-runtime provenance. Model and document values remain bound SQL parameters, and
-the schema deliberately omits canonical classifications until the promotion
-workflow is implemented. Runtime wiring, document registration, taxonomy
-initialization, and an uncalibrated scoring boundary are implemented locally. A
-side-effect-free application runtime configuration
-boundary can now compose the CockroachDB SQLAlchemy engine, approved Bedrock
-Runtime client, validated Bedrock gateway, and classification runtime from
-explicit environment values without opening a database connection or invoking a
-model during startup. The `docweave-classify-pdf` command now exposes the first
-controlled single-PDF runtime slice for real extraction, Bedrock invocation,
-and CockroachDB persistence when those runtime values and a migrated database
-are supplied. The `docweave-classify-batch` command extends the same explicit
-runtime path to a bounded recursive PDF batch of up to 1,000 files under an
-authorized root. It uses stable per-file idempotency keys, reports sanitized
-per-document success or failure, and never mutates source files. Live
-end-to-end database execution remains pending.
-
-The `docweave-review-proposal` command adds the first durable human-review
-runtime boundary. It persists one approved or rejected decision for an existing
-proposal using the retained proposal fingerprint and configured reviewer actor,
-without executing file operations. The cockpit now carries the persisted
-proposal identity forward from classification results and can use the same
-review-decision boundary when a real proposal ID is available. Durable review
-decisions can also append a human-attributed audit event in the same
-transaction.
-
-A fourth non-vector CockroachDB migration now defines append-only
-`file_lineage_events` memory for original, previous, and next directory and
-filename state. A readable `file_path_history` CockroachDB view exposes the
-same append-only rows with the exact original, previous, and next directory and
-filename columns needed for console inspection and demo evidence. A typed
-repository persists one lineage row atomically and idempotently with optional
-proposal, operation batch, and file-operation references. The
-`docweave-file-lineage` command composes the same configured runtime and can
-record or list lineage rows against a migrated CockroachDB target without
-exposing connection values. The cockpit now retains the
-operation-preview lineage state for each reviewed proposal, including
-original, previous, and next relative paths plus the plan fingerprint, and
-surfaces that memory preview when the reviewer selects a proposal. This is
-offline schema, adapter, command, and cockpit-preview evidence only: the
-lineage write path is not yet exercised by a full live UI execution flow, and
-cockpit approval or execution is not yet wired to persist lineage rows
-automatically.
-
-A fifth non-vector CockroachDB migration now defines AWS worker memory tables
-for cloud analysis jobs and classified S3 objects. The Lambda worker can
-attach content hashes, byte counts, Bedrock model identifiers, validated
-proposal payloads, and token usage to a parameterized CockroachDB writer when
-`DOCWEAVE_DATABASE_URL` is explicitly supplied by the runtime environment. This
-is real cloud operational memory staging for analysis observations; it is not
-yet the final canonical document-classification promotion workflow.
-
-The local shared core now also defines an explicit classification runtime that
-keeps extraction, database transactions, and Bedrock invocation in separate
-failure boundaries. It can register a verified PDF document version, install
-or verify the approved workspace taxonomy with recorded human authority, invoke
-the real validated Bedrock gateway, obtain scores from the versioned
-pre-evaluation method or an explicitly injected later provider, and persist the
-proposal. Runtime construction performs no database or model input/output. No
-live end-to-end execution is claimed.
-
-`confidence.raw.v0_1` now provides a deterministic pre-evaluation default for
-review ordering. It uses validated ordinal model signals, extraction coverage,
-evidence support, alternatives, contradictions, and missing expected evidence.
-It never uses filenames or model-authored percentages, leaves calibrated
-confidence null, and defines no automatic threshold. Corpus evaluation may
-replace it with a later version without rewriting historical proposals.
-
-An initial, explicitly labelled corpus of 30 synthetic two-page PDFs is
-available in `pdf_sintetici` for desktop discovery, preview, guarded-link, and
-later relationship testing. Its manifest records deterministic provenance,
-expected categories, document relationships, page counts, and content hashes.
-It is reference data, not model-generated analysis and not the planned final
-evaluation corpus.
-
-The current approved product direction includes:
-
-- a complete PySide6 desktop application for authorized Windows folders;
-- a complete cloud application using the same production agentic core;
-- discovery of up to 10,000 files;
-- up to 5,000 actively managed documents per Minimum Viable Product project;
-- resumable processing batches of up to 1,000 documents;
-- a representative demonstration corpus of approximately 300 synthetic PDFs;
-- confidence-driven human review and high-confidence quality sampling;
-- safe copy, move, and restore operations with append-only history;
-- complete attribution for operators, reviewers, agents, and project managers;
-- a relational-first CockroachDB design with meaningful vector retrieval.
-
-The first AWS cloud foundation is now represented in source control but is not
-deployed by application startup. A live `dev` deployment in `eu-central-1`
-now defines private versioned Amazon S3 artifact storage, Amazon SQS analysis
-buffering, AWS Lambda API and worker compute, Amazon API Gateway HTTP routing,
-Amazon CloudWatch Logs retention, and Amazon Bedrock runtime configuration.
-The cloud worker currently accepts queued jobs, invokes Amazon Bedrock for
-bounded PDF classification, writes sanitized result artifacts to Amazon S3,
-and can persist cloud analysis observations to CockroachDB when an explicit
-runtime database URL is present. It does not fabricate classification results.
-Canonical classification promotion, review decisions, and file operations must
-use the shared DocWeave runtime before the cloud path is claimed as end-to-end.
-
-## Documentation
-
-Start with the [requirements index](docs/requirements/README.md).
-
-## Runtime commands
-
-The desktop shell is launched with:
-
-```powershell
-docweave-desktop
-```
-
-The first controlled classification runtime slice is launched with:
-
-```powershell
-docweave-classify-pdf <pdf-path> --authorized-root <folder>
-```
-
-Bounded batch classification uses the same explicit runtime path:
-
-```powershell
-docweave-classify-batch <folder> --authorized-root <folder> --limit 1000
-```
-
-Use `--json-report <path>` to write a sanitized machine-readable validation
-artifact. Existing report files are not overwritten.
-
-Durable review decisions for existing proposals are launched with:
-
-```powershell
-docweave-review-proposal --proposal-id <uuid> --action approve --proposal-fingerprint <sha256>
-```
-
-Durable file lineage memory can be inspected with:
-
-```powershell
-docweave-file-lineage list --logical-document-key <stable-document-key>
-```
-
-One lineage event can be recorded only with explicit, already reviewed path
-state:
-
-```powershell
-docweave-file-lineage record --logical-document-key <stable-document-key> --lineage-sequence 1 --idempotency-key <stable-key> --action rename --original-relative-path incoming/a.pdf --previous-relative-path incoming/a.pdf --next-relative-path incoming/b.pdf --status succeeded --plan-fingerprint <sha256>
-```
-
-These commands require explicit runtime configuration through environment
-variables. Classification commands perform real extraction, Amazon Bedrock
-invocation, and CockroachDB writes only when invoked. Review and lineage
-commands perform only their explicit CockroachDB writes or reads when invoked.
-They do not create cloud resources, schemas, migrations, or secrets.
-
-Runtime configuration can be checked before invoking classification with:
-
-```powershell
-docweave-runtime-preflight
-docweave-runtime-preflight --database
-```
-
-CockroachDB memory migrations can be validated without opening a database
-connection with:
-
-```powershell
-docweave-live-memory-validation
-```
-
-The configured CockroachDB memory layer can also be inspected read-only with:
-
-```powershell
-docweave-memory-evidence
-docweave-memory-evidence --workspace-id <uuid> --json
-docweave-memory-schema
-docweave-memory-schema --flat
-docweave-memory-schema --json
-```
-
-The report verifies the Alembic revision, required DocWeave memory tables, and
-table counts. The optional workspace filter is applied only to tables that have
-a direct `workspace_id` column. The command never invokes Amazon Bedrock, writes
-database rows, changes schemas, mutates files, or prints connection values. The
-schema report prints the same live target as a SQL Server Management Studio
-style object explorer inventory by default: database, schema, tables, primary
-keys, columns, and foreign-key edges. Use `--flat` for the older line-oriented
-inventory and `--json` for automation. This makes the implemented memory graph
-checkable without relying on the CockroachDB Cloud query builder view.
-
-When `DOCWEAVE_DATABASE_URL` is already supplied by the approved runtime
-launcher or the current shell, the same command can explicitly inspect or
-upgrade the configured target:
-
-```powershell
-docweave-live-memory-validation --inspect-live
-docweave-live-memory-validation --online-upgrade --inspect-live
-```
-
-The validation command prints only sanitized migration and schema evidence. It
-does not invoke Amazon Bedrock, process documents, create cloud resources, or
-print connection values.
-
-When the approved cloud stack output has been supplied as
-`DOCWEAVE_CLOUD_API_URL`, the runtime preflight can also check the deployed
-Amazon API Gateway and Lambda health boundary:
-
-```powershell
-docweave-runtime-preflight --cloud
-docweave-runtime-preflight --cloud --cloud-api-url <api-gateway-stage-url>
-```
-
-The cloud preflight calls only `GET /health`; it does not upload documents,
-enqueue analysis jobs, invoke Bedrock directly from the desktop, or print any
-credential material.
-
-The default command validates configuration and Bedrock client construction
-without opening external services. The `--database` form opens the configured
-CockroachDB target and checks that the current non-vector DocWeave schema
-tables needed by classification, review, and file-lineage persistence are
-present.
-
-The cockpit surfaces the same fail-closed runtime readiness categories in its
-connection-state panel at startup. When the required runtime values are present,
-startup also performs a read-only CockroachDB reachability and schema-evidence
-refresh. It does not invoke Bedrock, create cloud resources, mutate schemas, or
-write application rows until the user starts an explicit analysis action. That
-action may process multiple ready PDFs sequentially, bounded by the MVP
-processing-batch limit.
-
-## CockroachDB schema map
-
-DocWeave now exposes a judged hackathon memory schema under
-`docweave_judged`. This is the schema to show first in CockroachDB Cloud and in
-the demo video. It deliberately uses a small set of obvious tables that map
-directly to the product loop:
+**DocWeave is an agentic document cockpit for the CockroachDB x AWS hackathon.**
+It turns a folder of badly named Portable Document Format (PDF) files, such as
+`scan_000184.pdf`, into a human-approved archive where every renamed document
+still remembers its original filename, original directory, model rationale, and
+approval history.
 
 ```text
-PDF scan -> Bedrock agent run -> proposal -> human decision -> file history
+Choose folder -> Bedrock analysis -> CockroachDB memory -> human approval -> safe rename/move -> original path still visible
 ```
 
-Judged schema:
+The agent does not just chat about documents. Amazon Bedrock reads extracted
+PDF text and proposes a document class, evidence, destination folder, and safer
+filename. The dashboard keeps the human in control: the user reviews the PDF,
+the evidence, and the proposed move before any file is changed. CockroachDB is
+the persistent operational, semantic, episodic, and preference memory that
+survives after the local folder has been reorganized.
 
-| Table | What a judge should see |
+DocWeave uses the required hackathon tools directly:
+
+- **CockroachDB Tool #1: `ccloud` Command-Line Interface (CLI).** The project
+  uses `ccloud` to verify the live CockroachDB Cloud cluster
+  `docweave-memory`, its AWS region, serverless plan, version, and SQL users
+  without exposing database passwords.
+- **CockroachDB Tool #2: CockroachDB Agent Skills repository.** The schema and
+  transaction path were reviewed with the `cockroachdb-sql` and
+  `designing-application-transactions` skills, then applied to the six-table
+  memory design, idempotent writes, `FOR UPDATE` proposal locking, and bounded
+  `40001` serialization retry handling.
+- **AWS services.** The deployed cloud slice uses Amazon Bedrock for document
+  reasoning, AWS Lambda for the HTTP API and analysis worker, Amazon Simple
+  Storage Service (Amazon S3) for PDF/result artifacts, Amazon Simple Queue
+  Service (Amazon SQS) for queued analysis jobs, Amazon API Gateway for the
+  public endpoint, Amazon CloudWatch Logs for operational evidence, and AWS
+  Secrets Manager dynamic references for the CockroachDB runtime URL.
+
+The visible product surface is the **glass-effect desktop cockpit**. A judge
+can choose a folder, scan documents, inspect an embedded PDF preview, run
+analysis, approve or reject the proposed rename, and then select the moved PDF
+to see exactly what it used to be called and where it came from. That is the
+core product loop: **LLM understanding + human control + durable path memory**.
+
+## Hackathon Integration
+
+**CockroachDB**
+
+- **Persistent agent memory:** `documents -> agent_runs -> proposals ->
+  human_decisions -> file_history` records what the agent saw, proposed, and
+  what the human approved.
+- **Required CockroachDB Tool #1: `ccloud` CLI:** used to inspect and prove the
+  live CockroachDB Cloud serverless cluster `docweave-memory` on AWS
+  `eu-central-1`.
+- **Required CockroachDB Tool #2: CockroachDB Agent Skills repository:** used to
+  review and shape schema design, idempotent writes, proposal locking, and
+  serializable transaction retry behavior.
+
+**AWS**
+
+- **Amazon Bedrock:** document reasoning and structured rename proposals.
+- **AWS Lambda:** cloud API and asynchronous analysis worker.
+- **Amazon S3:** PDF upload artifacts and JSON result artifacts.
+- **Amazon SQS:** queued analysis jobs between API and worker.
+- **Amazon API Gateway:** public demo endpoint.
+- **Amazon CloudWatch Logs:** operational execution evidence.
+- **AWS Secrets Manager dynamic references:** runtime CockroachDB URL wiring
+  without committing secrets.
+
+## Submission Fit
+
+| Requirement | DocWeave evidence |
 | --- | --- |
-| `docweave_judged.documents` | One row per discovered PDF, with original and current directory and filename. |
-| `docweave_judged.agent_runs` | One row per Amazon Bedrock analysis attempt, with model, task, status, input hash, output JSON, and summary. |
-| `docweave_judged.proposals` | The AI-proposed category, destination folder, filename, confidence, and evidence summary. |
-| `docweave_judged.human_decisions` | The human approve, reject, or request-change decision for a proposal. |
-| `docweave_judged.file_history` | The required before-and-after path memory: previous directory/name, next directory/name, operation, status, and time. |
-| `docweave_judged.document_relationships` | AI-suggested links such as purchase order to invoice or invoice to payment. |
+| Agentic application | Bedrock reads extracted PDF text and proposes class, metadata, evidence, destination folder, and filename. |
+| CockroachDB as persistent memory | CockroachDB stores documents, Bedrock runs, proposals, human decisions, and before/after file history. |
+| Deployed on AWS | CloudFormation deploys Lambda API/worker, S3 artifacts, SQS queue, API Gateway, CloudWatch Logs, Bedrock permissions, and Secrets Manager dynamic references. |
+| AWS services identified | Amazon Bedrock; AWS Lambda; Amazon S3; Amazon SQS; Amazon API Gateway; Amazon CloudWatch Logs; AWS Secrets Manager dynamic references. |
+| CockroachDB tools identified | `ccloud` CLI inspects the live `docweave-memory` CockroachDB Cloud cluster; CockroachDB Agent Skills review schema and transaction design. |
+| Demo must show memory layer | The dashboard and SQL queries show original filename, current filename, proposal, human decision, and file history in CockroachDB. |
+| Open-source license | MIT license in [`LICENSE`](LICENSE). |
+| Testing instructions | [`docs/submission/testing-instructions.md`](docs/submission/testing-instructions.md). |
 
-The older `docweave` schema remains an internal technical schema while the
-submission is being rescued. It is not the first judge-facing memory story.
+## AWS Services Used
 
-For the clearest project-owned view, run:
+- **Amazon Bedrock** - model reasoning for document class, evidence, metadata,
+  rationale, confidence signal, destination folder, and filename proposal.
+- **AWS Lambda** - serverless HTTP API and asynchronous analysis worker.
+- **Amazon S3** - uploaded PDF artifacts and JSON analysis-result artifacts.
+- **Amazon SQS** - queued analysis jobs between upload/API and worker.
+- **Amazon API Gateway** - public HTTP boundary for health, upload requests,
+  analysis requests, and result lookup.
+- **Amazon CloudWatch Logs** - operational evidence for Lambda execution.
+- **AWS Secrets Manager dynamic references** - CloudFormation wiring for the
+  CockroachDB runtime URL when a secret ARN is supplied.
 
-```powershell
-docweave-memory-schema
-```
+## CockroachDB Tools Used
 
-Expected shape:
+- **`ccloud` CLI** - verifies the live CockroachDB Cloud cluster
+  `docweave-memory`, its AWS region, serverless plan, version, and SQL users
+  without exposing the database password.
+- **CockroachDB Agent Skills repository** - applied the `cockroachdb-sql` and
+  `designing-application-transactions` skills to review the six-table schema,
+  primary keys, idempotent writes, `FOR UPDATE` proposal locking, and bounded
+  `40001` serialization retry handling.
+
+Evidence is recorded in
+[`docs/operations/hackathon-requirement-evidence.md`](docs/operations/hackathon-requirement-evidence.md).
+
+## CockroachDB Memory
+
+CockroachDB is intentionally simple. There is one schema, `docweave`, and six
+judge-visible tables. No hidden judge schema. No demo-only table family.
+
+| Table | What It Proves |
+| --- | --- |
+| `documents` | Original directory/name, current directory/name, digest, page count, status. |
+| `agent_runs` | Bedrock provider, model, task, input hash, sanitized output, timing. |
+| `proposals` | Proposed class, destination folder, destination filename, confidence, evidence. |
+| `human_decisions` | Human approval or rejection of a model proposal. |
+| `file_history` | Before/after path memory for an approved move or rename. |
+| `document_relationships` | Optional lightweight links between related documents. |
+
+In a four-minute demo:
+
+1. Start the cockpit and choose a messy PDF folder.
+2. Click Analyze. Bedrock produces a structured proposal and CockroachDB records
+   the run.
+3. Open a PDF row. The cockpit shows the PDF, model evidence, proposed class,
+   proposed destination, and memory status.
+4. Approve. The file moves only after the human decision.
+5. Select the moved PDF. DocWeave still shows the original filename and
+   original directory because CockroachDB retained the path history.
+
+## Why This Is Not Just Another AI Wrapper
+
+DocWeave treats the model as a proposal engine, not an authority. A Bedrock
+response cannot silently mutate files. The human approves the operation, the
+dashboard executes the move, and CockroachDB records both the model suggestion
+and the human decision.
+
+That gives the project a clean interview/hackathon explanation:
 
 ```text
-DocWeave CockroachDB Object Explorer
-Revision: 0007_judged_memory_schema
-Database: docweave
-Schema: docweave
-Tables: ...
-Views: ...
-
-[table] docweave.documents
-  [primary key] document_id
-  [columns]
-    - document_id: UUID NOT NULL PK
-  [foreign keys]
-    - ...
-
-[view] docweave.file_path_history
-  [primary key] none
-  [columns]
-    - original_directory: STRING NULL
-    - original_filename: STRING NULL
-    - previous_directory: STRING NULL
-    - previous_filename: STRING NULL
-    - next_directory: STRING NULL
-    - next_filename: STRING NULL
+LLM understanding + human control + durable path memory
 ```
 
-```sql
-SHOW DATABASES;
-USE docweave;
-SHOW SCHEMAS;
-SHOW TABLES FROM docweave_judged;
-SHOW COLUMNS FROM docweave_judged.documents;
-SHOW COLUMNS FROM docweave_judged.file_history;
-SHOW TABLES FROM docweave;
-SHOW COLUMNS FROM docweave.file_path_history;
-SHOW COLUMNS FROM docweave.documents;
-SHOW CONSTRAINTS FROM docweave.documents;
-```
+The output is useful even after the demo window closes: CockroachDB can answer
+"what was this file originally called?" and "why did it move here?"
 
-For the specific path-memory requirement, inspect the judged table directly:
-
-```sql
-SELECT
-    d.original_directory,
-    d.original_filename,
-    h.event_sequence,
-    h.operation,
-    status,
-    h.previous_directory,
-    h.previous_filename,
-    h.next_directory,
-    h.next_filename,
-    h.occurred_at
-FROM docweave_judged.file_history AS h
-JOIN docweave_judged.documents AS d
-    ON d.document_id = h.document_id
-ORDER BY d.original_filename, h.event_sequence;
-```
-
-This query is the core CockroachDB memory demo: it shows what the file was
-called, where it was, what the agent proposed or the human approved, and what
-the next directory and filename became.
-
-The same table inventory can be checked through `information_schema`:
-
-```sql
-SELECT table_schema, table_name, table_type
-FROM information_schema.tables
-WHERE table_schema = 'docweave'
-ORDER BY table_name;
-```
-
-Foreign keys can be inspected in a compact SQL Server Management Studio style:
-
-```sql
-SELECT
-    tc.table_schema,
-    tc.table_name,
-    kcu.column_name,
-    ccu.table_schema AS foreign_table_schema,
-    ccu.table_name AS foreign_table_name,
-    ccu.column_name AS foreign_column_name,
-    tc.constraint_name
-FROM information_schema.table_constraints AS tc
-JOIN information_schema.key_column_usage AS kcu
-    ON tc.constraint_name = kcu.constraint_name
-    AND tc.table_schema = kcu.table_schema
-JOIN information_schema.constraint_column_usage AS ccu
-    ON ccu.constraint_name = tc.constraint_name
-    AND ccu.table_schema = tc.table_schema
-WHERE tc.constraint_type = 'FOREIGN KEY'
-    AND tc.table_schema = 'docweave'
-ORDER BY tc.table_name, kcu.ordinal_position;
-```
-
-The broader internal technical schema, as of Alembic revision
-`0007_judged_memory_schema`, is:
-
-```mermaid
-erDiagram
-    WORKSPACES ||--o{ WORKSPACE_MEMBERS : authorizes
-    ACTORS ||--o{ WORKSPACE_MEMBERS : receives_role
-    ACTORS ||--o{ WORKSPACE_MEMBERS : grants_role
-
-    WORKSPACES ||--o{ OPERATION_BATCHES : owns
-    ACTORS ||--o{ OPERATION_BATCHES : creates
-    ACTORS ||--o{ OPERATION_BATCHES : approves
-    OPERATION_BATCHES ||--o{ FILE_OPERATIONS : contains
-    ACTORS ||--o{ FILE_OPERATIONS : executes
-    FILE_OPERATIONS ||--o{ FILE_OPERATIONS : compensates
-
-    WORKSPACES ||--o{ AUDIT_EVENTS : records
-    ACTORS ||--o{ AUDIT_EVENTS : causes
-    OPERATION_BATCHES ||--o{ AUDIT_EVENTS : correlates
-    FILE_OPERATIONS ||--o{ AUDIT_EVENTS : documents
-    AUDIT_EVENTS ||--o{ AUDIT_EVENTS : chains_previous
-    AUDIT_EVENTS ||--o{ AUDIT_EVENTS : chains_causation
-
-    WORKSPACES ||--o{ DOCUMENTS : owns
-    DOCUMENTS ||--o{ DOCUMENT_VERSIONS : versions
-    DOCUMENT_VERSIONS ||--o{ DOCUMENT_VERSIONS : supersedes
-
-    WORKSPACES ||--o{ TAXONOMY_VERSIONS : owns
-    ACTORS ||--o{ TAXONOMY_VERSIONS : approves
-    TAXONOMY_VERSIONS ||--o{ TAXONOMY_CLASSES : defines
-
-    DOCUMENT_VERSIONS ||--o{ AGENT_RUNS : analyzed_by
-    AGENT_RUNS ||--|| PROPOSALS : produces
-    DOCUMENT_VERSIONS ||--o{ PROPOSALS : receives
-    PROPOSALS ||--o{ PROPOSALS : supersedes
-    PROPOSALS ||--|| CLASSIFICATION_PROPOSALS : specializes
-    TAXONOMY_CLASSES ||--o{ CLASSIFICATION_PROPOSALS : proposed_class
-    TAXONOMY_CLASSES ||--o{ CLASSIFICATION_PROPOSALS : alternative_class
-    PROPOSALS ||--o{ PROPOSAL_EVIDENCE : supported_by
-
-    PROPOSALS ||--o| REVIEW_DECISIONS : reviewed_by
-    ACTORS ||--o{ REVIEW_DECISIONS : decides
-
-    WORKSPACES ||--o{ FILE_LINEAGE_EVENTS : records
-    OPERATION_BATCHES ||--o{ FILE_LINEAGE_EVENTS : groups
-    FILE_OPERATIONS ||--o{ FILE_LINEAGE_EVENTS : executes
-    PROPOSALS ||--o{ FILE_LINEAGE_EVENTS : informs
-
-    WORKSPACES ||--o{ CLOUD_ANALYSIS_JOBS : owns
-    CLOUD_ANALYSIS_JOBS ||--o{ CLOUD_ANALYSIS_OBJECTS : records
-```
-
-Implemented tables and their main relational role:
-
-| Table | Primary key | Main foreign keys | Purpose |
-| --- | --- | --- | --- |
-| `docweave.workspaces` | `workspace_id` | none | Workspace boundary for all operational and memory records. |
-| `docweave.actors` | `actor_id` | none | Human, service, and agent identities used for attribution. |
-| `docweave.workspace_members` | `workspace_id`, `actor_id`, `role_code`, `granted_at` | `workspace_id` to `workspaces`, `actor_id` and `granted_by_actor_id` to `actors` | Workspace role grants and revocations. |
-| `docweave.operation_batches` | `operation_batch_id` | `workspace_id` to `workspaces`, creator and approver actor IDs to `actors` | Human-approved copy or move batch envelope. |
-| `docweave.file_operations` | `file_operation_id` | `(workspace_id, operation_batch_id)` to `operation_batches`, `executor_actor_id` to `actors`, `compensates_operation_id` to `file_operations` | Per-file planned, intended, terminal, and reconciled operation state. |
-| `docweave.audit_events` | `workspace_id`, `event_sequence` | `workspace_id` to `workspaces`, `actor_id` to `actors`, batch and file-operation IDs to operation tables, previous and causation event IDs to `audit_events` | Append-only hash-chained audit chronology. |
-| `docweave.documents` | `document_id` | `workspace_id` to `workspaces` | Logical document identity. |
-| `docweave.document_versions` | `document_version_id` | `(workspace_id, document_id)` to `documents`, predecessor version to `document_versions` | Immutable content versions with digest and extraction state. |
-| `docweave.taxonomy_versions` | `taxonomy_version_id` | `workspace_id` to `workspaces`, `approved_by_actor_id` to `actors` | Versioned classification taxonomy. |
-| `docweave.taxonomy_classes` | `taxonomy_class_id` | `taxonomy_version_id` to `taxonomy_versions` | Class definitions available in a taxonomy version. |
-| `docweave.agent_runs` | `agent_run_id` | `(workspace_id, document_version_id)` to `document_versions` | Durable Amazon Bedrock classification run provenance, metrics, and outcome. |
-| `docweave.proposals` | `proposal_id` | `(workspace_id, document_version_id)` to `document_versions`, `(workspace_id, agent_run_id)` to `agent_runs`, superseded proposal to `proposals` | Non-authoritative agent proposal envelope. |
-| `docweave.classification_proposals` | `proposal_id` | `proposal_id` to `proposals`, proposed and alternative classes to `taxonomy_classes` | Classification-specific proposal details and confidence components. |
-| `docweave.proposal_evidence` | `proposal_evidence_id` | `(workspace_id, proposal_id)` to `proposals` | Minimized evidence excerpts and validation evidence for a proposal. |
-| `docweave.review_decisions` | `review_decision_id` | `(workspace_id, proposal_id)` to `proposals`, `reviewer_actor_id` to `actors` | Append-only human approve, reject, request-change, or escalation decision. |
-| `docweave.file_lineage_events` | `file_lineage_event_id` | `workspace_id` to `workspaces`, batch and file-operation IDs to operation tables, `proposal_id` to `proposals` | Append-only original, previous, and next directory and filename memory. |
-| `docweave.file_path_history` | none; read-only view | Reads from `file_lineage_events` | Human-readable path-history view for CockroachDB Console inspection with original, previous, and next directory and filename columns. |
-| `docweave.cloud_analysis_jobs` | `cloud_analysis_job_id` | `workspace_id` to `workspaces` | AWS worker job memory for cloud analysis status and result-artifact location. |
-| `docweave.cloud_analysis_objects` | `cloud_analysis_object_id` | `(workspace_id, cloud_analysis_job_id)` to `cloud_analysis_jobs` | Per-S3-object cloud analysis observations with content hash, byte size, Bedrock model, proposed class, validated proposal JSON, and usage JSON. |
-
-Tables shown in the broader architecture diagrams but not listed here are
-planned product schema, not implemented database objects. The authoritative
-implemented schema is the Alembic migration chain under
-[`migrations/versions`](migrations/versions).
-
-Mandatory governance:
-
-- [Project operating rules](PROJECT_RULES.md)
-- [Competition rules and compliance guide](docs/requirements/competition-rules.md)
-- [Product requirements](docs/requirements/product-requirements.md)
-- [Domain and relational data requirements](docs/requirements/domain-data-requirements.md)
-- [Minimum Viable Product scope and acceptance](docs/requirements/mvp-scope-and-acceptance.md)
-- [Quality and security charter](docs/requirements/quality-security-charter.md)
-- [Requirements traceability matrix](docs/requirements/requirements-traceability-matrix.md)
-
-Approved architecture:
-
-- [Amazon Bedrock primary-model decision](docs/architecture/decisions/0001-amazon-bedrock-primary-model.md)
-- [CockroachDB physical-data-model decision](docs/architecture/decisions/0002-cockroachdb-physical-data-model.md)
-- [CockroachDB migration-tooling decision](docs/architecture/decisions/0003-cockroachdb-migration-tooling.md)
-- [Isolated PDF text-extraction decision](docs/architecture/decisions/0004-isolated-pdf-text-extraction.md)
-- [Classification v1 structured-contract decision](docs/architecture/decisions/0005-classification-v1-contract.md)
-- [Bedrock classification-gateway decision](docs/architecture/decisions/0006-bedrock-classification-gateway.md)
-- [Uncalibrated confidence v0.1 decision](docs/architecture/decisions/0007-uncalibrated-confidence-v0.md)
-- [AWS cloud service foundation decision](docs/architecture/decisions/0008-aws-cloud-service-foundation.md)
-- [Document-processing pipeline](docs/architecture/document-processing-pipeline.md)
-- [CockroachDB physical-schema specification](docs/architecture/cockroachdb-physical-schema.md)
-- [CockroachDB Entity Relationship model](docs/architecture/cockroachdb-entity-relationship.md)
-- [CockroachDB operation persistence boundary](docs/architecture/cockroachdb-operation-persistence.md)
-- [CockroachDB classification persistence boundary](docs/architecture/cockroachdb-classification-persistence.md)
-- [CockroachDB review decision persistence boundary](docs/architecture/cockroachdb-review-decision-persistence.md)
-- [Desktop discovery shell](docs/architecture/desktop-discovery-shell.md)
-- [Verified AWS and CockroachDB environment baseline](docs/operations/environment-baseline.md)
-- [AWS cloud live deployment evidence](docs/operations/aws-cloud-live-deployment.md)
-- [Runtime configuration runbook](docs/operations/runtime-configuration-runbook.md)
-- [CockroachDB live validation evidence](docs/operations/cockroachdb-live-validation.md)
-- [Bedrock live classification validation](docs/operations/bedrock-live-validation.md)
-- [Delivery plan](docs/operations/delivery-plan.md)
-
-## Repository policy
-
-- Repository artifacts and submission material are written in English.
-- Architecture and implementation require explicit approval.
-- Intelligent behavior must be genuine, observable, and evaluated.
-- Private reference data, credentials, and real company documents must never be
-  committed.
-- Material changes are developed on branches and reviewed through pull
-  requests.
-
-## Local development
-
-The Python scaffold does not connect to a database by default. Its non-vector
-CockroachDB migrations are rendered and tested offline; live validation
-evidence is documented separately. A validation schema is not a runtime or
-production deployment. The scaffold establishes reproducible local quality
-gates before durable application wiring is enabled.
-
-Create a virtual environment, install the pinned development tools, and run the
-local checks:
+## Run The Dashboard
 
 ```powershell
 python -m venv .venv
 .\.venv\Scripts\python -m pip install -r requirements-lock.txt
 .\.venv\Scripts\python -m pip install -e . --no-deps
-.\scripts\check.ps1
-```
-
-Launch the initial read-only desktop discovery shell:
-
-```powershell
 .\.venv\Scripts\docweave-desktop.exe
 ```
 
-On Windows, the same dashboard can also be started by double-clicking
-`launch-docweave-dashboard.cmd` in the repository root. When the local
-runtime launcher exists under the user's DocWeave application-data directory,
-the repository launcher delegates to it so the dashboard inherits the explicit
-runtime environment already configured outside the repository. Otherwise it
-falls back to the repository-local virtual environment. It does not embed
-runtime credentials or cloud configuration.
+On this workstation, `launch-docweave-dashboard.cmd` delegates to the approved
+runtime launcher when present so runtime values stay outside the repository.
 
-The shell does not yet connect to CockroachDB or Amazon Bedrock, does not
-persist scan results or document analysis by default, and does not modify
-files. It only remembers the last successfully authorized folder path in the
-local desktop settings store so the next folder picker starts there.
+## Functional Demo Endpoint
 
-## AWS cloud foundation
+```text
+https://76824l7ub1.execute-api.eu-central-1.amazonaws.com/dev/health
+```
 
-The repository contains and has deployed the first AWS service foundation:
+Testing instructions for judges are in
+[`docs/submission/testing-instructions.md`](docs/submission/testing-instructions.md).
 
-- [`infrastructure/aws/docweave-cloud-foundation.template.json`](infrastructure/aws/docweave-cloud-foundation.template.json)
-  defines Amazon S3, Amazon SQS, AWS Lambda, Amazon API Gateway, Amazon
-  CloudWatch Logs, and Amazon Bedrock invocation permissions.
-- [`infrastructure/aws/docweave-artifact-bucket.template.json`](infrastructure/aws/docweave-artifact-bucket.template.json)
-  defines the retained deployment-artifact bucket used for Lambda packages.
-- [`services/api/docweave_cloud_api/handler.py`](services/api/docweave_cloud_api/handler.py)
-  provides the initial Lambda API and worker handlers.
-- [`scripts/package-aws-lambda.ps1`](scripts/package-aws-lambda.ps1) creates
-  the Lambda source archive for a later approved deployment.
+## Validate The Memory Path
 
-The cloud API currently exposes:
+```powershell
+.\.venv\Scripts\docweave-runtime-preflight.exe --database
+.\.venv\Scripts\docweave-memory-schema.exe --flat
+.\.venv\Scripts\docweave-memory-evidence.exe
+```
 
-- `GET /health` for sanitized AWS service readiness;
-- `POST /uploads/presign` for bounded PDF upload URLs into S3;
-- `POST /analysis-jobs` for queueing workspace-scoped PDF analysis requests.
+Expected readiness:
 
-The worker accepts queued jobs but does not fabricate classification results.
-Real extraction, Amazon Bedrock invocation, CockroachDB persistence, review
-decisions, and file operations must use the shared DocWeave runtime before the
-cloud path is claimed as end-to-end.
+```text
+runtime_config: ok (loaded)
+bedrock_client: ok (eu-central-1:configured)
+cockroachdb_connection: ok (reachable)
+docweave_schema: ok (ready)
+```
 
-Live deployment evidence is recorded in
-[`docs/operations/aws-cloud-live-deployment.md`](docs/operations/aws-cloud-live-deployment.md).
+Expected schema:
 
-## License
+```text
+memory_schema_revision: simple_docweave_schema
+memory_schema_tables: 6
+memory_schema_views: 0
+table docweave.documents
+table docweave.agent_runs
+table docweave.proposals
+table docweave.human_decisions
+table docweave.file_history
+table docweave.document_relationships
+```
 
-A competition-compatible open-source license will be selected explicitly before
-the repository is made public. No license is implied at this stage.
+## CockroachDB Demo Queries
+
+Show the schema a judge should see:
+
+```sql
+SHOW TABLES FROM docweave;
+```
+
+Show original and current file names:
+
+```sql
+SELECT
+    original_directory,
+    original_filename,
+    current_directory,
+    current_filename,
+    status
+FROM docweave.documents
+ORDER BY discovered_at DESC;
+```
+
+Show the approved move history:
+
+```sql
+SELECT
+    d.original_directory,
+    d.original_filename,
+    h.operation,
+    h.previous_directory,
+    h.previous_filename,
+    h.next_directory,
+    h.next_filename,
+    h.status,
+    h.occurred_at
+FROM docweave.file_history AS h
+JOIN docweave.documents AS d
+    ON d.document_id = h.document_id
+ORDER BY h.occurred_at DESC;
+```
+
+## Command-Line Proofs
+
+Analyze one PDF:
+
+```powershell
+.\.venv\Scripts\docweave-classify-pdf.exe pdf_sintetici\scan_000184.pdf --authorized-root pdf_sintetici
+```
+
+Analyze a bounded batch:
+
+```powershell
+.\.venv\Scripts\docweave-classify-batch.exe pdf_sintetici --authorized-root pdf_sintetici --limit 30
+```
+
+Render the schema migration:
+
+```powershell
+.\.venv\Scripts\python -m alembic heads
+.\.venv\Scripts\python -m alembic upgrade head --sql
+```
+
+Current migration head:
+
+```text
+0001_simple_docweave_schema
+```
+
+## Repository Map
+
+- `src/docweave/desktop/cockpit.py` - glass-effect dashboard and approval flow.
+- `src/docweave/classification_cli.py` - PDF extraction, Bedrock call,
+  proposal creation, CockroachDB write.
+- `src/docweave/review_cli.py` - human decision and file-history persistence.
+- `src/docweave/persistence/simple_memory_repository.py` - six-table
+  CockroachDB writer.
+- `services/api/docweave_cloud_api/` - AWS Lambda API and analysis worker.
+- `infrastructure/aws/` - CloudFormation for S3, SQS, Lambda, API Gateway,
+  CloudWatch Logs, Bedrock permissions, and secret dynamic references.
+- `migrations/versions/0001_simple_docweave_schema.py` - reproducible schema.
+
+## Current Limitations
+
+- The AWS stack needs a valid CockroachDB secret ARN with a `database_url`
+  value before Lambda can persist to CockroachDB.
+- Relationship inference exists as a lightweight table but is not the main demo
+  path.
+- Confidence is an uncalibrated review-ordering signal, not a production
+  probability.
+- Extraction quality still depends on PDF text quality and the selected
+  Bedrock model.
+
+## Governance
+
+Mandatory project rules are in [PROJECT_RULES.md](PROJECT_RULES.md). Claims in
+the README, demo, and submission must match live evidence. Intelligent behavior
+must remain genuine: no canned classifications, hidden bypasses, or fabricated
+success states.

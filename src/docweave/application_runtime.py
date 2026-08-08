@@ -26,14 +26,10 @@ from docweave.analysis import (
     create_bedrock_runtime_client,
 )
 from docweave.persistence import (
-    ClassificationRuntime,
-    CockroachFileLineageRepository,
-    CockroachRestoreAuditRepository,
-    CockroachReviewDecisionRepository,
+    CockroachSimpleMemoryRepository,
     CockroachTransactionRunner,
-    build_classification_runtime,
 )
-from docweave.persistence.classification_runtime import ClassificationGateway
+from docweave.persistence.simple_memory_repository import SerializableTransactionRunner
 
 DOCWEAVE_DATABASE_URL = "DOCWEAVE_DATABASE_URL"
 DOCWEAVE_WORKSPACE_ID = "DOCWEAVE_WORKSPACE_ID"
@@ -114,8 +110,7 @@ class ConfiguredClassificationRuntime:
 
     config: RuntimeEnvironmentConfig
     engine: Engine
-    gateway: ClassificationGateway
-    runtime: ClassificationRuntime
+    gateway: BedrockClassificationGateway
 
 
 @dataclass(frozen=True, slots=True)
@@ -125,27 +120,7 @@ class ConfiguredReviewDecisionRuntime:
     config: RuntimeEnvironmentConfig
     engine: Engine
     transaction_runner: CockroachTransactionRunner
-    repository: CockroachReviewDecisionRepository
-
-
-@dataclass(frozen=True, slots=True)
-class ConfiguredRestoreAuditRuntime:
-    """Lazily composed runtime dependencies for durable restore audit history."""
-
-    config: RuntimeEnvironmentConfig
-    engine: Engine
-    transaction_runner: CockroachTransactionRunner
-    repository: CockroachRestoreAuditRepository
-
-
-@dataclass(frozen=True, slots=True)
-class ConfiguredFileLineageRuntime:
-    """Lazily composed runtime dependencies for durable file lineage memory."""
-
-    config: RuntimeEnvironmentConfig
-    engine: Engine
-    transaction_runner: CockroachTransactionRunner
-    repository: CockroachFileLineageRepository
+    repository: CockroachSimpleMemoryRepository
 
 
 class SessionLike(Protocol):
@@ -162,18 +137,6 @@ class EngineFactory(Protocol):
         """Create a lazy SQLAlchemy engine without opening a connection."""
 
 
-class RuntimeFactory(Protocol):
-    """Narrow runtime factory used for deterministic tests."""
-
-    def __call__(
-        self,
-        engine: Engine,
-        *,
-        gateway: ClassificationGateway,
-    ) -> ClassificationRuntime:
-        """Build a runtime around an engine and a validated gateway."""
-
-
 class TransactionRunnerFactory(Protocol):
     """Narrow transaction runner factory used for deterministic tests."""
 
@@ -185,30 +148,9 @@ class ReviewRepositoryFactory(Protocol):
     """Narrow review repository factory used for deterministic tests."""
 
     def __call__(
-        self,
-        transaction_runner: CockroachTransactionRunner,
-    ) -> CockroachReviewDecisionRepository:
-        """Create a review decision repository."""
-
-
-class RestoreAuditRepositoryFactory(Protocol):
-    """Narrow restore audit repository factory used for deterministic tests."""
-
-    def __call__(
-        self,
-        transaction_runner: CockroachTransactionRunner,
-    ) -> CockroachRestoreAuditRepository:
-        """Create a restore audit repository."""
-
-
-class FileLineageRepositoryFactory(Protocol):
-    """Narrow file lineage repository factory used for deterministic tests."""
-
-    def __call__(
-        self,
-        transaction_runner: CockroachTransactionRunner,
-    ) -> CockroachFileLineageRepository:
-        """Create a file lineage repository."""
+        self, transaction_runner: SerializableTransactionRunner
+    ) -> CockroachSimpleMemoryRepository:
+        """Create the simple memory repository."""
 
 
 def runtime_integration_snapshot(
@@ -245,7 +187,6 @@ def build_configured_classification_runtime(
     *,
     session: SessionLike | None = None,
     engine_factory: EngineFactory = create_engine,
-    runtime_factory: RuntimeFactory = build_classification_runtime,
 ) -> ConfiguredClassificationRuntime:
     """Compose CockroachDB and Bedrock dependencies without invoking either service."""
     config = load_runtime_environment_config(environment)
@@ -262,12 +203,10 @@ def build_configured_classification_runtime(
         client,
         config=config.bedrock_config,
     )
-    runtime = runtime_factory(engine, gateway=gateway)
     return ConfiguredClassificationRuntime(
         config=config,
         engine=engine,
         gateway=gateway,
-        runtime=runtime,
     )
 
 
@@ -276,7 +215,7 @@ def build_configured_review_decision_runtime(
     *,
     engine_factory: EngineFactory = create_engine,
     transaction_runner_factory: TransactionRunnerFactory = CockroachTransactionRunner,
-    repository_factory: ReviewRepositoryFactory = CockroachReviewDecisionRepository,
+    repository_factory: ReviewRepositoryFactory = CockroachSimpleMemoryRepository,
 ) -> ConfiguredReviewDecisionRuntime:
     """Compose CockroachDB review-decision dependencies without database I/O."""
     config = load_runtime_environment_config(environment)
@@ -288,54 +227,6 @@ def build_configured_review_decision_runtime(
     transaction_runner = transaction_runner_factory(engine)
     repository = repository_factory(transaction_runner)
     return ConfiguredReviewDecisionRuntime(
-        config=config,
-        engine=engine,
-        transaction_runner=transaction_runner,
-        repository=repository,
-    )
-
-
-def build_configured_restore_audit_runtime(
-    environment: Mapping[str, str] | None = None,
-    *,
-    engine_factory: EngineFactory = create_engine,
-    transaction_runner_factory: TransactionRunnerFactory = CockroachTransactionRunner,
-    repository_factory: RestoreAuditRepositoryFactory = CockroachRestoreAuditRepository,
-) -> ConfiguredRestoreAuditRuntime:
-    """Compose CockroachDB restore-history dependencies without database I/O."""
-    config = load_runtime_environment_config(environment)
-    engine = engine_factory(
-        config.database_url,
-        pool_pre_ping=True,
-        future=True,
-    )
-    transaction_runner = transaction_runner_factory(engine)
-    repository = repository_factory(transaction_runner)
-    return ConfiguredRestoreAuditRuntime(
-        config=config,
-        engine=engine,
-        transaction_runner=transaction_runner,
-        repository=repository,
-    )
-
-
-def build_configured_file_lineage_runtime(
-    environment: Mapping[str, str] | None = None,
-    *,
-    engine_factory: EngineFactory = create_engine,
-    transaction_runner_factory: TransactionRunnerFactory = CockroachTransactionRunner,
-    repository_factory: FileLineageRepositoryFactory = CockroachFileLineageRepository,
-) -> ConfiguredFileLineageRuntime:
-    """Compose CockroachDB file-lineage dependencies without database I/O."""
-    config = load_runtime_environment_config(environment)
-    engine = engine_factory(
-        config.database_url,
-        pool_pre_ping=True,
-        future=True,
-    )
-    transaction_runner = transaction_runner_factory(engine)
-    repository = repository_factory(transaction_runner)
-    return ConfiguredFileLineageRuntime(
         config=config,
         engine=engine,
         transaction_runner=transaction_runner,
@@ -376,16 +267,12 @@ __all__ = [
     "DOCWEAVE_TAXONOMY_VERSION_ID",
     "DOCWEAVE_WORKSPACE_ID",
     "ConfiguredClassificationRuntime",
-    "ConfiguredFileLineageRuntime",
-    "ConfiguredRestoreAuditRuntime",
     "ConfiguredReviewDecisionRuntime",
     "RuntimeConfigurationError",
     "RuntimeConfigurationErrorCode",
     "RuntimeEnvironmentConfig",
     "RuntimeIntegrationSnapshot",
     "build_configured_classification_runtime",
-    "build_configured_file_lineage_runtime",
-    "build_configured_restore_audit_runtime",
     "build_configured_review_decision_runtime",
     "load_runtime_environment_config",
     "runtime_integration_snapshot",

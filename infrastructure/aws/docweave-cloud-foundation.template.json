@@ -44,6 +44,20 @@
       "Description": "Maximum PDF size the worker sends to Amazon Bedrock document analysis."
     }
   },
+  "Conditions": {
+    "HasCockroachDbSecret": {
+      "Fn::Not": [
+        {
+          "Fn::Equals": [
+            {
+              "Ref": "CockroachDbSecretArn"
+            },
+            ""
+          ]
+        }
+      ]
+    }
+  },
   "Resources": {
     "DocumentArtifactBucket": {
       "Type": "AWS::S3::Bucket",
@@ -277,6 +291,15 @@
             "DOCWEAVE_COCKROACHDB_SECRET_ARN": {
               "Ref": "CockroachDbSecretArn"
             },
+            "DOCWEAVE_DATABASE_URL": {
+              "Fn::If": [
+                "HasCockroachDbSecret",
+                {
+                  "Fn::Sub": "{{resolve:secretsmanager:${CockroachDbSecretArn}:SecretString:database_url}}"
+                },
+                ""
+              ]
+            },
             "DOCWEAVE_MAX_UPLOAD_BYTES": {
               "Ref": "MaxUploadBytes"
             }
@@ -331,6 +354,15 @@
             },
             "DOCWEAVE_COCKROACHDB_SECRET_ARN": {
               "Ref": "CockroachDbSecretArn"
+            },
+            "DOCWEAVE_DATABASE_URL": {
+              "Fn::If": [
+                "HasCockroachDbSecret",
+                {
+                  "Fn::Sub": "{{resolve:secretsmanager:${CockroachDbSecretArn}:SecretString:database_url}}"
+                },
+                ""
+              ]
             },
             "DOCWEAVE_MAX_BEDROCK_DOCUMENT_BYTES": {
               "Ref": "MaxBedrockDocumentBytes"

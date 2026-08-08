@@ -1,104 +1,47 @@
-# Verified Environment Baseline
+# Environment Baseline
 
-**Project:** DocWeave
-**Last verified:** 2026-07-24
-**Implementation status:** Validation schema available; product deployment not started
+**Project:** DocWeave  
+**Last updated:** 2026-08-08
 
-## 1. Purpose
+## AWS
 
-This document records the verified development environment without claiming
-that planned application integrations are already implemented. Exact account
-identifiers, credentials, connection strings, promotional codes, and private
-billing details are deliberately excluded.
-
-The live provider state remains authoritative. Re-run the documented checks
-before deployment and release.
-
-## 2. AWS baseline
-
-| Item | Verified state |
+| Item | Current setting |
 | --- | --- |
-| Account plan | AWS Free plan is active |
-| Project cost ceiling | 80 USD total unless the project owner explicitly approves a change |
-| Promotional credits | Available credits do not increase the approved project cost ceiling |
-| Budget | `DocWeave-Total-Cost`, cost budget, custom total period, 80 USD |
-| Budget alerts | Actual spend at 50%, 80%, and 100%; forecasted spend at 100% |
-| Cost anomaly detection | Default service monitor and confirmed daily email subscription |
-| Primary Region | `eu-central-1` |
-| Bedrock primary profile | `eu.anthropic.claude-sonnet-4-6`, active |
-| Bedrock invocation | Not performed for DocWeave; no runtime integration is claimed |
-| DocWeave infrastructure | No DocWeave CloudFormation stack or application workload deployed |
+| Region | `eu-central-1` |
+| Live stacks | `docweave-artifacts`, `docweave-cloud-dev` |
+| Runtime services | S3, SQS, Lambda, API Gateway, CloudWatch Logs, Bedrock |
+| Bedrock smoke model | `eu.amazon.nova-2-lite-v1:0` |
+| Secret handling | Lambda can receive `DOCWEAVE_DATABASE_URL` through a Secrets Manager dynamic reference when `CockroachDbSecretArn` is supplied |
 
-Existing resources created for unrelated exercises are outside DocWeave scope
-and must not be reused, renamed, or deleted as part of this project.
+## CockroachDB
 
-The accepted Bedrock model decision is therefore currently feasible in the
-selected European source Region. Invocation still requires the approved prompt
-contract, bounded token limits, least-privilege runtime role, cost measurement,
-and evaluation evidence.
-
-## 3. CockroachDB Cloud baseline
-
-| Item | Verified state |
+| Item | Current setting |
 | --- | --- |
-| Organization | Project owner's authorized education organization |
 | Cluster | `docweave-memory` |
 | Cloud provider | AWS |
-| Primary Region | `eu-central-1` |
-| Plan | CockroachDB Cloud Basic, reported by `ccloud` as `SERVERLESS` |
-| Cluster state | `CREATED` |
-| CockroachDB version | `v26.2.1` at verification time |
-| Request Unit limit | 50,000,000 per monthly cycle |
-| Storage limit | 10 GiB |
-| Network visibility | Public endpoint |
-| SQL administration | Administrative SQL user exists; credentials are not stored in the repository |
-| Validation database | `docweave_validation`, created on 2026-07-24 |
-| Initial schema | Revision `0001_operational_foundation` accepted and introspected in the isolated validation database |
-| Application connection | Not implemented; the validation schema is not a runtime or production deployment |
+| Region | `eu-central-1` |
+| Current application schema | `docweave` |
+| Current table count | 6 |
+| Runtime URL storage | Outside the repository |
 
-The current resource limits match the organization's documented monthly Basic
-free-resource allowance. They are not permission to increase capacity or
-enable unlimited usage.
+## Local Runtime
 
-The public endpoint is an explicit pre-implementation security item. The
-project owner approved existing root and administrator access for
-predevelopment control-plane validation without exposing credentials. Before
-an application connects, the architecture must define approved network
-controls, Transport Layer Security, certificate validation, application
-authentication, separate runtime identities, Row-Level Security, secret
-resolution, connection pooling, and workspace-context cleanup. Least-privilege
-deployment and runtime identities remain separately approval-gated.
+The approved local launcher under the user's DocWeave application-data folder
+sets:
 
-## 4. Tool evidence
+```text
+DOCWEAVE_DATABASE_URL
+DOCWEAVE_WORKSPACE_ID
+DOCWEAVE_TAXONOMY_VERSION_ID
+DOCWEAVE_APPROVED_BY_ACTOR_ID
+```
 
-- `ccloud` version 0.6.12 authenticated successfully and was used to list and
-  inspect the real `docweave-memory` cluster and SQL-user names.
-- The exact offline-rendered initial migration was accepted through the
-  authenticated CockroachDB Cloud SQL Shell in a clean validation database.
-  See [`cockroachdb-live-validation.md`](cockroachdb-live-validation.md).
-- The AWS Model Context Protocol server was used for the verified read-only
-  account, budget, Free plan, Cost Explorer, anomaly detection, resource, and
-  Bedrock inventory.
-- These checks are operational evidence only. They do not yet satisfy the
-  competition's meaningful-product-integration requirement.
+The repository does not store those values.
 
-## 5. Open gates before implementation
+## Verification
 
-The following decisions or artifacts remain mandatory:
-
-1. seed and test the approved taxonomy baseline before classification
-   contracts depend on it;
-2. approve the embedding model, vector dimension, and distance metric;
-3. implement the remaining reviewed CockroachDB migrations from ADR-0002;
-4. complete transaction, workspace-isolation, and recovery tests;
-5. create separately approved least-privilege migration, runtime, audit, and
-   bounded Model Context Protocol identities before application deployment;
-6. approve the local-versus-cloud extraction and privacy boundary;
-7. approve the AWS compute, storage, queue, authentication, and network
-   topology through Infrastructure as Code;
-8. implement and evaluate the Bedrock structured-output contract; and
-9. record cost, latency, quality, security, and recovery evidence.
-
-Until these gates are closed, the correct compliant state is to preserve the
-isolated validation schema without treating it as application persistence or
-deploying DocWeave workloads.
+```powershell
+.\.venv\Scripts\docweave-runtime-preflight.exe --database
+.\.venv\Scripts\docweave-memory-schema.exe --flat
+aws cloudformation validate-template --region eu-central-1 --template-body file://infrastructure/aws/docweave-cloud-foundation.template.json
+```

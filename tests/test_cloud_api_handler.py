@@ -479,7 +479,7 @@ def test_api_returns_analysis_result_artifact(
     fake_s3.object_bodies[result_key] = FakeBody(
         json.dumps(
             {
-                "contract_version": "cloud_analysis_result.v1",
+                "contract_version": "docweave_analysis_result.v1",
                 "job_id": job_id,
                 "workspace_id": WORKSPACE_ID,
                 "status": "bedrock_classified_pending_cockroachdb_persistence",
@@ -501,7 +501,7 @@ def test_api_returns_analysis_result_artifact(
 
     assert response["statusCode"] == 200
     payload = _body(response)
-    assert payload["contract_version"] == "cloud_analysis_result.v1"
+    assert payload["contract_version"] == "docweave_analysis_result.v1"
     assert payload["job_id"] == job_id
 
 

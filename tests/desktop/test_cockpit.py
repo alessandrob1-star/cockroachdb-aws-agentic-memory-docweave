@@ -14,7 +14,7 @@ from docweave.classification_cli import (
     ClassificationEvidenceDetail,
     ClassificationMetadataDetail,
 )
-from docweave.desktop.cockpit import CockpitWindow, Document
+from docweave.desktop.cockpit import CockpitLineagePreview, CockpitWindow, Document
 from docweave.desktop.scan import DesktopScanResult
 from docweave.discovery import DiscoveredFile, DiscoveryResult, DiscoveryStatus
 from docweave.intake import IntakeRecord, IntakeResult, IntakeStatus
@@ -220,7 +220,7 @@ def test_cockpit_surfaces_read_only_memory_evidence(
         table_counts=(
             MemoryTableCount("documents", True, 30),
             MemoryTableCount("proposals", True, 12),
-            MemoryTableCount("file_lineage_events", True, 6),
+            MemoryTableCount("file_history", True, 6),
         ),
     )
     window = CockpitWindow(
@@ -752,7 +752,7 @@ def test_cockpit_scans_synthetic_pdfs_and_raises_central_preview(
     close_cockpit_window(window)
 
 
-def test_cockpit_records_local_review_decision_without_file_mutation(
+def test_cockpit_records_local_rejection_without_file_mutation(
     qt_application: object,
 ) -> None:
     corpus = Path("pdf_sintetici").resolve(strict=True)
@@ -767,7 +767,6 @@ def test_cockpit_records_local_review_decision_without_file_mutation(
                 pages="2",
                 status="REVIEW",
                 path=first_pdf,
-                proposed_destination="DocWeave Organized/Invoices/invoice.pdf",
                 proposal_fingerprint="a" * 64,
             )
         ]
@@ -781,22 +780,20 @@ def test_cockpit_records_local_review_decision_without_file_mutation(
     assert "Review memory selected for invoice" in window.center.memory_summary.text()
     assert "fingerprint aaaaaaaaaaaa" in window.center.memory_detail.text()
 
-    window._approve_selected_review()
+    window._reject_selected_review()
 
     document = window.left.document_at(0)
     assert document is not None
-    assert document.status == "APPROVED"
+    assert document.status == "REJECTED"
     assert document.review_decision_id is not None
     assert window.left.count_status("REVIEW") == 0
     assert len(window._review_ledger.all_decisions()) == 1
-    assert "approved" in window.console.log_text.text()
+    assert "rejected" in window.console.log_text.text()
     assert cast(Any, window.right.event_rows[3]).event_text.text() == (
         "Local review ledger"
     )
-    assert cast(Any, window.right.event_rows[4]).event_text.text() == (
-        "No copy or move executed"
-    )
-    assert "Human review approved append recorded" in (
+    assert cast(Any, window.right.event_rows[4]).event_text.text() == "No move"
+    assert "Human review rejected append recorded" in (
         window.center.memory_summary.text()
     )
     assert "Local review ledger" in window.center.memory_detail.text()
@@ -806,9 +803,14 @@ def test_cockpit_records_local_review_decision_without_file_mutation(
 
 def test_cockpit_records_durable_review_decision_when_proposal_id_is_available(
     qt_application: object,
+    tmp_path: Path,
 ) -> None:
     corpus = Path("pdf_sintetici").resolve(strict=True)
     first_pdf = sorted(corpus.glob("*.pdf"))[0]
+    authorized = tmp_path / "authorized"
+    authorized.mkdir()
+    working_pdf = authorized / first_pdf.name
+    working_pdf.write_bytes(first_pdf.read_bytes())
     proposal_id = UUID("44444444-4444-4444-8444-444444444444")
     calls: list[ReviewDecisionCommandInput] = []
 
@@ -830,18 +832,30 @@ def test_cockpit_records_durable_review_decision_when_proposal_id_is_available(
         runtime_preflight_function=ready_runtime_preflight_report,
         review_decision_function=fake_review_decision_function,
     )
-    window.set_authorized_root(corpus)
+    window.set_authorized_root(authorized)
     window.left.set_documents(
         [
             Document(
-                name=first_pdf.name,
+                name=working_pdf.name,
                 category="invoice",
                 pages="2",
                 status="REVIEW",
-                path=first_pdf,
+                path=working_pdf,
                 proposed_destination="DocWeave Organized/Invoices/invoice.pdf",
+                document_id="66666666-6666-4666-8666-666666666666",
                 proposal_id=str(proposal_id),
                 proposal_fingerprint="a" * 64,
+                lineage_preview=CockpitLineagePreview(
+                    action="rename_and_move",
+                    original_relative_path=working_pdf.name,
+                    previous_relative_path=working_pdf.name,
+                    next_relative_path="DocWeave Organized/Invoices/invoice.pdf",
+                    original_directory="",
+                    original_filename=working_pdf.name,
+                    next_directory="DocWeave Organized/Invoices",
+                    next_filename="invoice.pdf",
+                    plan_fingerprint="b" * 64,
+                ),
             )
         ]
     )
@@ -851,8 +865,15 @@ def test_cockpit_records_durable_review_decision_when_proposal_id_is_available(
 
     document = window.left.document_at(0)
     assert document is not None
-    assert document.status == "APPROVED"
+    assert document.status == "MOVED"
+    assert document.path == (
+        authorized / "DocWeave Organized" / "Invoices" / "invoice.pdf"
+    )
+    assert document.path.exists()
+    assert not working_pdf.exists()
     assert len(calls) == 1
+    assert calls[0].previous_filename == first_pdf.name
+    assert calls[0].next_filename == "invoice.pdf"
     assert len(window._review_ledger.all_decisions()) == 1
     assert window._review_ledger.all_decisions()[0].proposal_id == str(proposal_id)
     assert "durably" in window.console.log_text.text()

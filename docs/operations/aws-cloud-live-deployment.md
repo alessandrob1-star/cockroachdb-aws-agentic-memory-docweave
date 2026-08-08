@@ -1,134 +1,67 @@
 # AWS Cloud Live Deployment Evidence
 
-**Date:** 2026-08-03  
+**Date:** 2026-08-08  
 **Region:** `eu-central-1`  
 **Environment:** `dev`  
-**Status:** Live infrastructure deployed for the first DocWeave cloud
-foundation slice.
+**Status:** Live stack updated; worker code targets the simple DocWeave schema;
+CockroachDB secret parameter is still missing in the deployed environment.
 
-## Scope
+## Deployed Stacks
 
-This evidence records the first live AWS deployment for DocWeave. It does not
-claim the complete cloud product, public demo readiness, CockroachDB secret
-configuration, or end-to-end cloud document analysis.
-
-## Deployed stacks
-
-| Stack | Purpose | Status |
+| Stack | Purpose | Last observed status |
 | --- | --- | --- |
-| `docweave-artifacts` | Private versioned S3 bucket for Lambda deployment artifacts | `CREATE_COMPLETE` |
-| `docweave-cloud-dev` | S3 document artifacts, SQS queue, Lambda API and worker, HTTP API, log groups, and Bedrock runtime configuration | `UPDATE_COMPLETE` |
+| `docweave-artifacts` | Private versioned S3 bucket for Lambda packages | `CREATE_COMPLETE` |
+| `docweave-cloud-dev` | S3 documents, SQS queue, Lambda API and worker, HTTP API, logs, Bedrock permissions | `UPDATE_COMPLETE` |
 
-## AWS services verified
+The CloudFormation template validated and `docweave-cloud-dev` updated to
+`UPDATE_COMPLETE` on 2026-08-08 with Lambda artifact:
 
-| Service | Live evidence | Result |
-| --- | --- | --- |
-| Amazon S3 | Deployment artifact uploaded to the artifact bucket; one synthetic PDF uploaded through the cloud API pre-signed URL to the document artifact bucket | Verified |
-| Amazon API Gateway | `GET /health`, `POST /uploads/presign`, and `POST /analysis-jobs` reached the Lambda API | Verified |
-| AWS Lambda | API Lambda returned live health; worker Lambda direct invocation accepted an SQS-shaped analysis job after verifying the uploaded PDF artifact metadata in S3 | Verified |
-| Amazon SQS | Analysis job was queued and consumed; queue returned to zero visible and zero in-flight messages | Verified |
-| Amazon CloudWatch Logs | API Lambda log stream exists for the live requests | Verified |
-| Amazon Bedrock | `bedrock-runtime converse` smoke test succeeded with `eu.amazon.nova-2-lite-v1:0`, `stopReason=end_turn`, 62 total tokens, output `OK` | Verified |
-| CockroachDB runtime secret | Not configured in the AWS stack yet | Pending |
+```text
+lambda/docweave-cloud-api-c83902aa0bf9.zip
+```
 
-## Worker artifact verification smoke test
+## AWS Services
 
-After the worker update, the live smoke test uploaded one synthetic PDF through
-the cloud API and invoked the worker with an SQS-shaped event for the same
-workspace-scoped S3 key. The worker returned:
+| Service | Purpose |
+| --- | --- |
+| Amazon S3 | Uploaded PDFs and bounded analysis-result artifacts. |
+| Amazon SQS | Workspace-scoped analysis job queue. |
+| AWS Lambda | HTTP API and queued worker. |
+| Amazon API Gateway | Public HTTP entrypoint for health, upload pre-signing, analysis jobs, and result reads. |
+| Amazon CloudWatch Logs | Runtime logs for API and worker functions. |
+| Amazon Bedrock | Real PDF classification through the configured model. |
+| AWS Secrets Manager | Optional dynamic reference for the CockroachDB `database_url` secret. |
+
+## Current Cloud Persistence Path
+
+The worker now persists successful Bedrock classifications into the same
+CockroachDB schema used by the local dashboard:
+
+```text
+docweave.documents
+docweave.agent_runs
+docweave.proposals
+```
+
+Human decisions and file history remain dashboard actions because they require
+explicit human approval before any file move or rename.
+
+For Lambda CockroachDB persistence, the stack parameter
+`CockroachDbSecretArn` must point to a Secrets Manager secret whose JSON value
+contains:
 
 ```json
 {
-  "accepted": 1,
-  "analysisStatus": "artifact_verified_pending_runtime",
-  "batchItemFailures": [],
-  "verifiedBytes": 5539,
-  "verifiedObjectCount": 1
+  "database_url": "cockroachdb+psycopg://..."
 }
 ```
 
-The SQS queue then returned to zero visible, zero in-flight, and zero delayed
-messages.
+The template uses a CloudFormation dynamic reference to set
+`DOCWEAVE_DATABASE_URL`; the secret value is not stored in the repository.
 
-## Worker Bedrock document classification
+## Health Payload
 
-The current worker implementation reads a bounded PDF object from S3, submits
-it to Amazon Bedrock Runtime as an untrusted document block, and validates a
-compact `classification.v1` JSON proposal against the approved
-`docweave_mvp_v0_1` taxonomy before acknowledging the SQS message.
-
-Live smoke evidence after deployment:
-
-```json
-{
-  "accepted": 1,
-  "analysisStatus": "bedrock_classified_pending_persistence",
-  "batchItemFailures": [],
-  "classifiedObjectCount": 1,
-  "proposal": {
-    "confidence_signal": "weak",
-    "proposed_class": "other"
-  },
-  "usage": {
-    "inputTokens": 699,
-    "outputTokens": 251,
-    "totalTokens": 950
-  },
-  "verifiedBytes": 5539,
-  "verifiedObjectCount": 1
-}
-```
-
-The tested PDF was a synthetic delivery note. The model selected `other` with
-weak confidence because the current approved taxonomy does not yet include a
-delivery-note class. This is acceptable smoke evidence for the Bedrock document
-path and also records a real taxonomy gap to resolve before final evaluation.
-
-This capability is labelled `bedrock_classified_pending_persistence` because it
-does not yet write the proposal to CockroachDB. The CockroachDB runtime secret
-and cloud persistence path remain separate pending work.
-
-## Cloud analysis result artifacts
-
-The cloud API now returns a result URL when an analysis job is queued:
-
-```json
-{
-  "job_id": "<uuid>",
-  "result_url": "/analysis-results/<uuid>?workspace_id=<workspace-uuid>",
-  "status": "queued"
-}
-```
-
-After the worker classifies the uploaded PDF, it writes a bounded JSON artifact
-under the workspace prefix in S3. The API can read that artifact through
-`GET /analysis-results/{job_id}?workspace_id=...`.
-
-Live smoke evidence after deployment:
-
-```json
-{
-  "healthStatus": "ready",
-  "resultUrlReturned": true,
-  "workerAccepted": 1,
-  "workerResultArtifactCount": 1,
-  "resultStatus": "bedrock_classified_pending_cockroachdb_persistence",
-  "resultClassifiedObjectCount": 1,
-  "resultVerifiedObjectCount": 1,
-  "queueVisible": "0",
-  "queueInFlight": "0",
-  "queueDelayed": "0"
-}
-```
-
-This is a cloud result artifact for AWS workflow observability and demo
-verification. It is not the authoritative agentic memory layer; CockroachDB
-must still persist the durable operational, semantic, episodic, preference, and
-audit memory before final submission claims are made.
-
-## Live health payload
-
-The cloud API reported:
+Observed `GET /health` after the 2026-08-08 update:
 
 ```json
 {
@@ -140,26 +73,42 @@ The cloud API reported:
     "amazon_sqs": "configured",
     "aws_lambda": "running",
     "cockroachdb_secret": "missing"
-  },
-  "capabilities": [
-    "health",
-    "presigned_pdf_upload",
-    "queued_analysis_request",
-    "worker_s3_artifact_verification",
-    "worker_bedrock_document_classification",
-    "cloud_analysis_result_artifacts"
-  ]
+  }
 }
 ```
 
-## Important limitations
+Because `cockroachdb_secret` is currently `missing`, cloud analysis can still
+produce S3 result artifacts but Lambda CockroachDB persistence is not
+configured. Do not claim live cloud-to-CockroachDB persistence until the secret
+ARN is supplied and a live worker run produces rows in `docweave`.
 
-- The worker verifies queued PDF artifact existence, size, and
-  `application/pdf` content type in S3 and can request a bounded Bedrock
-  document classification proposal before accepting a job. It does not yet run
-  CockroachDB persistence, review-decision, or file-lineage runtime in the cloud.
-- The stack does not yet configure the CockroachDB runtime secret.
-- Anthropic Claude was not available for live smoke testing because the AWS
-  account still requires the Anthropic use-case details form. The working live
-  smoke model is `eu.amazon.nova-2-lite-v1:0`.
-- No guestbook resources were modified.
+## Deployment Verification
+
+Validate the template:
+
+```powershell
+aws cloudformation validate-template --region eu-central-1 --template-body file://infrastructure/aws/docweave-cloud-foundation.template.json
+```
+
+Inspect live stacks:
+
+```powershell
+aws cloudformation list-stacks --region eu-central-1 --stack-status-filter CREATE_COMPLETE UPDATE_COMPLETE
+```
+
+After packaging and deployment, verify:
+
+1. `GET /health` reports configured AWS services.
+2. `POST /uploads/presign` returns a workspace-scoped S3 upload URL.
+3. `POST /analysis-jobs` queues an SQS job and returns a result URL.
+4. The worker invokes Amazon Bedrock and writes an S3 result artifact.
+5. If `CockroachDbSecretArn` is configured, CockroachDB receives document,
+   agent-run, and proposal rows in `docweave`.
+
+## Limitations
+
+- The CockroachDB secret ARN still must be configured before claiming AWS cloud
+  persistence in the demo.
+- The cloud path does not approve file moves. Approval remains a dashboard
+  workflow.
+- Relationship inference is not the main cloud smoke test.

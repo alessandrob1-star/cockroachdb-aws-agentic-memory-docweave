@@ -28,8 +28,6 @@ from docweave.classification_cli import (
     build_content_addressed_identity,
     discover_batch_pdfs,
 )
-from docweave.extraction import ExtractionStatus, PdfExtractionResult
-from docweave.persistence import PersistedClassificationRun
 from docweave.persistence.contracts import PersistenceDisposition
 
 
@@ -116,76 +114,70 @@ def test_main_prints_sanitized_success(
 
 
 def test_command_result_includes_validated_evidence_details() -> None:
-    persisted = PersistedClassificationRun(
-        extraction=PdfExtractionResult(
-            status=ExtractionStatus.COMPLETED,
-            pages=(),
-            source_sha256="ab" * 32,
-            source_bytes=100,
-            document_page_count=1,
-            extractor="test",
-        ),
-        model_run=BedrockClassificationRun(
-            proposal=ClassificationProposal(
-                contract_version="classification.v1",
-                taxonomy_version="docweave_mvp_v0_1",
-                proposed_class=TaxonomyClass.INVOICE,
-                document_language="en",
-                rationale="Invoice heading and total are explicit.",
-                rationale_evidence_ids=("ev_1",),
-                evidence=(
-                    EvidenceReference(
-                        evidence_id="ev_1",
-                        page_index=0,
-                        quote="Invoice heading and total are explicit.",
-                        supports=("classification",),
-                    ),
-                    EvidenceReference(
-                        evidence_id="ev_2",
-                        page_index=1,
-                        quote="Supplier name is visible.",
-                        supports=("metadata",),
-                    ),
+    model_run = BedrockClassificationRun(
+        proposal=ClassificationProposal(
+            contract_version="classification.v1",
+            taxonomy_version="docweave_mvp_v0_1",
+            proposed_class=TaxonomyClass.INVOICE,
+            document_language="en",
+            rationale="Invoice heading and total are explicit.",
+            rationale_evidence_ids=("ev_1",),
+            evidence=(
+                EvidenceReference(
+                    evidence_id="ev_1",
+                    page_index=0,
+                    quote="Invoice heading and total are explicit.",
+                    supports=("classification",),
                 ),
-                candidate_metadata=(
-                    CandidateMetadata(
-                        name="supplier",
-                        value="ACME SRL",
-                        evidence_ids=("ev_2",),
-                    ),
+                EvidenceReference(
+                    evidence_id="ev_2",
+                    page_index=1,
+                    quote="Supplier name is visible.",
+                    supports=("metadata",),
                 ),
-                alternative_classes=(),
-                contradictions=(),
-                missing_expected_evidence=(),
-                raw_signals=RawClassificationSignals(
-                    classification_strength=SignalStrength.STRONG,
-                    evidence_coverage=SignalStrength.STRONG,
-                    ambiguity=SignalStrength.WEAK,
-                ),
-                abstention_reason=None,
             ),
-            provenance=BedrockRunProvenance(
-                region_name="eu-central-1",
-                model_id="eu.amazon.nova-2-lite-v1:0",
-                contract_version="classification.v1",
-                taxonomy_version="docweave_mvp_v0_1",
-                stop_reason="tool_use",
-                usage=BedrockUsage(10, 5, 15),
-                service_latency_ms=100,
-                observed_duration_ms=110,
-                request_id="request-123",
-                retry_attempts=1,
-                estimated_cost_usd=Decimal("0.00001"),
+            candidate_metadata=(
+                CandidateMetadata(
+                    name="supplier",
+                    value="ACME SRL",
+                    evidence_ids=("ev_2",),
+                ),
             ),
+            alternative_classes=(),
+            contradictions=(),
+            missing_expected_evidence=(),
+            raw_signals=RawClassificationSignals(
+                classification_strength=SignalStrength.STRONG,
+                evidence_coverage=SignalStrength.STRONG,
+                ambiguity=SignalStrength.WEAK,
+            ),
+            abstention_reason=None,
         ),
-        document_disposition=PersistenceDisposition.APPLIED,
-        taxonomy_disposition=PersistenceDisposition.IDEMPOTENT_REPLAY,
-        proposal_disposition=PersistenceDisposition.APPLIED,
+        provenance=BedrockRunProvenance(
+            region_name="eu-central-1",
+            model_id="eu.amazon.nova-2-lite-v1:0",
+            contract_version="classification.v1",
+            taxonomy_version="docweave_mvp_v0_1",
+            stop_reason="tool_use",
+            usage=BedrockUsage(10, 5, 15),
+            service_latency_ms=100,
+            observed_duration_ms=110,
+            request_id="request-123",
+            retry_attempts=1,
+            estimated_cost_usd=Decimal("0.00001"),
+        ),
     )
 
     proposal_id = UUID("44444444-4444-4444-8444-444444444444")
 
-    result = classification_cli._command_result(persisted, proposal_id=proposal_id)
+    result = classification_cli._command_result_from_run(
+        model_run,
+        proposal_id=proposal_id,
+        proposal_disposition=PersistenceDisposition.APPLIED,
+        raw_confidence="0.80000",
+        classification_confidence="0.80000",
+        metadata_confidence="0.70000",
+    )
 
     assert result.proposal_id == proposal_id
     assert result.evidence_count == 2

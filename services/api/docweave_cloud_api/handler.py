@@ -553,7 +553,7 @@ def _write_analysis_result_artifact(
 ) -> str:
     result_key = _analysis_result_key(result.workspace_id, result.job_id)
     payload = {
-        "contract_version": "cloud_analysis_result.v1",
+        "contract_version": "docweave_analysis_result.v1",
         "job_id": result.job_id,
         "workspace_id": result.workspace_id,
         "status": str(result.persistence["status"]),
@@ -662,8 +662,8 @@ def _health_payload(config: CloudConfig) -> dict[str, Any]:
             "queued_analysis_request",
             "worker_s3_artifact_verification",
             "worker_bedrock_document_classification",
-            "cloud_analysis_result_artifacts",
-            "cloud_cockroachdb_persistence_seam",
+            "analysis_result_artifacts",
+            "simple_cockroachdb_memory_persistence",
         ],
     }
 
