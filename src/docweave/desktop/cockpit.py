@@ -1657,23 +1657,52 @@ class CurvedConsoleButton(QPushButton):
         bounds = path.boundingRect()
 
         pressed = self.isDown()
-        hovered = self.underMouse()
+        hovered = self.underMouse() and self.isEnabled()
+        enabled = self.isEnabled()
+        role = self.text().casefold()
 
-        if pressed:
+        if not enabled:
+            top = QColor(18, 24, 23, 125)
+            bottom = QColor(8, 12, 12, 155)
+            edge_color = QColor(100, 118, 112, 90)
+            text_color = QColor(142, 158, 152, 170)
+        elif role == "approve":
+            top = QColor(30, 126, 82, 235)
+            bottom = QColor(7, 54, 34, 245)
+            edge_color = QColor(126, 255, 183, 235)
+            text_color = QColor("#F4FFF8")
+        elif role == "reject":
+            top = QColor(126, 42, 42, 235)
+            bottom = QColor(58, 11, 17, 245)
+            edge_color = QColor(255, 135, 135, 230)
+            text_color = QColor("#FFF6F6")
+        elif pressed:
             top = QColor(8, 38, 31, 235)
             bottom = QColor(3, 20, 17, 245)
+            edge_color = QColor(185, 255, 230, 220)
+            text_color = QColor("#EAF5F1")
         elif hovered:
             top = QColor(37, 118, 94, 220)
             bottom = QColor(10, 54, 43, 235)
+            edge_color = QColor(185, 255, 230, 215)
+            text_color = QColor("#EAF5F1")
         else:
             top = QColor(24, 82, 66, 220)
             bottom = QColor(7, 38, 31, 238)
+            edge_color = QColor(185, 255, 230, 175)
+            text_color = QColor("#EAF5F1")
 
         fill = QLinearGradient(0, bounds.top(), 0, bounds.bottom())
         fill.setColorAt(0.00, top)
         fill.setColorAt(0.42, QColor(top.red(), top.green(), top.blue(), 190))
         fill.setColorAt(1.00, bottom)
         painter.fillPath(path, QBrush(fill))
+
+        if enabled and role in {"approve", "reject"}:
+            glow_color = QColor(edge_color)
+            glow_color.setAlpha(95)
+            painter.setPen(QPen(glow_color, 4.8))
+            painter.drawPath(path)
 
         # Upper illuminated edge.
         top_edge = QPainterPath()
@@ -1689,7 +1718,8 @@ class CurvedConsoleButton(QPushButton):
         )
         painter.setPen(
             QPen(
-                QColor(185, 255, 230, 215 if hovered else 175), 1.4 if hovered else 1.2
+                edge_color,
+                1.9 if enabled and role in {"approve", "reject"} else 1.2,
             )
         )
         painter.drawPath(top_edge)
@@ -1706,10 +1736,10 @@ class CurvedConsoleButton(QPushButton):
             bounds.right() - bounds.width() * 0.04,
             bounds.top() + bounds.height() * 0.68,
         )
-        painter.setPen(QPen(QColor(0, 8, 6, 190), 2.4))
+        painter.setPen(QPen(QColor(0, 8, 6, 95 if not enabled else 190), 2.4))
         painter.drawPath(bottom_edge)
 
-        painter.setPen(QPen(QColor(115, 235, 195, 100), 1.0))
+        painter.setPen(QPen(edge_color if enabled else QColor(90, 104, 99, 90), 1.0))
         painter.drawLine(
             int(bounds.left() + bounds.width() * 0.10),
             int(bounds.top() + bounds.height() * 0.20),
@@ -1717,7 +1747,7 @@ class CurvedConsoleButton(QPushButton):
             int(bounds.top() + bounds.height() * 0.68),
         )
 
-        painter.setPen(QPen(QColor(0, 10, 8, 150), 1.3))
+        painter.setPen(QPen(QColor(0, 10, 8, 70 if not enabled else 150), 1.3))
         painter.drawLine(
             int(bounds.right() - bounds.width() * 0.10),
             int(bounds.top() + bounds.height() * 0.20),
@@ -1725,7 +1755,7 @@ class CurvedConsoleButton(QPushButton):
             int(bounds.top() + bounds.height() * 0.68),
         )
 
-        painter.setPen(QColor("#EAF5F1"))
+        painter.setPen(text_color)
         font = QFont("Segoe UI", 10, QFont.Weight.Bold)
         font.setLetterSpacing(QFont.SpacingType.AbsoluteSpacing, 0)
         painter.setFont(font)
@@ -3236,6 +3266,16 @@ class CockpitWindow(QMainWindow):
             )
         self.console.buttons[4].setEnabled(review_ready)
         self.console.buttons[5].setEnabled(review_ready)
+        if review_ready:
+            self.console.buttons[4].setToolTip("Approve the selected AI proposal.")
+            self.console.buttons[5].setToolTip("Reject the selected AI proposal.")
+        else:
+            self.console.buttons[4].setToolTip(
+                "Select a document in REVIEW before approving."
+            )
+            self.console.buttons[5].setToolTip(
+                "Select a document in REVIEW before rejecting."
+            )
 
     def _set_status(self, message: str) -> None:
         self.console.log_text.setText(message)
