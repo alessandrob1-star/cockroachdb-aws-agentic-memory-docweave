@@ -1382,7 +1382,7 @@ class CenterPreview(ShapeWidget):
         self.review_table = QTableWidget(0, 4, self)
         self.review_table.setObjectName("reviewTable")
         self.review_table.setHorizontalHeaderLabels(
-            ["PDF NAME", "PROPOSED NAME", "SUGGESTED DIRECTORY", ""]
+            ["PDF NAME", "PROPOSED NAME", "SUGGESTED DIRECTORY", "ACTIONS"]
         )
         self.review_table.verticalHeader().setVisible(False)
         self.review_table.setShowGrid(False)
@@ -1392,8 +1392,8 @@ class CenterPreview(ShapeWidget):
         review_header = self.review_table.horizontalHeader()
         review_header.setFont(QFont("Segoe UI", 12, QFont.Weight.Bold))
         review_header.setSectionResizeMode(0, QHeaderView.ResizeMode.Fixed)
-        review_header.setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
-        review_header.setSectionResizeMode(2, QHeaderView.ResizeMode.Stretch)
+        review_header.setSectionResizeMode(1, QHeaderView.ResizeMode.Fixed)
+        review_header.setSectionResizeMode(2, QHeaderView.ResizeMode.Fixed)
         review_header.setSectionResizeMode(3, QHeaderView.ResizeMode.Fixed)
         self.review_table.hide()
 
@@ -1463,19 +1463,20 @@ class CenterPreview(ShapeWidget):
     def _review_action_widget(self, row: int) -> QWidget:
         box = QWidget(self.review_table)
         layout = QHBoxLayout(box)
-        layout.setContentsMargins(7, 3, 7, 3)
-        layout.setSpacing(9)
-        approve = QPushButton("⚑", box)
+        layout.setContentsMargins(8, 4, 8, 4)
+        layout.setSpacing(10)
+        approve = QPushButton("✓", box)
         reject = QPushButton("×", box)
         preview = QPushButton("PDF", box)
         approve.setObjectName("reviewApproveButton")
         reject.setObjectName("reviewRejectButton")
         preview.setObjectName("reviewPreviewButton")
         approve.setFont(QFont("Segoe UI Symbol", 24, QFont.Weight.Black))
-        reject.setFont(QFont("Segoe UI", 23, QFont.Weight.Black))
+        reject.setFont(QFont("Segoe UI", 24, QFont.Weight.Black))
         for button in (approve, reject):
-            button.setFixedSize(60, 34)
-        preview.setFixedSize(64, 34)
+            button.setFixedSize(54, 34)
+        preview.setFixedSize(58, 34)
+        box.setMinimumWidth(198)
         approve_glow = QGraphicsDropShadowEffect(approve)
         approve_glow.setBlurRadius(18)
         approve_glow.setOffset(0, 0)
@@ -1501,6 +1502,7 @@ class CenterPreview(ShapeWidget):
         layout.addWidget(approve)
         layout.addWidget(reject)
         layout.addWidget(preview)
+        layout.addStretch(1)
         return box
 
     def shape_path(self) -> QPainterPath:
@@ -1537,8 +1539,18 @@ class CenterPreview(ShapeWidget):
         self.review_title.setGeometry(28, 112, 210, 27)
         self.review_approve_all.setGeometry(w - 148, 112, 120, 30)
         self.review_table.setGeometry(18, 150, w - 36, h - 166)
-        self.review_table.setColumnWidth(0, 230)
-        self.review_table.setColumnWidth(3, 250)
+        table_width = max(760, w - 36)
+        action_width = 230
+        original_width = min(230, max(170, int(table_width * 0.16)))
+        directory_width = min(360, max(220, int(table_width * 0.24)))
+        proposed_width = max(
+            260,
+            table_width - original_width - directory_width - action_width - 28,
+        )
+        self.review_table.setColumnWidth(0, original_width)
+        self.review_table.setColumnWidth(1, proposed_width)
+        self.review_table.setColumnWidth(2, directory_width)
+        self.review_table.setColumnWidth(3, action_width)
 
         top = 112
         if self.analysis_panel.isVisible():
