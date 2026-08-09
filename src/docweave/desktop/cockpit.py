@@ -30,7 +30,7 @@ import sys
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from uuid import UUID, uuid4
 
 from PySide6.QtCore import (
@@ -1365,10 +1365,10 @@ class CenterPreview(ShapeWidget):
         self.review_approve_all.hide()
         self.review_approve_all.clicked.connect(self.review_approve_all_requested)
 
-        self.review_table = QTableWidget(0, 3, self)
+        self.review_table = QTableWidget(0, 4, self)
         self.review_table.setObjectName("reviewTable")
         self.review_table.setHorizontalHeaderLabels(
-            ["ORIGINAL DIRECTORY / NAME", "PROPOSED DIRECTORY / NAME", ""]
+            ["PDF NAME", "PROPOSED NAME", "SUGGESTED DIRECTORY", ""]
         )
         self.review_table.verticalHeader().setVisible(False)
         self.review_table.setShowGrid(False)
@@ -1377,9 +1377,10 @@ class CenterPreview(ShapeWidget):
         self.review_table.setFont(QFont("Segoe UI", 12, QFont.Weight.Medium))
         review_header = self.review_table.horizontalHeader()
         review_header.setFont(QFont("Segoe UI", 12, QFont.Weight.Bold))
-        review_header.setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
+        review_header.setSectionResizeMode(0, QHeaderView.ResizeMode.Fixed)
         review_header.setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
-        review_header.setSectionResizeMode(2, QHeaderView.ResizeMode.Fixed)
+        review_header.setSectionResizeMode(2, QHeaderView.ResizeMode.Stretch)
+        review_header.setSectionResizeMode(3, QHeaderView.ResizeMode.Fixed)
         self.review_table.hide()
 
         self._document = QPdfDocument(self)
@@ -1520,7 +1521,8 @@ class CenterPreview(ShapeWidget):
         self.review_title.setGeometry(28, 112, 210, 27)
         self.review_approve_all.setGeometry(w - 148, 112, 120, 30)
         self.review_table.setGeometry(18, 150, w - 36, h - 166)
-        self.review_table.setColumnWidth(2, 220)
+        self.review_table.setColumnWidth(0, 230)
+        self.review_table.setColumnWidth(3, 220)
 
         top = 112
         if self.analysis_panel.isVisible():
@@ -1590,7 +1592,7 @@ class CenterPreview(ShapeWidget):
         self._geometry_animation.start()
         self.opacity_animation.start()
 
-    def show_review_table(self, rows: list[tuple[int, str, str]]) -> None:
+    def show_review_table(self, rows: list[tuple[int, str, str, str]]) -> None:
         """Replace the PDF preview with a batch decision table."""
         self._geometry_animation.stop()
         self.opacity_animation.stop()
@@ -1612,16 +1614,21 @@ class CenterPreview(ShapeWidget):
         self.review_approve_all.show()
         self.review_table.show()
         self.review_table.setRowCount(len(rows))
-        for table_row, (document_row, original, proposed) in enumerate(rows):
+        for table_row, (document_row, original, proposed_name, directory) in enumerate(
+            rows
+        ):
             original_item = QTableWidgetItem(original)
-            proposed_item = QTableWidgetItem(proposed)
+            proposed_item = QTableWidgetItem(proposed_name)
+            directory_item = QTableWidgetItem(directory)
             original_item.setToolTip(original)
-            proposed_item.setToolTip(proposed)
+            proposed_item.setToolTip(proposed_name)
+            directory_item.setToolTip(directory)
             self.review_table.setItem(table_row, 0, original_item)
             self.review_table.setItem(table_row, 1, proposed_item)
+            self.review_table.setItem(table_row, 2, directory_item)
             self.review_table.setCellWidget(
                 table_row,
-                2,
+                3,
                 self._review_action_widget(document_row),
             )
             self.review_table.setRowHeight(table_row, 48)
@@ -3395,19 +3402,25 @@ class CockpitWindow(QMainWindow):
             ]
         )
 
-    def _batch_review_rows(self) -> list[tuple[int, str, str]]:
-        rows: list[tuple[int, str, str]] = []
+    def _batch_review_rows(self) -> list[tuple[int, str, str, str]]:
+        rows: list[tuple[int, str, str, str]] = []
         for row in range(self.left.document_count):
             document = self.left.document_at(row)
             if document is None or document.status != "REVIEW":
                 continue
-            original = _review_original_path_label(document.lineage_preview)
-            proposed = _review_proposed_path_label(document.lineage_preview)
-            if original == "Original path unavailable":
+            original = _review_original_name_label(document.lineage_preview)
+            proposed_name = _review_proposed_name_label(document.lineage_preview)
+            directory = _review_proposed_directory_label(document.lineage_preview)
+            if original == "Original name unavailable":
                 original = document.name
-            if proposed == "Proposed path unavailable":
-                proposed = document.proposed_destination or document.name
-            rows.append((row, original, proposed))
+            if proposed_name == "Proposed name unavailable":
+                proposed_name = _filename_from_destination(
+                    document.proposed_destination,
+                    fallback=document.name,
+                )
+            if directory == "Suggested directory unavailable":
+                directory = _directory_from_destination(document.proposed_destination)
+            rows.append((row, original, proposed_name, directory))
         return rows
 
     @Slot(int)
@@ -3438,7 +3451,10 @@ class CockpitWindow(QMainWindow):
 
     @Slot()
     def _approve_all_review_rows(self) -> None:
-        rows = [row for row, _original, _proposed in self._batch_review_rows()]
+        rows = [
+            row
+            for row, _original, _proposed_name, _directory in self._batch_review_rows()
+        ]
         if not rows:
             self._set_status("No review proposals remain to approve.")
             return
@@ -4252,16 +4268,37 @@ def _original_path_label(preview: CockpitLineagePreview | None) -> str:
     )
 
 
-def _review_original_path_label(preview: CockpitLineagePreview | None) -> str:
-    if preview is None:
-        return "Original path unavailable"
-    return f"{preview.original_directory}\n{preview.original_filename}"
+def _review_original_name_label(preview: CockpitLineagePreview | None) -> str:
+    if preview is None or not preview.original_filename:
+        return "Original name unavailable"
+    return preview.original_filename
 
 
-def _review_proposed_path_label(preview: CockpitLineagePreview | None) -> str:
-    if preview is None:
-        return "Proposed path unavailable"
-    return f"{preview.next_directory}\n{preview.next_filename}"
+def _review_proposed_name_label(preview: CockpitLineagePreview | None) -> str:
+    if preview is None or not preview.next_filename:
+        return "Proposed name unavailable"
+    return preview.next_filename
+
+
+def _review_proposed_directory_label(preview: CockpitLineagePreview | None) -> str:
+    if preview is None or not preview.next_directory:
+        return "Suggested directory unavailable"
+    return preview.next_directory
+
+
+def _filename_from_destination(destination: str | None, *, fallback: str) -> str:
+    if not destination:
+        return fallback
+    return PurePosixPath(destination.replace("\\", "/")).name or fallback
+
+
+def _directory_from_destination(destination: str | None) -> str:
+    if not destination:
+        return "Suggested directory unavailable"
+    directory = PurePosixPath(destination.replace("\\", "/")).parent.as_posix()
+    if directory == ".":
+        return "Suggested directory unavailable"
+    return directory
 
 
 def _current_path_label(document: Document) -> str:

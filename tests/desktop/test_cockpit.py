@@ -1038,16 +1038,28 @@ def test_cockpit_opens_batch_review_table_from_approve_button(
     assert window.side_view.isHidden()
     assert window.center.geometry().width() > window.width() * 0.75
     assert window.center.review_table.rowCount() == 2
-    assert window.center.review_table.columnCount() == 3
-    assert window.center.review_table.columnWidth(2) >= 220
+    assert window.center.review_table.columnCount() == 4
+    original_header = window.center.review_table.horizontalHeaderItem(0)
+    proposed_header = window.center.review_table.horizontalHeaderItem(1)
+    directory_header = window.center.review_table.horizontalHeaderItem(2)
+    assert original_header is not None
+    assert proposed_header is not None
+    assert directory_header is not None
+    assert original_header.text() == "PDF NAME"
+    assert proposed_header.text() == "PROPOSED NAME"
+    assert directory_header.text() == "SUGGESTED DIRECTORY"
+    assert window.center.review_table.columnWidth(0) <= 240
+    assert window.center.review_table.columnWidth(3) >= 220
     original_item = window.center.review_table.item(0, 0)
     proposed_item = window.center.review_table.item(0, 1)
+    directory_item = window.center.review_table.item(0, 2)
     assert original_item is not None
     assert proposed_item is not None
-    assert first_pdf.name in original_item.text()
-    assert "DocWeave Organized/Invoices" in proposed_item.text()
-    assert "first.pdf" in proposed_item.text()
-    action_widget = window.center.review_table.cellWidget(0, 2)
+    assert directory_item is not None
+    assert original_item.text() == first_pdf.name
+    assert proposed_item.text() == "first.pdf"
+    assert directory_item.text() == "DocWeave Organized/Invoices"
+    action_widget = window.center.review_table.cellWidget(0, 3)
     assert action_widget is not None
     action_buttons = action_widget.findChildren(QPushButton)
     assert [button.objectName() for button in action_buttons] == [
