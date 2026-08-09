@@ -201,7 +201,7 @@ def test_cockpit_starts_with_definitive_local_surface(
     assert window.left.table.horizontalHeader().font().pointSize() >= 11
     assert window.console.bedrock_button is window.console.buttons[6]
     assert window.console.lateral_screens_button.text() == "S-SCREENS"
-    assert window.console.lateral_screens_button.isHidden()
+    assert not window.console.lateral_screens_button.isHidden()
     assert cast(Any, window.right.event_rows[0]).event_text.wordWrap()
     assert "CockroachDB      Configured" in window.console.status_text.text()
     assert window.console.bedrock_button.text() == "BEDROCK"
@@ -904,6 +904,17 @@ def test_cockpit_scans_synthetic_pdfs_and_raises_central_preview(
     assert opened_paths == [first_pdf]
     assert "No files were changed" in window.console.log_text.text()
     assert window.console.buttons[3].isEnabled()
+    compact_width = window.center.geometry().width()
+
+    window.console.lateral_screens_button.click()
+
+    assert window.side_view.isHidden()
+    assert window.center.geometry().width() > window.width() * 0.75
+
+    window.console.lateral_screens_button.click()
+
+    assert not window.side_view.isHidden()
+    assert window.center.geometry().width() == compact_width
 
     window._analyze_selected_document()
     wait_for_cockpit_classification(window)
@@ -1078,9 +1089,15 @@ def test_cockpit_opens_batch_review_table_from_approve_button(  # noqa: PLR0915
     window.console.lateral_screens_button.click()
 
     assert not window.side_view.isHidden()
-    assert window.center.review_table.isHidden()
-    assert window.console.lateral_screens_button.isHidden()
+    assert not window.center.review_table.isHidden()
+    assert not window.console.lateral_screens_button.isHidden()
     assert window.center.geometry().width() < window.width() * 0.60
+
+    window.console.lateral_screens_button.click()
+
+    assert window.side_view.isHidden()
+    assert not window.center.review_table.isHidden()
+    assert window.center.geometry().width() > window.width() * 0.75
 
     close_cockpit_window(window)
 

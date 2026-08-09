@@ -2190,9 +2190,8 @@ class ConsolePanel(ShapeWidget):
         self.lateral_screens_button = CurvedConsoleButton("S-SCREENS", self)
         self.lateral_screens_button.setObjectName("lateralScreensButton")
         self.lateral_screens_button.setToolTip(
-            "Restore the left and right cockpit screens."
+            "Toggle side screens and single central screen mode."
         )
-        self.lateral_screens_button.hide()
 
         self.log_text = QLabel(
             "Session started\n"
@@ -2440,6 +2439,7 @@ class CockpitWindow(QMainWindow):
         self._bedrock_auth_state = "unknown"
         self._bedrock_login_poll_attempts = 0
         self._review_expanded = False
+        self._center_expanded = False
         self._selected_document_row: int | None = None
         self._review_ledger = InMemoryReviewDecisionLedger()
         self._workspace = DesktopWorkspaceSession()
@@ -2501,7 +2501,7 @@ class CockpitWindow(QMainWindow):
         self.console.buttons[5].clicked.connect(self._reject_selected_review)
         self.console.bedrock_button.clicked.connect(self._handle_bedrock_button_clicked)
         self.console.lateral_screens_button.clicked.connect(
-            lambda _checked=False: self._close_batch_review()
+            self._toggle_lateral_screens
         )
         self.center.review_approve_requested.connect(self._approve_review_row)
         self.center.review_reject_requested.connect(self._reject_review_row)
@@ -3037,7 +3037,7 @@ class CockpitWindow(QMainWindow):
 
     @Slot(int)
     def _open_document_row(self, row: int) -> None:  # noqa: PLR0911
-        self._set_review_expanded(False)
+        self._set_review_expanded(False, keep_center_expanded=True)
         document = self.left.document_at(row)
         root = self.authorized_root
         if document is None or document.path is None or root is None:
@@ -3461,18 +3461,41 @@ class CockpitWindow(QMainWindow):
     def _preview_review_row(self, row: int) -> None:
         self._close_batch_review(preview_row=row)
 
-    def _set_review_expanded(self, expanded: bool) -> None:
+    @Slot()
+    def _toggle_lateral_screens(self) -> None:
+        self._set_center_expanded(not self._center_expanded)
+        if self._center_expanded:
+            self._set_status("Single central screen mode enabled.")
+            return
+        self._set_status("Side screens restored.")
+
+    def _set_review_expanded(
+        self,
+        expanded: bool,
+        *,
+        keep_center_expanded: bool = False,
+    ) -> None:
         if self._review_expanded == expanded:
             return
         self._review_expanded = expanded
-        self.console.lateral_screens_button.setVisible(expanded)
-        self.console.lateral_screens_button.setEnabled(expanded)
-        self.side_view.setVisible(not expanded)
+        self._set_center_expanded(expanded, keep_expanded=keep_center_expanded)
+
+    def _set_center_expanded(
+        self,
+        expanded: bool,
+        *,
+        keep_expanded: bool = False,
+    ) -> None:
+        if keep_expanded and self._center_expanded:
+            expanded = True
+        if self._center_expanded != expanded:
+            self._center_expanded = expanded
+        self.side_view.setVisible(not self._center_expanded)
         self.resizeEvent(None)
 
     @Slot()
     def _close_batch_review(self, *, preview_row: int | None = None) -> None:
-        self._set_review_expanded(False)
+        self._set_review_expanded(False, keep_center_expanded=preview_row is not None)
         self.center.review_title.hide()
         self.center.review_approve_all.hide()
         self.center.review_table.hide()
@@ -3730,9 +3753,7 @@ class CockpitWindow(QMainWindow):
             )
         self.console.buttons[4].setEnabled(batch_review_ready)
         self.console.buttons[5].setEnabled(selected_review_ready)
-        self.console.lateral_screens_button.setEnabled(
-            self._review_expanded and not blocked
-        )
+        self.console.lateral_screens_button.setEnabled(not blocked)
         if batch_review_ready:
             self.console.buttons[4].setToolTip(
                 "Open the batch review table for all proposed renames."
@@ -4018,7 +4039,7 @@ class CockpitWindow(QMainWindow):
 
         self.console.setGeometry(console_x, console_y, console_w, console_h)
 
-        if self._review_expanded:
+        if self._center_expanded:
             expanded_margin_x = int(w * 0.075)
             expanded_top = max(12, top - center_lift)
             expanded_bottom = console_y - int(h * 0.035)
@@ -4042,7 +4063,7 @@ class CockpitWindow(QMainWindow):
                 12,
             )
 
-        if not self._review_expanded:
+        if not self._center_expanded:
             self.side_view.raise_()
         self.console.raise_()
         self.center.raise_()
