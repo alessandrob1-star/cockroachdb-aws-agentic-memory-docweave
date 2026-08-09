@@ -4053,7 +4053,7 @@ class CockpitWindow(QMainWindow):
             target = QRect(center_x, center_y, center_w, center_h)
         self.center.set_target_rect(target)
 
-        if self.center.opacity_effect.opacity() > 0.01:
+        if self._center_expanded or self.center.opacity_effect.opacity() > 0.01:
             self.center.setGeometry(target)
         else:
             self.center.setGeometry(
