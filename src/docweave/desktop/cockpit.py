@@ -756,10 +756,6 @@ class LeftScreen(ShapeWidget):
         self.min_button.setObjectName("windowButton")
         self.min_button.clicked.connect(window.showMinimized)
 
-        self.brand = QLabel("DOCWEAVE", self)
-        self.brand.setObjectName("brand")
-        self.brand.hide()
-
         self.local = QLabel("● LOCAL", self)
         self.local.setObjectName("online")
 
@@ -791,7 +787,7 @@ class LeftScreen(ShapeWidget):
         self.hint = QLabel("Choose a folder, scan, then select a ready PDF.", self)
         self.hint.setObjectName("muted")
 
-        for label in (self.brand, self.local, self.section, self.hint):
+        for label in (self.local, self.section, self.hint):
             glow = QGraphicsDropShadowEffect(label)
             glow.setBlurRadius(14)
             glow.setOffset(0, 0)
@@ -930,7 +926,6 @@ class LeftScreen(ShapeWidget):
 
         self.close_button.setGeometry(34, 18, 31, 29)
         self.min_button.setGeometry(71, 18, 31, 29)
-        self.brand.setGeometry(112, 16, 190, 32)
         self.local.setGeometry(w - 94, 20, 72, 24)
 
         # Carbon content area: extra lower/side clearance keeps the table
@@ -963,24 +958,6 @@ class LeftScreen(ShapeWidget):
             w - 92,
             hint_height,
         )
-
-    def paintEvent(self, event) -> None:
-        super().paintEvent(event)
-
-        painter = QPainter(self)
-        painter.setRenderHint(QPainter.RenderHint.Antialiasing, True)
-        painter.setRenderHint(QPainter.RenderHint.TextAntialiasing, True)
-
-        text_rect = QRectF(112, 19, max(160, self.width() - 190), 34)
-        font = QFont("Segoe UI", 18, QFont.Weight.DemiBold)
-        font.setLetterSpacing(QFont.SpacingType.PercentageSpacing, 104)
-        painter.setFont(font)
-
-        for radius, alpha in ((3, 70), (2, 105), (1, 150)):
-            painter.setPen(QPen(QColor(255, 34, 34, alpha), radius))
-            painter.drawText(text_rect, Qt.AlignmentFlag.AlignLeft, "DOCWEAVE")
-        painter.setPen(QPen(QColor(255, 58, 58, 245), 1))
-        painter.drawText(text_rect, Qt.AlignmentFlag.AlignLeft, "DOCWEAVE")
 
     def mousePressEvent(self, event: QMouseEvent) -> None:
         if event.button() == Qt.MouseButton.LeftButton and event.position().y() < 58:
