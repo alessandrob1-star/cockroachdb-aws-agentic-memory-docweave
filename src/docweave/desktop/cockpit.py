@@ -756,7 +756,7 @@ class LeftScreen(ShapeWidget):
         self.min_button.setObjectName("windowButton")
         self.min_button.clicked.connect(window.showMinimized)
 
-        self.brand = QLabel("DOC WEAVE", self)
+        self.brand = QLabel("DOCWEAVE", self)
         self.brand.setObjectName("brand")
 
         self.local = QLabel("● LOCAL", self)
@@ -927,10 +927,11 @@ class LeftScreen(ShapeWidget):
         w = self.width()
         h = self.height()
 
-        # Header and footer labels remain on the glass frame.
+        # Window controls remain on the glass frame; the brand sits inside the
+        # visible carbon area so perspective/clipping never hides it.
         self.close_button.setGeometry(34, 18, 31, 29)
         self.min_button.setGeometry(71, 18, 31, 29)
-        self.brand.setGeometry(112, 16, 190, 32)
+        self.brand.setGeometry(48, 70, 240, 30)
         self.local.setGeometry(w - 94, 20, 72, 24)
 
         # Carbon content area: extra lower/side clearance keeps the table
@@ -947,7 +948,7 @@ class LeftScreen(ShapeWidget):
             24,
         )
 
-        table_top = content_top
+        table_top = content_top + 28
         hint_height = 22
         hint_y = h - 46
         self.table.setGeometry(
@@ -963,6 +964,7 @@ class LeftScreen(ShapeWidget):
             w - 92,
             hint_height,
         )
+        self.brand.raise_()
 
     def mousePressEvent(self, event: QMouseEvent) -> None:
         if event.button() == Qt.MouseButton.LeftButton and event.position().y() < 58:
