@@ -24,6 +24,8 @@ Requires:
 from __future__ import annotations
 
 import math
+import shutil
+import subprocess
 import sys
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
@@ -49,6 +51,7 @@ from PySide6.QtCore import (
 )
 from PySide6.QtGui import (
     QColor,
+    QDesktopServices,
     QFont,
     QLinearGradient,
     QRadialGradient,
@@ -241,6 +244,54 @@ ReviewDecisionFunction = Callable[
 ]
 RuntimePreflightFunction = Callable[[], RuntimePreflightReport]
 MemoryEvidenceFunction = Callable[[], MemoryEvidenceReport]
+BedrockAuthProbeFunction = Callable[[], bool]
+BedrockLoginLauncher = Callable[[], bool]
+
+
+BEDROCK_LOGIN_HELP_URL = (
+    "https://docs.aws.amazon.com/signin/latest/userguide/command-line-sign-in.html"
+)
+
+
+def probe_bedrock_aws_session() -> bool:
+    """Return whether local AWS credentials are usable without exposing identity."""
+    aws_executable = shutil.which("aws")
+    if aws_executable is None:
+        return False
+    try:
+        completed = subprocess.run(  # noqa: S603
+            [aws_executable, "sts", "get-caller-identity", "--output", "json"],
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=8,
+        )
+    except (FileNotFoundError, OSError, subprocess.TimeoutExpired):
+        return False
+    return completed.returncode == 0
+
+
+def launch_aws_login() -> bool:
+    """Start AWS CLI browser login as an explicit user action."""
+    aws_executable = shutil.which("aws")
+    if aws_executable is None:
+        QDesktopServices.openUrl(QUrl(BEDROCK_LOGIN_HELP_URL))
+        return False
+    creation_flags = 0
+    if sys.platform.startswith("win"):
+        creation_flags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+    try:
+        subprocess.Popen(  # noqa: S603
+            [aws_executable, "login"],
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            creationflags=creation_flags,
+        )
+    except (FileNotFoundError, OSError):
+        QDesktopServices.openUrl(QUrl(BEDROCK_LOGIN_HELP_URL))
+        return False
+    return True
 
 
 def classify_pdf_for_cockpit(
@@ -2101,11 +2152,15 @@ class ConsolePanel(ShapeWidget):
         self.status_text = QLabel(
             "● Local scan       Ready\n"
             "● PDF preview      Ready\n"
-            "● CockroachDB      Not connected\n"
-            "● Bedrock          Not connected",
+            "● CockroachDB      Not connected",
             self,
         )
         self.status_text.setObjectName("consoleText")
+
+        self.bedrock_button = QPushButton("BEDROCK", self)
+        self.bedrock_button.setObjectName("bedrockButton")
+        self.bedrock_button.setProperty("authState", "unknown")
+        self.bedrock_button.setToolTip("Bedrock AWS session status.")
 
         self.log_text = QLabel(
             "Session started\n"
@@ -2122,6 +2177,27 @@ class ConsolePanel(ShapeWidget):
             self,
         )
         self.quick_text.setObjectName("consoleText")
+
+    def set_bedrock_auth_state(self, state: str) -> None:
+        labels = {
+            "connected": "BEDROCK ON",
+            "disconnected": "BEDROCK LOGIN",
+            "checking": "BEDROCK...",
+            "unknown": "BEDROCK",
+        }
+        tooltips = {
+            "connected": "AWS session is active for Bedrock calls.",
+            "disconnected": "AWS login required. Click to open browser login.",
+            "checking": "Checking or opening AWS login.",
+            "unknown": "Bedrock client configured; AWS session not checked yet.",
+        }
+        clean_state = state if state in labels else "unknown"
+        self.bedrock_button.setText(labels[clean_state])
+        self.bedrock_button.setToolTip(tooltips[clean_state])
+        self.bedrock_button.setProperty("authState", clean_state)
+        self.bedrock_button.style().unpolish(self.bedrock_button)
+        self.bedrock_button.style().polish(self.bedrock_button)
+        self.bedrock_button.update()
 
     def carbon_path(self) -> QPainterPath:
         """Inset carbon silhouette aligned with every outer console face."""
@@ -2258,6 +2334,12 @@ class ConsolePanel(ShapeWidget):
         self.action_title.setGeometry(int(w * 0.715), title_y, 170, 22)
 
         self.status_text.setGeometry(int(w * 0.17), text_y, 270, text_h)
+        self.bedrock_button.setGeometry(
+            int(w * 0.17),
+            text_y + int(h * 0.145),
+            132,
+            30,
+        )
         self.log_text.setGeometry(
             int(w * 0.39),
             log_text_y,
@@ -2281,6 +2363,10 @@ class CockpitWindow(QMainWindow):
         runtime_preflight_function: RuntimePreflightFunction | None = None,
         memory_evidence_function: MemoryEvidenceFunction = collect_memory_evidence,
         folder_memory: FolderMemory | None = None,
+        bedrock_auth_probe_function: BedrockAuthProbeFunction = (
+            probe_bedrock_aws_session
+        ),
+        bedrock_login_launcher: BedrockLoginLauncher = launch_aws_login,
     ) -> None:
         super().__init__()
         self._scan_function = scan_function
@@ -2288,6 +2374,11 @@ class CockpitWindow(QMainWindow):
         self._review_decision_function = review_decision_function
         self._runtime_preflight_function = runtime_preflight_function
         self._memory_evidence_function = memory_evidence_function
+        self._bedrock_auth_probe_function = bedrock_auth_probe_function
+        self._bedrock_login_launcher = bedrock_login_launcher
+        self._bedrock_auth_probe_explicit = (
+            bedrock_auth_probe_function is not probe_bedrock_aws_session
+        )
         self._folder_memory = (
             folder_memory if folder_memory is not None else QtFolderMemory()
         )
@@ -2309,6 +2400,8 @@ class CockpitWindow(QMainWindow):
         self._classification_batch_total = 0
         self._memory_evidence_report: MemoryEvidenceReport | None = None
         self._memory_evidence_error: str | None = None
+        self._bedrock_auth_state = "unknown"
+        self._bedrock_login_poll_attempts = 0
         self._selected_document_row: int | None = None
         self._review_ledger = InMemoryReviewDecisionLedger()
         self._workspace = DesktopWorkspaceSession()
@@ -2368,6 +2461,7 @@ class CockpitWindow(QMainWindow):
         self.console.buttons[3].clicked.connect(self._analyze_selected_document)
         self.console.buttons[4].clicked.connect(self._open_batch_review)
         self.console.buttons[5].clicked.connect(self._reject_selected_review)
+        self.console.bedrock_button.clicked.connect(self._handle_bedrock_button_clicked)
         self.center.review_approve_requested.connect(self._approve_review_row)
         self.center.review_reject_requested.connect(self._reject_review_row)
         self.center.review_preview_requested.connect(self._preview_review_row)
@@ -2605,6 +2699,32 @@ class CockpitWindow(QMainWindow):
                 padding-top: 4px;
             }
 
+            QPushButton#bedrockButton {
+                border-radius: 8px;
+                font-size: 11px;
+                font-weight: 900;
+                letter-spacing: 0;
+                padding: 3px 8px;
+            }
+
+            QPushButton#bedrockButton[authState="connected"] {
+                color: #061411;
+                background: rgba(103, 216, 176, 235);
+                border: 1px solid rgba(202, 255, 235, 235);
+            }
+
+            QPushButton#bedrockButton[authState="disconnected"] {
+                color: #FFFFFF;
+                background: rgba(178, 34, 34, 235);
+                border: 1px solid rgba(255, 114, 114, 235);
+            }
+
+            QPushButton#bedrockButton[authState="checking"] {
+                color: #1B1202;
+                background: rgba(225, 171, 77, 230);
+                border: 1px solid rgba(255, 222, 150, 235);
+            }
+
             QScrollBar:vertical {
                 background: transparent;
                 width: 8px;
@@ -2629,6 +2749,7 @@ class CockpitWindow(QMainWindow):
         )
         if runtime_preflight_function is None and integration_snapshot is None:
             self._refresh_runtime_preflight_report()
+            self._refresh_bedrock_auth_status()
             self._set_status(
                 "Ready. Runtime integrations checked; choose an authorized folder."
             )
@@ -2919,6 +3040,8 @@ class CockpitWindow(QMainWindow):
         if self.scan_in_progress or self.classification_in_progress:
             return
         self._refresh_runtime_preflight_report()
+        if self._should_probe_bedrock_auth():
+            self._refresh_bedrock_auth_status()
         runtime_block = _classification_preflight_block(self._runtime_preflight_report)
         if runtime_block is not None:
             self._set_status(
@@ -2930,6 +3053,18 @@ class CockpitWindow(QMainWindow):
                     ("CONFIG", f"Blocked {runtime_block}"),
                     ("MEMORY", "No proposal attempted"),
                     ("BEDROCK", "No model invocation"),
+                    ("SECURITY", "No file mutation performed"),
+                ]
+            )
+            return
+        if self._bedrock_auth_state == "disconnected":
+            self._set_status("Bedrock login required before classification.")
+            self.right.set_events(
+                [
+                    ("CLASSIFIER", "Not started"),
+                    ("BEDROCK", "AWS login required"),
+                    ("ACTION", "Press red Bedrock button"),
+                    ("MEMORY", "No proposal attempted"),
                     ("SECURITY", "No file mutation performed"),
                 ]
             )
@@ -3060,6 +3195,9 @@ class CockpitWindow(QMainWindow):
         if not isinstance(raw_failure, ClassificationBatchFailure):
             self._handle_classification_failed("InvalidClassificationFailure")
             return
+        if raw_failure.error_category == "bedrock:authentication_failed":
+            self._bedrock_auth_state = "disconnected"
+            self.console.set_bedrock_auth_state("disconnected")
         self._classification_batch_completed = raw_failure.completed
         self._classification_batch_failed = raw_failure.failed
         self._classification_batch_total = raw_failure.total
@@ -3139,6 +3277,9 @@ class CockpitWindow(QMainWindow):
 
     @Slot(str)
     def _handle_classification_failed(self, error_category: str) -> None:
+        if error_category == "bedrock:authentication_failed":
+            self._bedrock_auth_state = "disconnected"
+            self.console.set_bedrock_auth_state("disconnected")
         batch_total = self._classification_batch_total
         batch_completed = self._classification_batch_completed
         progress_label = (
@@ -3480,16 +3621,16 @@ class CockpitWindow(QMainWindow):
             self._runtime_preflight_report,
             self._integration_snapshot,
         )
-        bedrock_status = _bedrock_status(self._runtime_preflight_report)
+        bedrock_status = self._effective_bedrock_status()
         self.console.status_text.setText(
             "● Local scan       "
             + ("Running" if self.scan_in_progress else "Ready")
             + "\n"
             "● PDF preview      Ready\n"
             f"● Runtime config   {runtime_status}\n"
-            f"● CockroachDB      {cockroachdb_status}\n"
-            f"● Bedrock          {bedrock_status}"
+            f"● CockroachDB      {cockroachdb_status}"
         )
+        self.console.set_bedrock_auth_state(self._bedrock_auth_state)
         self.right.set_events(
             [
                 ("DISCOVERY", message[:42]),
@@ -3518,6 +3659,15 @@ class CockpitWindow(QMainWindow):
             _memory_table_rows(self._memory_evidence_report)
         )
 
+    def _effective_bedrock_status(self) -> str:
+        if self._bedrock_auth_state == "connected":
+            return "Connected"
+        if self._bedrock_auth_state == "disconnected":
+            return "Login required"
+        if self._bedrock_auth_state == "checking":
+            return "Checking login"
+        return _bedrock_status(self._runtime_preflight_report)
+
     def _refresh_runtime_preflight_report(self) -> None:
         """Refresh runtime readiness before a user-triggered classification run."""
         try:
@@ -3537,6 +3687,53 @@ class CockpitWindow(QMainWindow):
                 )
             )
         self._refresh_memory_evidence()
+
+    def _refresh_bedrock_auth_status(self) -> None:
+        """Refresh local AWS credential usability without exposing account details."""
+        try:
+            connected = self._bedrock_auth_probe_function()
+        except Exception:
+            connected = False
+        self._bedrock_auth_state = "connected" if connected else "disconnected"
+        self.console.set_bedrock_auth_state(self._bedrock_auth_state)
+
+    def _should_probe_bedrock_auth(self) -> bool:
+        return (
+            self._bedrock_auth_probe_explicit
+            or self._runtime_preflight_function is None
+        )
+
+    @Slot()
+    def _handle_bedrock_button_clicked(self) -> None:
+        if self._bedrock_auth_state == "connected":
+            self._refresh_bedrock_auth_status()
+            self._set_status("Bedrock AWS session is active.")
+            return
+        self._bedrock_auth_state = "checking"
+        self.console.set_bedrock_auth_state("checking")
+        launched = self._bedrock_login_launcher()
+        if launched:
+            self._set_status(
+                "AWS login opened. Complete the browser flow, then press Analyze."
+            )
+            self._bedrock_login_poll_attempts = 0
+            QTimer.singleShot(4_000, self._poll_bedrock_auth_after_login)
+            return
+        self._bedrock_auth_state = "disconnected"
+        self.console.set_bedrock_auth_state("disconnected")
+        self._set_status("AWS login could not start; browser help was opened.")
+
+    @Slot()
+    def _poll_bedrock_auth_after_login(self) -> None:
+        self._bedrock_login_poll_attempts += 1
+        self._refresh_bedrock_auth_status()
+        if self._bedrock_auth_state == "connected":
+            self._set_status("Bedrock AWS session is active.")
+            return
+        if self._bedrock_login_poll_attempts < 6:
+            QTimer.singleShot(5_000, self._poll_bedrock_auth_after_login)
+            return
+        self._set_status("Bedrock still needs AWS login. Press the red button again.")
 
     def _refresh_memory_evidence(self) -> None:
         """Refresh read-only CockroachDB memory evidence after database preflight."""

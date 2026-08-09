@@ -201,9 +201,89 @@ def test_cockpit_starts_with_definitive_local_surface(
     assert window.left.table.horizontalHeader().font().pointSize() >= 11
     assert cast(Any, window.right.event_rows[0]).event_text.wordWrap()
     assert "CockroachDB      Configured" in window.console.status_text.text()
-    assert "Bedrock          Client configured" in window.console.status_text.text()
+    assert window.console.bedrock_button.text() == "BEDROCK"
     assert "Read-only CockroachDB restore history reader is available" in (
         window.right.restore_text.text()
+    )
+
+    close_cockpit_window(window)
+
+
+def test_cockpit_bedrock_button_launches_login_when_disconnected(
+    qt_application: object,
+) -> None:
+    launches = 0
+
+    def fake_login() -> bool:
+        nonlocal launches
+        launches += 1
+        return True
+
+    window = CockpitWindow(
+        integration_snapshot=RuntimeIntegrationSnapshot(
+            cockroachdb_configured=True,
+            bedrock_region="eu-central-1",
+            bedrock_model_id="eu.amazon.nova-2-lite-v1:0",
+        ),
+        bedrock_auth_probe_function=lambda: False,
+        bedrock_login_launcher=fake_login,
+    )
+    window._refresh_bedrock_auth_status()
+
+    assert window.console.bedrock_button.text() == "BEDROCK LOGIN"
+    assert window.console.bedrock_button.property("authState") == "disconnected"
+
+    window.console.bedrock_button.click()
+
+    assert launches == 1
+    assert "AWS login opened" in window.console.log_text.text()
+    assert window.console.bedrock_button.property("authState") == "checking"
+
+    close_cockpit_window(window)
+
+
+def test_cockpit_blocks_analyze_when_bedrock_login_is_required(
+    qt_application: object,
+) -> None:
+    corpus = Path("pdf_sintetici").resolve(strict=True)
+    first_pdf = sorted(corpus.glob("*.pdf"))[0]
+    calls = 0
+
+    def unexpected_classification(
+        source_path: Path,
+        authorized_root: Path,
+    ) -> ClassificationCommandResult:
+        nonlocal calls
+        calls += 1
+        raise AssertionError("classification should not start")
+
+    window = CockpitWindow(
+        classification_function=unexpected_classification,
+        runtime_preflight_function=ready_runtime_preflight_report,
+        bedrock_auth_probe_function=lambda: False,
+    )
+    window.set_authorized_root(corpus)
+    window.left.set_documents(
+        [
+            Document(
+                name=first_pdf.name,
+                category="PDF",
+                pages="-",
+                status="READY",
+                path=first_pdf,
+            )
+        ]
+    )
+    window._selected_document_row = 0
+    window._set_busy(False)
+
+    window._analyze_selected_document()
+
+    assert calls == 0
+    assert "Bedrock login required" in window.console.log_text.text()
+    assert window.console.bedrock_button.text() == "BEDROCK LOGIN"
+    assert cast(Any, window.right.event_rows[1]).event_text.text() == (
+        "AWS login required"
     )
 
     close_cockpit_window(window)
@@ -395,7 +475,7 @@ def test_cockpit_surfaces_runtime_preflight_fail_closed(
     status = window.console.status_text.text()
     assert "Runtime config   Blocked (database url missing)" in status
     assert "CockroachDB      Not configured" in status
-    assert "Bedrock          Blocked by config" in status
+    assert window.console.bedrock_button.text() == "BEDROCK"
     assert "DOCWEAVE_DATABASE_URL" not in status
     assert "Restore history reader blocked by runtime config" in (
         window.right.restore_text.text()
@@ -651,7 +731,10 @@ def test_cockpit_checks_database_before_analyze_and_reports_reachable(
     )
     monkeypatch.setattr(cockpit_module, "run_preflight", fake_run_preflight)
 
-    window = CockpitWindow(classification_function=fake_classification)
+    window = CockpitWindow(
+        classification_function=fake_classification,
+        bedrock_auth_probe_function=lambda: True,
+    )
     window.set_authorized_root(corpus)
     window.left.set_documents(
         [
