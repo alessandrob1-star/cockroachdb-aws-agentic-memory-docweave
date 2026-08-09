@@ -848,6 +848,8 @@ def test_cockpit_scans_synthetic_pdfs_and_raises_central_preview(
         classification_function=fake_classification,
         runtime_preflight_function=ready_runtime_preflight_report,
     )
+    window.show()
+    cast(QApplication, qt_application).processEvents()
     window.set_authorized_root(corpus)
 
     first_pdf = sorted(corpus.glob("*.pdf"))[0]
