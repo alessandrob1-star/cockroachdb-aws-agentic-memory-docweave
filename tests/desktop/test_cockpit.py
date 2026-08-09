@@ -1088,9 +1088,11 @@ def test_cockpit_opens_batch_review_table_from_approve_button(  # noqa: PLR0915
         "reviewRejectButton",
         "reviewPreviewButton",
     ]
-    assert action_buttons[0].width() >= 52
-    assert action_buttons[1].width() >= 52
-    assert action_buttons[2].width() >= 58
+    assert action_buttons[0].text() == "⚑"
+    assert action_buttons[1].text() == chr(215)
+    assert action_buttons[0].width() >= 60
+    assert action_buttons[1].width() >= 60
+    assert action_buttons[2].width() >= 64
     assert "Batch review ready: 2 proposed rename" in window.console.log_text.text()
 
     window.console.lateral_screens_button.click()

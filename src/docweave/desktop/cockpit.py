@@ -1449,17 +1449,19 @@ class CenterPreview(ShapeWidget):
     def _review_action_widget(self, row: int) -> QWidget:
         box = QWidget(self.review_table)
         layout = QHBoxLayout(box)
-        layout.setContentsMargins(8, 3, 8, 3)
-        layout.setSpacing(8)
-        approve = QPushButton("✓", box)
+        layout.setContentsMargins(7, 3, 7, 3)
+        layout.setSpacing(9)
+        approve = QPushButton("⚑", box)
         reject = QPushButton("×", box)
         preview = QPushButton("PDF", box)
         approve.setObjectName("reviewApproveButton")
         reject.setObjectName("reviewRejectButton")
         preview.setObjectName("reviewPreviewButton")
+        approve.setFont(QFont("Segoe UI Symbol", 24, QFont.Weight.Black))
+        reject.setFont(QFont("Segoe UI", 23, QFont.Weight.Black))
         for button in (approve, reject):
-            button.setFixedSize(52, 32)
-        preview.setFixedSize(58, 32)
+            button.setFixedSize(60, 34)
+        preview.setFixedSize(64, 34)
         approve_glow = QGraphicsDropShadowEffect(approve)
         approve_glow.setBlurRadius(18)
         approve_glow.setOffset(0, 0)
@@ -1522,7 +1524,7 @@ class CenterPreview(ShapeWidget):
         self.review_approve_all.setGeometry(w - 148, 112, 120, 30)
         self.review_table.setGeometry(18, 150, w - 36, h - 166)
         self.review_table.setColumnWidth(0, 230)
-        self.review_table.setColumnWidth(3, 220)
+        self.review_table.setColumnWidth(3, 250)
 
         top = 112
         if self.analysis_panel.isVisible():
@@ -2724,27 +2726,25 @@ class CockpitWindow(QMainWindow):
             }
 
             QPushButton#reviewApproveButton {
-                color: #A8FFD9;
-                background: rgba(4, 34, 25, 238);
-                border: 1px solid rgba(117, 255, 190, 235);
+                color: #66FFB8;
+                background: rgba(2, 38, 23, 245);
+                border: 2px solid rgba(104, 255, 184, 255);
                 border-radius: 9px;
-                font-size: 19px;
                 font-weight: 900;
                 padding: 0;
             }
 
             QPushButton#reviewApproveButton:hover {
                 color: #FFFFFF;
-                background: rgba(12, 104, 70, 245);
-                border: 2px solid rgba(167, 255, 214, 255);
+                background: rgba(9, 126, 74, 255);
+                border: 2px solid rgba(185, 255, 222, 255);
             }
 
             QPushButton#reviewRejectButton {
-                color: #FFB0B0;
+                color: #FF4F5F;
                 background: rgba(48, 8, 10, 238);
-                border: 1px solid rgba(255, 92, 92, 235);
+                border: 2px solid rgba(255, 80, 92, 255);
                 border-radius: 9px;
-                font-size: 18px;
                 font-weight: 900;
                 padding: 0;
             }
