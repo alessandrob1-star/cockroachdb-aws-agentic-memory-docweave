@@ -2187,9 +2187,8 @@ class ConsolePanel(ShapeWidget):
         self.bedrock_button.setObjectName("bedrockButton")
         self.bedrock_button.setProperty("authState", "unknown")
         self.bedrock_button.setToolTip("Bedrock AWS session status.")
-        self.lateral_screens_button = QPushButton("LATERAL SCREENS", self)
+        self.lateral_screens_button = CurvedConsoleButton("S-SCREENS", self)
         self.lateral_screens_button.setObjectName("lateralScreensButton")
-        self.lateral_screens_button.setCheckable(True)
         self.lateral_screens_button.setToolTip(
             "Restore the left and right cockpit screens."
         )
@@ -2358,9 +2357,12 @@ class ConsolePanel(ShapeWidget):
         self.lateral_screens_button.setGeometry(
             int(w * 0.085),
             int(h * 0.355),
-            150,
-            34,
+            button_w,
+            button_h,
         )
+        self.lateral_screens_button.angle = 0.0
+        self.lateral_screens_button.update_mask()
+        self.lateral_screens_button.update()
 
         # Keep all text blocks clear of the lower recess.
         title_y = int(h * 0.455)
@@ -2715,30 +2717,6 @@ class CockpitWindow(QMainWindow):
             QPushButton#smallButton {
                 font-size: 9px;
                 min-width: 44px;
-            }
-
-            QPushButton#lateralScreensButton {
-                color: #DFFCF3;
-                background: rgba(9, 41, 35, 230);
-                border: 1px solid rgba(116, 255, 208, 170);
-                border-left: 4px solid rgba(116, 255, 208, 235);
-                border-radius: 14px;
-                font-size: 10px;
-                font-weight: 900;
-                padding: 0 12px;
-            }
-
-            QPushButton#lateralScreensButton:hover {
-                color: #FFFFFF;
-                background: rgba(20, 106, 83, 245);
-                border-color: rgba(165, 255, 224, 255);
-                border-left-color: rgba(165, 255, 224, 255);
-            }
-
-            QPushButton#lateralScreensButton:checked {
-                background: rgba(9, 58, 48, 245);
-                border-color: rgba(123, 255, 211, 245);
-                border-left-color: rgba(123, 255, 211, 255);
             }
 
             QPushButton#reviewApproveButton {
@@ -3489,7 +3467,6 @@ class CockpitWindow(QMainWindow):
         self._review_expanded = expanded
         self.console.lateral_screens_button.setVisible(expanded)
         self.console.lateral_screens_button.setEnabled(expanded)
-        self.console.lateral_screens_button.setChecked(expanded)
         self.side_view.setVisible(not expanded)
         self.resizeEvent(None)
 
