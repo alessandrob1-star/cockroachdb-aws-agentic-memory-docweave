@@ -1143,8 +1143,7 @@ def test_cockpit_opens_batch_review_table_from_approve_button(  # noqa: PLR0915
     assert proposed_item.text() == "first.pdf"
     assert directory_item.text() == "DocWeave Organized/Invoices"
     action_buttons = [
-        window.center.review_table.cellWidget(0, column)
-        for column in (3, 4, 5)
+        window.center.review_table.cellWidget(0, column) for column in (3, 4, 5)
     ]
     assert all(isinstance(button, QPushButton) for button in action_buttons)
     typed_action_buttons = cast(list[QPushButton], action_buttons)
