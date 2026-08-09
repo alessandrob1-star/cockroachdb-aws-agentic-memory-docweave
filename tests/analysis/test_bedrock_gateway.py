@@ -8,9 +8,13 @@ import pytest
 from botocore.config import Config  # type: ignore[import-untyped]
 from botocore.exceptions import (  # type: ignore[import-untyped]
     ClientError,
+    CredentialRetrievalError,
     EndpointConnectionError,
+    NoAuthTokenError,
     NoCredentialsError,
     ParamValidationError,
+    SSOTokenLoadError,
+    UnauthorizedSSOTokenError,
 )
 
 from docweave.analysis import (
@@ -403,6 +407,25 @@ def test_gateway_maps_aws_errors_without_exposing_messages(
     [
         (
             NoCredentialsError(),
+            BedrockGatewayErrorCode.AUTHENTICATION_FAILED,
+        ),
+        (
+            SSOTokenLoadError(error_msg="session expired"),
+            BedrockGatewayErrorCode.AUTHENTICATION_FAILED,
+        ),
+        (
+            UnauthorizedSSOTokenError(),
+            BedrockGatewayErrorCode.AUTHENTICATION_FAILED,
+        ),
+        (
+            NoAuthTokenError(),
+            BedrockGatewayErrorCode.AUTHENTICATION_FAILED,
+        ),
+        (
+            CredentialRetrievalError(
+                provider="sso",
+                error_msg="session expired",
+            ),
             BedrockGatewayErrorCode.AUTHENTICATION_FAILED,
         ),
         (

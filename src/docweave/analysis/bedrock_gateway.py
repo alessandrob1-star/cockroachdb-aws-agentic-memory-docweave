@@ -16,11 +16,18 @@ from botocore.exceptions import (  # type: ignore[import-untyped]
     BotoCoreError,
     ClientError,
     ConnectTimeoutError,
+    CredentialRetrievalError,
     EndpointConnectionError,
+    LoginTokenLoadError,
+    NoAuthTokenError,
     NoCredentialsError,
     ParamValidationError,
     PartialCredentialsError,
     ReadTimeoutError,
+    SSOError,
+    SSOTokenLoadError,
+    TokenRetrievalError,
+    UnauthorizedSSOTokenError,
 )
 
 from docweave.analysis.contracts import (
@@ -311,7 +318,17 @@ class BedrockClassificationGateway:
             raise BedrockGatewayError(
                 BedrockGatewayErrorCode.TRANSPORT_FAILED
             ) from error
-        except (NoCredentialsError, PartialCredentialsError) as error:
+        except (
+            CredentialRetrievalError,
+            LoginTokenLoadError,
+            NoAuthTokenError,
+            NoCredentialsError,
+            PartialCredentialsError,
+            SSOError,
+            SSOTokenLoadError,
+            TokenRetrievalError,
+            UnauthorizedSSOTokenError,
+        ) as error:
             raise BedrockGatewayError(
                 BedrockGatewayErrorCode.AUTHENTICATION_FAILED
             ) from error
