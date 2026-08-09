@@ -1448,14 +1448,27 @@ class CenterPreview(ShapeWidget):
     def _review_action_widget(self, row: int) -> QWidget:
         box = QWidget(self.review_table)
         layout = QHBoxLayout(box)
-        layout.setContentsMargins(4, 3, 4, 3)
-        layout.setSpacing(5)
+        layout.setContentsMargins(8, 3, 8, 3)
+        layout.setSpacing(8)
         approve = QPushButton("✓", box)
         reject = QPushButton("×", box)
         preview = QPushButton("PDF", box)
-        for button in (approve, reject, preview):
-            button.setObjectName("smallButton")
-            button.setFixedSize(42, 28)
+        approve.setObjectName("reviewApproveButton")
+        reject.setObjectName("reviewRejectButton")
+        preview.setObjectName("reviewPreviewButton")
+        for button in (approve, reject):
+            button.setFixedSize(52, 32)
+        preview.setFixedSize(58, 32)
+        approve_glow = QGraphicsDropShadowEffect(approve)
+        approve_glow.setBlurRadius(18)
+        approve_glow.setOffset(0, 0)
+        approve_glow.setColor(QColor(90, 255, 185, 190))
+        approve.setGraphicsEffect(approve_glow)
+        reject_glow = QGraphicsDropShadowEffect(reject)
+        reject_glow.setBlurRadius(18)
+        reject_glow.setOffset(0, 0)
+        reject_glow.setColor(QColor(255, 70, 70, 190))
+        reject.setGraphicsEffect(reject_glow)
         approve.setToolTip("Approve this proposed rename.")
         reject.setToolTip("Reject this proposed rename.")
         preview.setToolTip("Open the PDF preview for this row.")
@@ -1507,7 +1520,7 @@ class CenterPreview(ShapeWidget):
         self.review_title.setGeometry(28, 112, 210, 27)
         self.review_approve_all.setGeometry(w - 148, 112, 120, 30)
         self.review_table.setGeometry(18, 150, w - 36, h - 166)
-        self.review_table.setColumnWidth(2, 148)
+        self.review_table.setColumnWidth(2, 220)
 
         top = 112
         if self.analysis_panel.isVisible():
@@ -2678,6 +2691,48 @@ class CockpitWindow(QMainWindow):
             QPushButton#smallButton {
                 font-size: 9px;
                 min-width: 44px;
+            }
+
+            QPushButton#reviewApproveButton {
+                color: #A8FFD9;
+                background: rgba(4, 34, 25, 238);
+                border: 1px solid rgba(117, 255, 190, 235);
+                border-radius: 9px;
+                font-size: 19px;
+                font-weight: 900;
+                padding: 0;
+            }
+
+            QPushButton#reviewApproveButton:hover {
+                color: #FFFFFF;
+                background: rgba(12, 104, 70, 245);
+                border: 2px solid rgba(167, 255, 214, 255);
+            }
+
+            QPushButton#reviewRejectButton {
+                color: #FFB0B0;
+                background: rgba(48, 8, 10, 238);
+                border: 1px solid rgba(255, 92, 92, 235);
+                border-radius: 9px;
+                font-size: 18px;
+                font-weight: 900;
+                padding: 0;
+            }
+
+            QPushButton#reviewRejectButton:hover {
+                color: #FFFFFF;
+                background: rgba(132, 22, 24, 245);
+                border: 2px solid rgba(255, 142, 142, 255);
+            }
+
+            QPushButton#reviewPreviewButton {
+                color: #E6F6F0;
+                background: rgba(10, 42, 34, 225);
+                border: 1px solid rgba(145, 245, 210, 125);
+                border-radius: 9px;
+                font-size: 10px;
+                font-weight: 900;
+                padding: 0;
             }
 
             QPushButton#consoleButton {

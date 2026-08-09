@@ -4,7 +4,7 @@ from uuid import UUID
 
 import pytest
 from PySide6.QtCore import QCoreApplication, QEventLoop, QTimer
-from PySide6.QtWidgets import QApplication, QFileDialog
+from PySide6.QtWidgets import QApplication, QFileDialog, QPushButton
 
 import docweave.desktop.cockpit as cockpit_module
 from docweave.analysis import BedrockGatewayError, BedrockGatewayErrorCode
@@ -1039,6 +1039,7 @@ def test_cockpit_opens_batch_review_table_from_approve_button(
     assert window.center.geometry().width() > window.width() * 0.75
     assert window.center.review_table.rowCount() == 2
     assert window.center.review_table.columnCount() == 3
+    assert window.center.review_table.columnWidth(2) >= 220
     original_item = window.center.review_table.item(0, 0)
     proposed_item = window.center.review_table.item(0, 1)
     assert original_item is not None
@@ -1046,7 +1047,17 @@ def test_cockpit_opens_batch_review_table_from_approve_button(
     assert first_pdf.name in original_item.text()
     assert "DocWeave Organized/Invoices" in proposed_item.text()
     assert "first.pdf" in proposed_item.text()
-    assert window.center.review_table.cellWidget(0, 2) is not None
+    action_widget = window.center.review_table.cellWidget(0, 2)
+    assert action_widget is not None
+    action_buttons = action_widget.findChildren(QPushButton)
+    assert [button.objectName() for button in action_buttons] == [
+        "reviewApproveButton",
+        "reviewRejectButton",
+        "reviewPreviewButton",
+    ]
+    assert action_buttons[0].width() >= 52
+    assert action_buttons[1].width() >= 52
+    assert action_buttons[2].width() >= 58
     assert "Batch review ready: 2 proposed rename" in window.console.log_text.text()
 
     window._preview_review_row(0)
