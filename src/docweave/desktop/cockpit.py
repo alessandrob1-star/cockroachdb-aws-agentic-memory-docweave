@@ -2313,7 +2313,7 @@ class ConsolePanel(ShapeWidget):
         w = self.width()
         h = self.height()
 
-        # CHOOSE follows the first angled face.
+        # CHOOSE and S-SCREENS follow the angled side faces.
         # SCAN through BEDROCK sit on the long flat axis.
         button_w = 118
         button_h = 62
@@ -2353,13 +2353,17 @@ class ConsolePanel(ShapeWidget):
             button.update_mask()
             button.update()
 
+        last_x = w - first_x - button_w
+        last_surface_y, _ = self.upper_carbon_surface(last_x + button_w / 2)
+        last_y = int(last_surface_y - button_h * 0.14 + h * 0.060)
+
         self.lateral_screens_button.setGeometry(
-            int(w * 0.085),
-            int(h * 0.355),
+            last_x,
+            last_y,
             button_w,
             button_h,
         )
-        self.lateral_screens_button.angle = 0.0
+        self.lateral_screens_button.angle = 13.0
         self.lateral_screens_button.update_mask()
         self.lateral_screens_button.update()
 

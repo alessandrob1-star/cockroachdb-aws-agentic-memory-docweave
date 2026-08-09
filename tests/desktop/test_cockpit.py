@@ -202,6 +202,11 @@ def test_cockpit_starts_with_definitive_local_surface(
     assert window.console.bedrock_button is window.console.buttons[6]
     assert window.console.lateral_screens_button.text() == "S-SCREENS"
     assert not window.console.lateral_screens_button.isHidden()
+    window.show()
+    cast(QApplication, qt_application).processEvents()
+    assert window.console.lateral_screens_button.x() > window.console.bedrock_button.x()
+    assert window.console.lateral_screens_button.angle == 13.0
+    assert window.console.buttons[0].angle == -13.0
     assert cast(Any, window.right.event_rows[0]).event_text.wordWrap()
     assert "CockroachDB      Configured" in window.console.status_text.text()
     assert window.console.bedrock_button.text() == "BEDROCK"
