@@ -2134,6 +2134,7 @@ class ConsolePanel(ShapeWidget):
             ("ANALYZE", 0.0),
             ("APPROVE", 0.0),
             ("REJECT", 0.0),
+            ("BEDROCK", 0.0),
         )
 
         for text, angle in button_specs:
@@ -2157,7 +2158,7 @@ class ConsolePanel(ShapeWidget):
         )
         self.status_text.setObjectName("consoleText")
 
-        self.bedrock_button = QPushButton("BEDROCK", self)
+        self.bedrock_button = self.buttons[6]
         self.bedrock_button.setObjectName("bedrockButton")
         self.bedrock_button.setProperty("authState", "unknown")
         self.bedrock_button.setToolTip("Bedrock AWS session status.")
@@ -2283,7 +2284,7 @@ class ConsolePanel(ShapeWidget):
         h = self.height()
 
         # CHOOSE follows the first angled face.
-        # SCAN, CANCEL, ANALYZE, APPROVE and REJECT sit on the long flat axis.
+        # SCAN through BEDROCK sit on the long flat axis.
         button_w = 118
         button_h = 62
 
@@ -2308,6 +2309,7 @@ class ConsolePanel(ShapeWidget):
             int(w * 0.408),
             int(w * 0.488),
             int(w * 0.568),
+            int(w * 0.648),
         )
 
         for button, x_pos in zip(self.buttons[1:], flat_xs):
@@ -2334,12 +2336,6 @@ class ConsolePanel(ShapeWidget):
         self.action_title.setGeometry(int(w * 0.715), title_y, 170, 22)
 
         self.status_text.setGeometry(int(w * 0.17), text_y, 270, text_h)
-        self.bedrock_button.setGeometry(
-            int(w * 0.17),
-            text_y + int(h * 0.145),
-            132,
-            30,
-        )
         self.log_text.setGeometry(
             int(w * 0.39),
             log_text_y,
@@ -2700,29 +2696,33 @@ class CockpitWindow(QMainWindow):
             }
 
             QPushButton#bedrockButton {
-                border-radius: 8px;
-                font-size: 11px;
+                border-radius: 13px;
+                border-bottom: 3px solid rgba(0, 10, 8, 185);
+                font-size: 10px;
                 font-weight: 900;
                 letter-spacing: 0;
-                padding: 3px 8px;
+                padding-top: 2px;
             }
 
             QPushButton#bedrockButton[authState="connected"] {
                 color: #061411;
                 background: rgba(103, 216, 176, 235);
                 border: 1px solid rgba(202, 255, 235, 235);
+                border-bottom: 3px solid rgba(0, 10, 8, 185);
             }
 
             QPushButton#bedrockButton[authState="disconnected"] {
                 color: #FFFFFF;
                 background: rgba(178, 34, 34, 235);
                 border: 1px solid rgba(255, 114, 114, 235);
+                border-bottom: 3px solid rgba(0, 10, 8, 185);
             }
 
             QPushButton#bedrockButton[authState="checking"] {
                 color: #1B1202;
                 background: rgba(225, 171, 77, 230);
                 border: 1px solid rgba(255, 222, 150, 235);
+                border-bottom: 3px solid rgba(0, 10, 8, 185);
             }
 
             QScrollBar:vertical {
