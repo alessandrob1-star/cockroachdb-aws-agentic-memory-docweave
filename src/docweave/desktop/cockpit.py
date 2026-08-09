@@ -758,6 +758,7 @@ class LeftScreen(ShapeWidget):
 
         self.brand = QLabel("DOCWEAVE", self)
         self.brand.setObjectName("brand")
+        self.brand.hide()
 
         self.local = QLabel("● LOCAL", self)
         self.local.setObjectName("online")
@@ -927,11 +928,9 @@ class LeftScreen(ShapeWidget):
         w = self.width()
         h = self.height()
 
-        # Window controls remain on the glass frame; the brand sits inside the
-        # visible carbon area so perspective/clipping never hides it.
         self.close_button.setGeometry(34, 18, 31, 29)
         self.min_button.setGeometry(71, 18, 31, 29)
-        self.brand.setGeometry(48, 70, 240, 30)
+        self.brand.setGeometry(112, 16, 190, 32)
         self.local.setGeometry(w - 94, 20, 72, 24)
 
         # Carbon content area: extra lower/side clearance keeps the table
@@ -948,7 +947,7 @@ class LeftScreen(ShapeWidget):
             24,
         )
 
-        table_top = content_top + 28
+        table_top = content_top
         hint_height = 22
         hint_y = h - 46
         self.table.setGeometry(
@@ -964,7 +963,24 @@ class LeftScreen(ShapeWidget):
             w - 92,
             hint_height,
         )
-        self.brand.raise_()
+
+    def paintEvent(self, event) -> None:
+        super().paintEvent(event)
+
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing, True)
+        painter.setRenderHint(QPainter.RenderHint.TextAntialiasing, True)
+
+        text_rect = QRectF(112, 26, max(160, self.width() - 190), 34)
+        font = QFont("Segoe UI", 19, QFont.Weight.Black)
+        font.setLetterSpacing(QFont.SpacingType.PercentageSpacing, 104)
+        painter.setFont(font)
+
+        for radius, alpha in ((3, 70), (2, 105), (1, 150)):
+            painter.setPen(QPen(QColor(255, 34, 34, alpha), radius))
+            painter.drawText(text_rect, Qt.AlignmentFlag.AlignLeft, "DOCWEAVE")
+        painter.setPen(QPen(QColor(255, 58, 58, 245), 1))
+        painter.drawText(text_rect, Qt.AlignmentFlag.AlignLeft, "DOCWEAVE")
 
     def mousePressEvent(self, event: QMouseEvent) -> None:
         if event.button() == Qt.MouseButton.LeftButton and event.position().y() < 58:
