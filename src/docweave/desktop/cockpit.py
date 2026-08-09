@@ -2160,6 +2160,7 @@ class ConsolePanel(ShapeWidget):
             ("APPROVE", 0.0),
             ("REJECT", 0.0),
             ("BEDROCK", 0.0),
+            ("BACK", 0.0),
         )
 
         for text, angle in button_specs:
@@ -2187,6 +2188,11 @@ class ConsolePanel(ShapeWidget):
         self.bedrock_button.setObjectName("bedrockButton")
         self.bedrock_button.setProperty("authState", "unknown")
         self.bedrock_button.setToolTip("Bedrock AWS session status.")
+        self.review_back_button = self.buttons[7]
+        self.review_back_button.setToolTip(
+            "Close batch review and restore side screens."
+        )
+        self.review_back_button.hide()
 
         self.log_text = QLabel(
             "Session started\n"
@@ -2335,6 +2341,7 @@ class ConsolePanel(ShapeWidget):
             int(w * 0.488),
             int(w * 0.568),
             int(w * 0.648),
+            int(w * 0.728),
         )
 
         for button, x_pos in zip(self.buttons[1:], flat_xs):
@@ -2484,6 +2491,9 @@ class CockpitWindow(QMainWindow):
         self.console.buttons[4].clicked.connect(self._open_batch_review)
         self.console.buttons[5].clicked.connect(self._reject_selected_review)
         self.console.bedrock_button.clicked.connect(self._handle_bedrock_button_clicked)
+        self.console.review_back_button.clicked.connect(
+            lambda _checked=False: self._close_batch_review()
+        )
         self.center.review_approve_requested.connect(self._approve_review_row)
         self.center.review_reject_requested.connect(self._reject_review_row)
         self.center.review_preview_requested.connect(self._preview_review_row)
@@ -3440,14 +3450,40 @@ class CockpitWindow(QMainWindow):
 
     @Slot(int)
     def _preview_review_row(self, row: int) -> None:
-        self._open_document_row(row)
+        self._close_batch_review(preview_row=row)
 
     def _set_review_expanded(self, expanded: bool) -> None:
         if self._review_expanded == expanded:
             return
         self._review_expanded = expanded
+        self.console.review_back_button.setVisible(expanded)
+        self.console.review_back_button.setEnabled(expanded)
         self.side_view.setVisible(not expanded)
         self.resizeEvent(None)
+
+    @Slot()
+    def _close_batch_review(self, *, preview_row: int | None = None) -> None:
+        self._set_review_expanded(False)
+        self.center.review_title.hide()
+        self.center.review_approve_all.hide()
+        self.center.review_table.hide()
+        row = self._selected_document_row if preview_row is None else preview_row
+        if row is None:
+            self._set_status("Batch review closed. Side screens restored.")
+            return
+        document = self.left.document_at(row)
+        root = self.authorized_root
+        if document is None or document.path is None or root is None:
+            self._set_status("Batch review closed. Side screens restored.")
+            return
+        try:
+            validated_path = validate_pdf_for_open(document.path, root)
+        except PdfOpenValidationError as error:
+            self._set_status(f"PDF preview blocked safely ({error.category.value}).")
+            return
+        self._selected_document_row = row
+        self.center.open_document(validated_path)
+        self._set_status("Batch review closed. Side screens restored.")
 
     @Slot()
     def _approve_all_review_rows(self) -> None:
@@ -3685,6 +3721,9 @@ class CockpitWindow(QMainWindow):
             )
         self.console.buttons[4].setEnabled(batch_review_ready)
         self.console.buttons[5].setEnabled(selected_review_ready)
+        self.console.review_back_button.setEnabled(
+            self._review_expanded and not blocked
+        )
         if batch_review_ready:
             self.console.buttons[4].setToolTip(
                 "Open the batch review table for all proposed renames."

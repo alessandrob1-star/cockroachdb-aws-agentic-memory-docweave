@@ -200,6 +200,8 @@ def test_cockpit_starts_with_definitive_local_surface(
     assert window.left.table.font().pointSize() >= 11
     assert window.left.table.horizontalHeader().font().pointSize() >= 11
     assert window.console.bedrock_button is window.console.buttons[6]
+    assert window.console.review_back_button is window.console.buttons[7]
+    assert window.console.review_back_button.isHidden()
     assert cast(Any, window.right.event_rows[0]).event_text.wordWrap()
     assert "CockroachDB      Configured" in window.console.status_text.text()
     assert window.console.bedrock_button.text() == "BEDROCK"
@@ -1038,6 +1040,7 @@ def test_cockpit_opens_batch_review_table_from_approve_button(
     assert window.side_view.isHidden()
     assert window.center.geometry().width() > window.width() * 0.75
     assert window.center.review_table.rowCount() == 2
+    assert not window.console.review_back_button.isHidden()
     assert window.center.review_table.columnCount() == 4
     original_header = window.center.review_table.horizontalHeaderItem(0)
     proposed_header = window.center.review_table.horizontalHeaderItem(1)
@@ -1072,7 +1075,7 @@ def test_cockpit_opens_batch_review_table_from_approve_button(
     assert action_buttons[2].width() >= 58
     assert "Batch review ready: 2 proposed rename" in window.console.log_text.text()
 
-    window._preview_review_row(0)
+    window.console.review_back_button.click()
 
     assert not window.side_view.isHidden()
     assert window.center.review_table.isHidden()
