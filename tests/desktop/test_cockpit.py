@@ -1119,7 +1119,7 @@ def test_cockpit_opens_batch_review_table_from_approve_button(  # noqa: PLR0915
     assert window.center.geometry().width() > window.width() * 0.75
     assert window.center.review_table.rowCount() == 2
     assert not window.console.lateral_screens_button.isHidden()
-    assert window.center.review_table.columnCount() == 4
+    assert window.center.review_table.columnCount() == 6
     original_header = window.center.review_table.horizontalHeaderItem(0)
     proposed_header = window.center.review_table.horizontalHeaderItem(1)
     directory_header = window.center.review_table.horizontalHeaderItem(2)
@@ -1130,7 +1130,9 @@ def test_cockpit_opens_batch_review_table_from_approve_button(  # noqa: PLR0915
     assert proposed_header.text() == "PROPOSED NAME"
     assert directory_header.text() == "SUGGESTED DIRECTORY"
     assert window.center.review_table.columnWidth(0) <= 240
-    assert window.center.review_table.columnWidth(3) >= 220
+    assert window.center.review_table.columnWidth(3) >= 54
+    assert window.center.review_table.columnWidth(4) >= 54
+    assert window.center.review_table.columnWidth(5) >= 68
     original_item = window.center.review_table.item(0, 0)
     proposed_item = window.center.review_table.item(0, 1)
     directory_item = window.center.review_table.item(0, 2)
@@ -1140,19 +1142,20 @@ def test_cockpit_opens_batch_review_table_from_approve_button(  # noqa: PLR0915
     assert original_item.text() == first_pdf.name
     assert proposed_item.text() == "first.pdf"
     assert directory_item.text() == "DocWeave Organized/Invoices"
-    action_widget = window.center.review_table.cellWidget(0, 3)
-    assert action_widget is not None
-    action_buttons = action_widget.findChildren(QPushButton)
-    assert [button.objectName() for button in action_buttons] == [
+    action_buttons = [
+        window.center.review_table.cellWidget(0, column)
+        for column in (3, 4, 5)
+    ]
+    assert all(isinstance(button, QPushButton) for button in action_buttons)
+    typed_action_buttons = cast(list[QPushButton], action_buttons)
+    assert [button.objectName() for button in typed_action_buttons] == [
         "reviewApproveButton",
         "reviewRejectButton",
         "reviewPreviewButton",
     ]
-    assert action_buttons[0].text() == "✓"
-    assert action_buttons[1].text() == chr(215)
-    assert action_buttons[0].width() >= 54
-    assert action_buttons[1].width() >= 54
-    assert action_buttons[2].width() >= 58
+    assert typed_action_buttons[0].text() == "✓"
+    assert typed_action_buttons[1].text() == chr(215)
+    assert typed_action_buttons[2].text() == "PDF"
     assert "Batch review ready: 2 proposed rename" in window.console.log_text.text()
 
     window.console.lateral_screens_button.click()
