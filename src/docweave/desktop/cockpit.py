@@ -971,8 +971,8 @@ class LeftScreen(ShapeWidget):
         painter.setRenderHint(QPainter.RenderHint.Antialiasing, True)
         painter.setRenderHint(QPainter.RenderHint.TextAntialiasing, True)
 
-        text_rect = QRectF(112, 26, max(160, self.width() - 190), 34)
-        font = QFont("Segoe UI", 19, QFont.Weight.Black)
+        text_rect = QRectF(112, 19, max(160, self.width() - 190), 34)
+        font = QFont("Segoe UI", 18, QFont.Weight.DemiBold)
         font.setLetterSpacing(QFont.SpacingType.PercentageSpacing, 104)
         painter.setFont(font)
 
