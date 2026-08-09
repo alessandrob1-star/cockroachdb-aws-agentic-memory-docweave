@@ -115,6 +115,8 @@ from docweave.desktop.workspace import (
     DesktopWorkspaceSession,
     WorkspacePhase,
 )
+from docweave.core.fingerprints import compute_sha256_fingerprint
+from docweave.core.paths import path_comparison_key
 from docweave.intake import IntakeStatus
 from docweave.memory_evidence_report import (
     MemoryEvidenceReport,
@@ -127,21 +129,38 @@ from docweave.review_cli import (
     persist_review_decision,
 )
 from docweave.operations import (
+    AppendOnlyAuditTrail,
     InMemoryReviewDecisionLedger,
     MassOperationCandidate,
     MassOperationMode,
     MassOperationPreviewItem,
     ProposalReviewDecisionRequest,
+    RestoreAuditContext,
+    ResultDisposition,
     ReviewDecisionAction,
+    RestoreExecutionStatus,
     build_mass_operation_preview,
+    append_restore_approval_audit_event,
+    append_restore_execution_audit_event,
+    approve_restore_plan,
     create_proposal_review_decision_from_fingerprint,
+    execute_restore_operation,
+    plan_restore_operation,
     validate_proposal_review_decision_fingerprint,
 )
+from docweave.operations.results import OperationResultRecord
 from docweave.operations.approval import approve_operation_plan
-from docweave.operations.execution import execute_file_operation
+from docweave.operations.execution import (
+    ExecutionReason,
+    ExecutionStatus,
+    execute_file_operation,
+)
 from docweave.operations.planning import (
     FileOperation,
+    FileOperationPlan,
+    FileOperationReason,
     FileOperationRequest,
+    FileOperationStatus,
     plan_file_operation,
 )
 from docweave.runtime_preflight import (
@@ -2448,6 +2467,7 @@ class CockpitWindow(QMainWindow):
         self._center_expanded = False
         self._selected_document_row: int | None = None
         self._review_ledger = InMemoryReviewDecisionLedger()
+        self._restore_audit_trail = AppendOnlyAuditTrail()
         self._workspace = DesktopWorkspaceSession()
 
         self.setWindowTitle("DocWeave Cockpit")
@@ -3556,25 +3576,110 @@ class CockpitWindow(QMainWindow):
                 "Select a moved document with retained file history before restore."
             )
             return
-        self._set_status(
-            "Restore preview ready: current file can be moved back "
-            "to its original path."
+        row = self._selected_document_row
+        root = self.authorized_root
+        if row is None or root is None:
+            self._set_status("Restore blocked: no authorized root is active.")
+            return
+        try:
+            original_plan, original_result = self._restore_original_operation_for(
+                document,
+                root,
+            )
+            restore_plan = plan_restore_operation(original_plan, original_result)
+        except (OSError, ValueError) as error:
+            self._set_status(
+                f"Restore blocked before preview ({error.__class__.__name__})."
+            )
+            return
+        if not restore_plan.is_ready:
+            self._set_status(f"Restore blocked safely: {restore_plan.reason.value}.")
+            self.center.show_memory_trace(
+                summary="Restore blocked by deterministic file-history checks.",
+                detail=(
+                    f"Current: {document.lineage_preview.next_relative_path}; "
+                    f"original: {document.lineage_preview.original_relative_path}; "
+                    f"reason: {restore_plan.reason.value}."
+                ),
+            )
+            return
+        restore_id = str(uuid4())
+        approved_at = datetime.now(UTC)
+        approval = approve_restore_plan(
+            restore_plan,
+            approval_id=restore_id,
+            approved_by_user_id="local-cockpit-reviewer",
+            approved_at_utc=approved_at,
+            expires_at_utc=approved_at + timedelta(minutes=15),
         )
+        audit_context = RestoreAuditContext(
+            workspace_id="local-cockpit",
+            batch_id="single-restore",
+            batch_item_id=restore_id,
+            actor_id="local-cockpit-reviewer",
+            correlation_id=restore_id,
+            occurred_at_utc=approved_at,
+        )
+        append_restore_approval_audit_event(
+            self._restore_audit_trail,
+            restore_plan,
+            approval,
+            audit_context,
+        )
+        self.center.release_document_handle()
+        result = execute_restore_operation(
+            restore_plan,
+            approval,
+            restore_id=restore_id,
+            now_utc=approved_at,
+        )
+        append_restore_execution_audit_event(
+            self._restore_audit_trail,
+            restore_plan,
+            result,
+            audit_context,
+        )
+        if result.status is not RestoreExecutionStatus.SUCCEEDED:
+            self._set_status(f"Restore failed safely: {result.reason.value}.")
+            self.center.show_memory_trace(
+                summary="Restore execution did not mutate to the requested state.",
+                detail=(
+                    f"Restore id {restore_id[:8]}; reason {result.reason.value}; "
+                    f"current {document.lineage_preview.next_relative_path}; "
+                    f"original {document.lineage_preview.original_relative_path}."
+                ),
+            )
+            return
+        restored_path = root / document.lineage_preview.original_relative_path
+        self.left.record_review_decision(
+            row,
+            status="RESTORED",
+            review_decision_id=restore_id,
+            path=restored_path,
+            name=document.lineage_preview.original_filename,
+        )
+        self.right.set_metrics(
+            self.left.document_count,
+            self.left.count_status("READY"),
+            self.left.count_status("REVIEW"),
+        )
+        self._set_status("Restore completed: file moved back to its original path.")
         self.center.show_memory_trace(
-            summary="Restore uses persistent file history, not a hidden undo.",
+            summary="Restore approved and executed from persistent file history.",
             detail=(
-                f"Current: {document.lineage_preview.next_relative_path}; "
-                f"original: {document.lineage_preview.original_relative_path}; "
-                "execute restore from this exact lineage in the restore workflow."
+                f"Restore {restore_id[:8]}; "
+                f"{document.lineage_preview.next_relative_path} -> "
+                f"{document.lineage_preview.original_relative_path}; "
+                "append-only restore approval and execution audit recorded."
             ),
         )
         self.right.set_events(
             [
-                ("RESTORE", "Persistent history selected"),
-                ("CURRENT", document.lineage_preview.next_relative_path),
-                ("ORIGINAL", document.lineage_preview.original_relative_path),
-                ("MEMORY", "CockroachDB file_history is the restore source"),
-                ("SAFETY", "Restore requires explicit approval"),
+                ("RESTORE", "Succeeded"),
+                ("CURRENT", document.lineage_preview.original_relative_path),
+                ("PREVIOUS", document.lineage_preview.next_relative_path),
+                ("MEMORY", "file_history lineage drove restore"),
+                ("AUDIT", f"{len(self._restore_audit_trail.events)} restore events"),
             ]
         )
 
@@ -3973,6 +4078,64 @@ class CockpitWindow(QMainWindow):
         ):
             return None
         return document
+
+    def _restore_original_operation_for(
+        self,
+        document: Document,
+        root: Path,
+    ) -> tuple[FileOperationPlan, OperationResultRecord]:
+        lineage = document.lineage_preview
+        if lineage is None or document.path is None:
+            raise ValueError("restore lineage is incomplete")
+        resolved_root = root.resolve(strict=True)
+        original_path = (resolved_root / lineage.original_relative_path).resolve(
+            strict=False,
+        )
+        current_path = document.path.resolve(strict=True)
+        original_path.relative_to(resolved_root)
+        current_path.relative_to(resolved_root)
+        original_request = FileOperationRequest(
+            operation=FileOperation.MOVE,
+            source_root=resolved_root,
+            source_relative_path=lineage.original_relative_path,
+            destination_root=resolved_root,
+            destination_relative_path=lineage.next_relative_path,
+        )
+        original_plan = FileOperationPlan(
+            request=original_request,
+            status=FileOperationStatus.READY,
+            reason=FileOperationReason.READY,
+            source_root=resolved_root,
+            source_path=original_path,
+            source_relative_path=lineage.original_relative_path,
+            destination_root=resolved_root,
+            destination_path=current_path,
+            destination_relative_path=lineage.next_relative_path,
+            destination_comparison_key=path_comparison_key(
+                lineage.next_relative_path,
+                case_sensitive=original_request.case_sensitive_paths,
+            ),
+        )
+        now = datetime.now(UTC)
+        current_digest = compute_sha256_fingerprint(current_path).hex_digest
+        return (
+            original_plan,
+            OperationResultRecord(
+                batch_id="local-cockpit-approval",
+                batch_item_id=document.review_decision_id or "selected-document",
+                execution_key=document.review_decision_id or "selected-document",
+                execution_id=document.review_decision_id or "selected-document",
+                status=ExecutionStatus.SUCCEEDED,
+                reason=ExecutionReason.SUCCEEDED,
+                disposition=ResultDisposition.EXECUTED,
+                attempted_at_utc=now,
+                completed_at_utc=now,
+                approval_id=document.review_decision_id,
+                source_exists_after=False,
+                destination_exists_after=True,
+                destination_digest_after=current_digest,
+            ),
+        )
 
     def _classification_batch_items(
         self,

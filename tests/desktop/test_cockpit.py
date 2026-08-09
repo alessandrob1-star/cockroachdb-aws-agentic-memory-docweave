@@ -1038,10 +1038,19 @@ def test_cockpit_restore_button_uses_moved_document_history(
 
     window.console.buttons[5].click()
 
-    assert "Restore preview ready" in window.console.log_text.text()
-    assert "persistent file history" in window.center.memory_summary.text()
+    restored_pdf = tmp_path / original_relative
+    assert restored_pdf.exists()
+    assert not current_pdf.exists()
+    assert "Restore completed" in window.console.log_text.text()
+    assert "approved and executed" in window.center.memory_summary.text()
     assert cast(Any, window.right.event_rows[0]).event_name.text() == "RESTORE"
-    assert cast(Any, window.right.event_rows[2]).event_text.text() == original_relative
+    assert cast(Any, window.right.event_rows[1]).event_text.text() == original_relative
+    assert len(window._restore_audit_trail.events) == 2
+    document = window.left.document_at(0)
+    assert document is not None
+    assert document.status == "RESTORED"
+    assert document.path == restored_pdf
+    assert document.name == "scan_001.pdf"
 
     close_cockpit_window(window)
 

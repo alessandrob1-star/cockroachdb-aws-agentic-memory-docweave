@@ -159,7 +159,7 @@ must be closed before production-grade batch execution:
 | No live application bootstrap execution | The composed restart path is not yet a live application integration | Run the configured runtime against the approved validation target |
 | Audit adapter has no live runtime evidence | Activity History cannot yet survive restart | Run approved integration and restart tests against CockroachDB |
 | Lease renewal and execution fencing are not implemented | A worker that outlives its lease is not yet safe for concurrent production execution | Add renewal or fencing before enabling multiple workers |
-| Restore persistence not wired | Move and copy outcomes now have tested restore-preview, approved local restore-execution, explicit local restore audit events, bounded local batch restore orchestration, CockroachDB-ready restore audit mapping/append evidence, a durable restore audit recorder boundary, and a bounded restore audit history reader, but no end-to-end durable restore workflow is wired yet | Add UI restore controls and connect them to CockroachDB-backed restore history |
+| Durable restore persistence not wired end to end | Move and copy outcomes now have tested restore-preview, approved local restore-execution, explicit local restore audit events, bounded local batch restore orchestration, CockroachDB-ready restore audit mapping/append evidence, a durable restore audit recorder boundary, a bounded restore audit history reader, and a single-document cockpit restore action driven by retained file history. Durable CockroachDB restore audit persistence is still not wired into the dashboard action. | Connect the cockpit restore action to CockroachDB-backed restore audit persistence and render durable restore history |
 | No workspace/user authorization model | Approval uses user identifiers but no role policy yet | Add authorization contract before user interface or cloud execution |
 
 ## 6. Completed live validation boundary
@@ -206,26 +206,30 @@ results. Restore planning blocks changed generated copies, changed moved files,
 missing files, non-succeeded source results, and original-location collisions.
 Approved restore execution is bound to the exact restore preview fingerprint,
 rechecks the preview before mutation, removes only a verified generated copy,
-or moves a verified moved file back without overwrite. This is not yet
-user-interface restore or durable restore history. Restore approval and
-terminal restore execution can now append local audit events with human/system
-attribution, exact restore fingerprint, approval id, source/destination
-relative paths, and sanitized failure categories. Bounded local batch restore
-orchestration now plans up to 1,000 restore items, keeps blocked items visible,
-executes ready items independently, and reports partial outcomes without hiding
-per-item status. Restore audit events also have persistence-mapper and
-repository tests showing that restore event type, attribution, fingerprint,
-approval id, idempotency key, and relative paths are carried as bound SQL
-parameters instead of interpolated SQL text. Durable audit append contracts now
-also reject absolute, parent-traversal, empty, or Windows-style relative path
-values before repository calls are built. A bounded restore audit history reader
-can now load CockroachDB restore audit evidence by workspace, optional batch,
-and optional item filters, and the durable operation runtime now exposes that
-reader for future Activity History and restore UI views. The application
-runtime also has a side-effect-free restore audit runtime builder for real
-configuration handoff. The cockpit now surfaces that boundary as a read-only
-restore history readiness indicator, but it does not yet render persisted
-history rows or execute restore actions from the user interface.
+or moves a verified moved file back without overwrite. The cockpit now exposes
+a single-document restore action for moved documents that still have retained
+file history. That action reconstructs the original move, plans the reverse
+operation, binds a local human approval, releases the embedded PDF handle,
+executes the verified move-back, updates the visible row to `RESTORED`, and
+records local append-only restore approval/execution audit events. Restore
+approval and terminal restore execution can append local audit events with
+human/system attribution, exact restore fingerprint, approval id,
+source/destination relative paths, and sanitized failure categories. Bounded
+local batch restore orchestration now plans up to 1,000 restore items, keeps
+blocked items visible, executes ready items independently, and reports partial
+outcomes without hiding per-item status. Restore audit events also have
+persistence-mapper and repository tests showing that restore event type,
+attribution, fingerprint, approval id, idempotency key, and relative paths are
+carried as bound SQL parameters instead of interpolated SQL text. Durable audit
+append contracts now also reject absolute, parent-traversal, empty, or
+Windows-style relative path values before repository calls are built. A bounded
+restore audit history reader can now load CockroachDB restore audit evidence by
+workspace, optional batch, and optional item filters, and the durable operation
+runtime now exposes that reader for future Activity History and restore UI
+views. The application runtime also has a side-effect-free restore audit runtime
+builder for real configuration handoff. The cockpit still does not persist its
+restore action through the durable CockroachDB restore audit recorder or render
+persisted restore history rows.
 
 `docs/operations/runtime-configuration-runbook.md` records the current
 operator sequence for safe local runtime configuration, configuration-only
