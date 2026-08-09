@@ -217,7 +217,7 @@ def test_cockpit_starts_with_definitive_local_surface(
     close_cockpit_window(window)
 
 
-def test_cockpit_places_bedrock_button_beside_reject(
+def test_cockpit_places_bedrock_button_beside_restore(
     qt_application: object,
 ) -> None:
     window = CockpitWindow(
@@ -231,13 +231,14 @@ def test_cockpit_places_bedrock_button_beside_reject(
     window.show()
     cast(QApplication, qt_application).processEvents()
 
-    reject = window.console.buttons[5].geometry()
+    restore = window.console.buttons[5].geometry()
     bedrock = window.console.bedrock_button.geometry()
 
-    assert bedrock.left() > reject.left()
-    assert bedrock.top() == reject.top()
-    assert bedrock.height() == reject.height()
-    assert bedrock.width() == reject.width()
+    assert window.console.buttons[5].text() == "RESTORE"
+    assert bedrock.left() > restore.left()
+    assert bedrock.top() == restore.top()
+    assert bedrock.height() == restore.height()
+    assert bedrock.width() == restore.width()
 
     close_cockpit_window(window)
 
@@ -969,7 +970,7 @@ def test_cockpit_records_local_rejection_without_file_mutation(
     window._open_document_row(0)
 
     assert window.console.buttons[4].isEnabled()
-    assert window.console.buttons[5].isEnabled()
+    assert not window.console.buttons[5].isEnabled()
     assert not window.center.memory_panel.isHidden()
     assert "Review memory selected for invoice" in window.center.memory_summary.text()
     assert "fingerprint aaaaaaaaaaaa" in window.center.memory_detail.text()
@@ -991,6 +992,56 @@ def test_cockpit_records_local_rejection_without_file_mutation(
         window.center.memory_summary.text()
     )
     assert "Local review ledger" in window.center.memory_detail.text()
+
+    close_cockpit_window(window)
+
+
+def test_cockpit_restore_button_uses_moved_document_history(
+    qt_application: object,
+    tmp_path: Path,
+) -> None:
+    current_pdf = tmp_path / "DocWeave Organized" / "Invoices" / "invoice.pdf"
+    current_pdf.parent.mkdir(parents=True)
+    current_pdf.write_bytes(b"%PDF-1.4\n%restore test\n")
+    original_relative = "scan_001.pdf"
+
+    window = CockpitWindow(runtime_preflight_function=ready_runtime_preflight_report)
+    window.set_authorized_root(tmp_path)
+    window.left.set_documents(
+        [
+            Document(
+                name=current_pdf.name,
+                category="invoice",
+                pages="2",
+                status="MOVED",
+                path=current_pdf,
+                lineage_preview=CockpitLineagePreview(
+                    action="rename_and_move",
+                    original_relative_path=original_relative,
+                    previous_relative_path=original_relative,
+                    next_relative_path="DocWeave Organized/Invoices/invoice.pdf",
+                    original_directory=".",
+                    original_filename="scan_001.pdf",
+                    next_directory="DocWeave Organized/Invoices",
+                    next_filename="invoice.pdf",
+                    plan_fingerprint="a" * 64,
+                ),
+            )
+        ]
+    )
+
+    window._selected_document_row = 0
+    window._set_busy(False)
+
+    assert window.console.buttons[5].text() == "RESTORE"
+    assert window.console.buttons[5].isEnabled()
+
+    window.console.buttons[5].click()
+
+    assert "Restore preview ready" in window.console.log_text.text()
+    assert "persistent file history" in window.center.memory_summary.text()
+    assert cast(Any, window.right.event_rows[0]).event_name.text() == "RESTORE"
+    assert cast(Any, window.right.event_rows[2]).event_text.text() == original_relative
 
     close_cockpit_window(window)
 

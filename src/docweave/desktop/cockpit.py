@@ -2160,7 +2160,7 @@ class ConsolePanel(ShapeWidget):
             ("CANCEL", 0.0),
             ("ANALYZE", 0.0),
             ("APPROVE", 0.0),
-            ("REJECT", 0.0),
+            ("RESTORE", 0.0),
             ("BEDROCK", 0.0),
         )
 
@@ -2504,7 +2504,7 @@ class CockpitWindow(QMainWindow):
         self.console.buttons[2].clicked.connect(self.cancel_scan)
         self.console.buttons[3].clicked.connect(self._analyze_selected_document)
         self.console.buttons[4].clicked.connect(self._open_batch_review)
-        self.console.buttons[5].clicked.connect(self._reject_selected_review)
+        self.console.buttons[5].clicked.connect(self._open_restore_for_selected)
         self.console.bedrock_button.clicked.connect(self._handle_bedrock_button_clicked)
         self.console.lateral_screens_button.clicked.connect(
             self._toggle_lateral_screens
@@ -3548,6 +3548,36 @@ class CockpitWindow(QMainWindow):
             reason="Reviewer rejected the local proposal.",
         )
 
+    @Slot()
+    def _open_restore_for_selected(self) -> None:
+        document = self._selected_restorable_document()
+        if document is None or document.lineage_preview is None:
+            self._set_status(
+                "Select a moved document with retained file history before restore."
+            )
+            return
+        self._set_status(
+            "Restore preview ready: current file can be moved back "
+            "to its original path."
+        )
+        self.center.show_memory_trace(
+            summary="Restore uses persistent file history, not a hidden undo.",
+            detail=(
+                f"Current: {document.lineage_preview.next_relative_path}; "
+                f"original: {document.lineage_preview.original_relative_path}; "
+                "execute restore from this exact lineage in the restore workflow."
+            ),
+        )
+        self.right.set_events(
+            [
+                ("RESTORE", "Persistent history selected"),
+                ("CURRENT", document.lineage_preview.next_relative_path),
+                ("ORIGINAL", document.lineage_preview.original_relative_path),
+                ("MEMORY", "CockroachDB file_history is the restore source"),
+                ("SAFETY", "Restore requires explicit approval"),
+            ]
+        )
+
     def _record_selected_review_decision(  # noqa: PLR0911
         self,
         action: ReviewDecisionAction,
@@ -3736,8 +3766,8 @@ class CockpitWindow(QMainWindow):
             _classification_preflight_block(self._runtime_preflight_report) is None
         )
         batch_review_ready = self.left.count_status("REVIEW") > 0 and not blocked
-        selected_review_ready = (
-            self._selected_review_document() is not None and not blocked
+        selected_restore_ready = (
+            self._selected_restorable_document() is not None and not blocked
         )
         self.console.buttons[0].setEnabled(not blocked)
         self.console.buttons[1].setEnabled(
@@ -3756,7 +3786,7 @@ class CockpitWindow(QMainWindow):
                 "Retry runtime preflight and analyze when configuration is ready."
             )
         self.console.buttons[4].setEnabled(batch_review_ready)
-        self.console.buttons[5].setEnabled(selected_review_ready)
+        self.console.buttons[5].setEnabled(selected_restore_ready)
         self.console.lateral_screens_button.setEnabled(not blocked)
         if batch_review_ready:
             self.console.buttons[4].setToolTip(
@@ -3766,11 +3796,13 @@ class CockpitWindow(QMainWindow):
             self.console.buttons[4].setToolTip(
                 "Analyze documents before opening batch review."
             )
-        if selected_review_ready:
-            self.console.buttons[5].setToolTip("Reject the selected AI proposal.")
+        if selected_restore_ready:
+            self.console.buttons[5].setToolTip(
+                "Open restore preview from retained file history."
+            )
         else:
             self.console.buttons[5].setToolTip(
-                "Select a document in REVIEW before rejecting."
+                "Select a moved document with retained file history before restore."
             )
 
     def _set_status(self, message: str) -> None:
@@ -3924,6 +3956,20 @@ class CockpitWindow(QMainWindow):
             document is None
             or document.status != "REVIEW"
             or document.proposal_fingerprint is None
+        ):
+            return None
+        return document
+
+    def _selected_restorable_document(self) -> Document | None:
+        row = self._selected_document_row
+        if row is None:
+            return None
+        document = self.left.document_at(row)
+        if (
+            document is None
+            or document.status not in {"APPROVED", "MOVED"}
+            or document.path is None
+            or document.lineage_preview is None
         ):
             return None
         return document
