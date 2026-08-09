@@ -1029,10 +1029,14 @@ def test_cockpit_opens_batch_review_table_from_approve_button(
 
     window._selected_document_row = 0
     window._set_busy(False)
+    window.show()
+    cast(QApplication, qt_application).processEvents()
     window.console.buttons[4].click()
 
     assert window.center.page.isHidden()
     assert not window.center.review_table.isHidden()
+    assert window.side_view.isHidden()
+    assert window.center.geometry().width() > window.width() * 0.75
     assert window.center.review_table.rowCount() == 2
     assert window.center.review_table.columnCount() == 3
     original_item = window.center.review_table.item(0, 0)
@@ -1044,6 +1048,12 @@ def test_cockpit_opens_batch_review_table_from_approve_button(
     assert "first.pdf" in proposed_item.text()
     assert window.center.review_table.cellWidget(0, 2) is not None
     assert "Batch review ready: 2 proposed rename" in window.console.log_text.text()
+
+    window._preview_review_row(0)
+
+    assert not window.side_view.isHidden()
+    assert window.center.review_table.isHidden()
+    assert window.center.geometry().width() < window.width() * 0.60
 
     close_cockpit_window(window)
 

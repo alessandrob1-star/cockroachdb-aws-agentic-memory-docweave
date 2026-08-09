@@ -1579,6 +1579,11 @@ class CenterPreview(ShapeWidget):
 
     def show_review_table(self, rows: list[tuple[int, str, str]]) -> None:
         """Replace the PDF preview with a batch decision table."""
+        self._geometry_animation.stop()
+        self.opacity_animation.stop()
+        self.opacity_effect.setOpacity(1.0)
+        self.setGeometry(self._target_rect)
+        self.show()
         self._document.close()
         self.page.hide()
         self.title.hide()
@@ -2398,6 +2403,7 @@ class CockpitWindow(QMainWindow):
         self._memory_evidence_error: str | None = None
         self._bedrock_auth_state = "unknown"
         self._bedrock_login_poll_attempts = 0
+        self._review_expanded = False
         self._selected_document_row: int | None = None
         self._review_ledger = InMemoryReviewDecisionLedger()
         self._workspace = DesktopWorkspaceSession()
@@ -2950,6 +2956,7 @@ class CockpitWindow(QMainWindow):
 
     @Slot(int)
     def _open_document_row(self, row: int) -> None:  # noqa: PLR0911
+        self._set_review_expanded(False)
         document = self.left.document_at(row)
         root = self.authorized_root
         if document is None or document.path is None or root is None:
@@ -3320,6 +3327,7 @@ class CockpitWindow(QMainWindow):
         if not rows:
             self._set_status("No review proposals are ready for batch approval.")
             return
+        self._set_review_expanded(True)
         self.center.show_review_table(rows)
         self._set_status(
             f"Batch review ready: {len(rows)} proposed rename(s) awaiting decision."
@@ -3365,6 +3373,13 @@ class CockpitWindow(QMainWindow):
     @Slot(int)
     def _preview_review_row(self, row: int) -> None:
         self._open_document_row(row)
+
+    def _set_review_expanded(self, expanded: bool) -> None:
+        if self._review_expanded == expanded:
+            return
+        self._review_expanded = expanded
+        self.side_view.setVisible(not expanded)
+        self.resizeEvent(None)
 
     @Slot()
     def _approve_all_review_rows(self) -> None:
@@ -3884,7 +3899,18 @@ class CockpitWindow(QMainWindow):
 
         self.console.setGeometry(console_x, console_y, console_w, console_h)
 
-        target = QRect(center_x, center_y, center_w, center_h)
+        if self._review_expanded:
+            expanded_margin_x = int(w * 0.075)
+            expanded_top = max(12, top - center_lift)
+            expanded_bottom = console_y - int(h * 0.035)
+            target = QRect(
+                expanded_margin_x,
+                expanded_top,
+                w - expanded_margin_x * 2,
+                max(int(h * 0.50), expanded_bottom - expanded_top),
+            )
+        else:
+            target = QRect(center_x, center_y, center_w, center_h)
         self.center.set_target_rect(target)
 
         if self.center.opacity_effect.opacity() > 0.01:
@@ -3897,7 +3923,8 @@ class CockpitWindow(QMainWindow):
                 12,
             )
 
-        self.side_view.raise_()
+        if not self._review_expanded:
+            self.side_view.raise_()
         self.console.raise_()
         self.center.raise_()
 
