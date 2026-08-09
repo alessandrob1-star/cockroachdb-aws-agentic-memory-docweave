@@ -2160,7 +2160,6 @@ class ConsolePanel(ShapeWidget):
             ("APPROVE", 0.0),
             ("REJECT", 0.0),
             ("BEDROCK", 0.0),
-            ("BACK", 0.0),
         )
 
         for text, angle in button_specs:
@@ -2188,11 +2187,13 @@ class ConsolePanel(ShapeWidget):
         self.bedrock_button.setObjectName("bedrockButton")
         self.bedrock_button.setProperty("authState", "unknown")
         self.bedrock_button.setToolTip("Bedrock AWS session status.")
-        self.review_back_button = self.buttons[7]
-        self.review_back_button.setToolTip(
-            "Close batch review and restore side screens."
+        self.lateral_screens_button = QPushButton("LATERAL SCREENS", self)
+        self.lateral_screens_button.setObjectName("lateralScreensButton")
+        self.lateral_screens_button.setCheckable(True)
+        self.lateral_screens_button.setToolTip(
+            "Restore the left and right cockpit screens."
         )
-        self.review_back_button.hide()
+        self.lateral_screens_button.hide()
 
         self.log_text = QLabel(
             "Session started\n"
@@ -2341,7 +2342,6 @@ class ConsolePanel(ShapeWidget):
             int(w * 0.488),
             int(w * 0.568),
             int(w * 0.648),
-            int(w * 0.728),
         )
 
         for button, x_pos in zip(self.buttons[1:], flat_xs):
@@ -2354,6 +2354,13 @@ class ConsolePanel(ShapeWidget):
             )
             button.update_mask()
             button.update()
+
+        self.lateral_screens_button.setGeometry(
+            int(w * 0.085),
+            int(h * 0.355),
+            150,
+            34,
+        )
 
         # Keep all text blocks clear of the lower recess.
         title_y = int(h * 0.455)
@@ -2491,7 +2498,7 @@ class CockpitWindow(QMainWindow):
         self.console.buttons[4].clicked.connect(self._open_batch_review)
         self.console.buttons[5].clicked.connect(self._reject_selected_review)
         self.console.bedrock_button.clicked.connect(self._handle_bedrock_button_clicked)
-        self.console.review_back_button.clicked.connect(
+        self.console.lateral_screens_button.clicked.connect(
             lambda _checked=False: self._close_batch_review()
         )
         self.center.review_approve_requested.connect(self._approve_review_row)
@@ -2708,6 +2715,30 @@ class CockpitWindow(QMainWindow):
             QPushButton#smallButton {
                 font-size: 9px;
                 min-width: 44px;
+            }
+
+            QPushButton#lateralScreensButton {
+                color: #DFFCF3;
+                background: rgba(9, 41, 35, 230);
+                border: 1px solid rgba(116, 255, 208, 170);
+                border-left: 4px solid rgba(116, 255, 208, 235);
+                border-radius: 14px;
+                font-size: 10px;
+                font-weight: 900;
+                padding: 0 12px;
+            }
+
+            QPushButton#lateralScreensButton:hover {
+                color: #FFFFFF;
+                background: rgba(20, 106, 83, 245);
+                border-color: rgba(165, 255, 224, 255);
+                border-left-color: rgba(165, 255, 224, 255);
+            }
+
+            QPushButton#lateralScreensButton:checked {
+                background: rgba(9, 58, 48, 245);
+                border-color: rgba(123, 255, 211, 245);
+                border-left-color: rgba(123, 255, 211, 255);
             }
 
             QPushButton#reviewApproveButton {
@@ -3456,8 +3487,9 @@ class CockpitWindow(QMainWindow):
         if self._review_expanded == expanded:
             return
         self._review_expanded = expanded
-        self.console.review_back_button.setVisible(expanded)
-        self.console.review_back_button.setEnabled(expanded)
+        self.console.lateral_screens_button.setVisible(expanded)
+        self.console.lateral_screens_button.setEnabled(expanded)
+        self.console.lateral_screens_button.setChecked(expanded)
         self.side_view.setVisible(not expanded)
         self.resizeEvent(None)
 
@@ -3721,7 +3753,7 @@ class CockpitWindow(QMainWindow):
             )
         self.console.buttons[4].setEnabled(batch_review_ready)
         self.console.buttons[5].setEnabled(selected_review_ready)
-        self.console.review_back_button.setEnabled(
+        self.console.lateral_screens_button.setEnabled(
             self._review_expanded and not blocked
         )
         if batch_review_ready:
