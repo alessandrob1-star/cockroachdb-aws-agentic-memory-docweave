@@ -1,6 +1,6 @@
 # Hackathon Requirement Evidence
 
-**Last updated:** 2026-08-08
+**Last updated:** 2026-08-10
 
 DocWeave must prove meaningful AWS and CockroachDB tool use, not just mention
 services in documentation.
@@ -76,7 +76,7 @@ Stack:
 ```text
 docweave-cloud-dev
 status: UPDATE_COMPLETE
-lambda artifact: lambda/docweave-cloud-api-6866f23e2332.zip
+lambda artifact: lambda/docweave-cloud-api-3eee97039dbc.zip
 ```
 
 Services used:
@@ -97,7 +97,7 @@ Observed endpoint:
 https://76824l7ub1.execute-api.eu-central-1.amazonaws.com/dev
 ```
 
-Observed `/health` capabilities after the 2026-08-08 deployment:
+Observed `/health` capabilities after the 2026-08-10 deployment:
 
 ```text
 health
@@ -109,13 +109,29 @@ analysis_result_artifacts
 simple_cockroachdb_memory_persistence
 ```
 
-Current live health limitation:
+Observed `/health` service configuration:
 
 ```text
-cockroachdb_secret: missing
+amazon_bedrock: configured
+amazon_s3: configured
+amazon_sqs: configured
+aws_lambda: running
+cockroachdb_secret: configured
 ```
 
-Meaning: AWS infrastructure and Bedrock worker path are active, but Lambda
-cloud-to-CockroachDB persistence must not be claimed as complete until the
-CockroachDB database URL secret ARN is connected and `/health` reports the
-secret as configured.
+Live cloud memory proof from 2026-08-10:
+
+```text
+job_id: 55555555-5555-4555-8555-555555555555
+input object: scan_000184.pdf
+model_id: eu.amazon.nova-2-lite-v1:0
+proposed_class: purchase_order
+analysisStatus: bedrock_classified_cockroachdb_persisted
+persistedClassificationCount: 1
+resultArtifactCount: 1
+```
+
+Meaning: AWS infrastructure, Bedrock classification, Amazon S3 result
+artifacts, and Lambda-to-CockroachDB memory persistence are active. The cloud
+worker persists proposals only; human approval, file moves, and restore remain
+in the dashboard workflow.

@@ -1,70 +1,60 @@
 # DocWeave
 
-**DocWeave is an agentic document cockpit for the CockroachDB x AWS hackathon.**
-It turns a folder of badly named Portable Document Format (PDF) files, such as
-`scan_000184.pdf`, into a human-approved archive where every renamed document
-still remembers its original filename, original directory, model rationale, and
-approval history.
+**DocWeave is an agentic memory cockpit for messy business documents.** A user
+opens the glass-effect dashboard, chooses a folder full of opaque Portable
+Document Format (PDF) names such as `scan_000184.pdf` or `attachment_081.pdf`,
+and lets document agents read, classify, explain, and propose a safer archive
+structure. Nothing is renamed by the model alone: the human approves each move,
+and CockroachDB remembers the original filename, original directory, proposed
+name, approval decision, and restore path.
 
 ```text
-Choose folder -> Bedrock analysis -> CockroachDB memory -> human approval -> safe rename/move -> original path still visible
+messy folder -> PDF extraction -> Bedrock proposal -> CockroachDB memory -> human approval -> safe rename/move -> one-click restore
 ```
 
-The agent does not just chat about documents. Amazon Bedrock reads extracted
-PDF text and proposes a document class, evidence, destination folder, and safer
-filename. The dashboard keeps the human in control: the user reviews the PDF,
-the evidence, and the proposed move before any file is changed. CockroachDB is
-the persistent operational, semantic, episodic, and preference memory that
-survives after the local folder has been reorganized.
+The visible product is the dashboard, not a chat box. The left screen shows the
+selected folder, the center screen previews the PDF and model evidence, and the
+right screen shows live memory/runtime status. After analysis, the center
+screen becomes a review table: original PDF name, proposed filename, suggested
+directory, approve/reject controls, and preview buttons. The restore view uses
+CockroachDB `file_history` to answer the practical question a real user asks
+after cleanup: **"What was this file called before, and where did it come
+from?"**
 
-DocWeave uses the required hackathon tools directly:
+## Hackathon Proof In One Screen
 
-- **CockroachDB Tool #1: `ccloud` Command-Line Interface (CLI).** The project
-  uses `ccloud` to verify the live CockroachDB Cloud cluster
-  `docweave-memory`, its AWS region, serverless plan, version, and SQL users
-  without exposing database passwords.
-- **CockroachDB Tool #2: CockroachDB Agent Skills repository.** The schema and
-  transaction path were reviewed with the `cockroachdb-sql` and
-  `designing-application-transactions` skills, then applied to the six-table
-  memory design, idempotent writes, `FOR UPDATE` proposal locking, and bounded
-  `40001` serialization retry handling.
-- **AWS services.** The deployed cloud slice uses Amazon Bedrock for document
-  reasoning, AWS Lambda for the HTTP API and analysis worker, Amazon Simple
-  Storage Service (Amazon S3) for PDF/result artifacts, Amazon Simple Queue
-  Service (Amazon SQS) for queued analysis jobs, Amazon API Gateway for the
-  public endpoint, Amazon CloudWatch Logs for operational evidence, and AWS
-  Secrets Manager dynamic references for the CockroachDB runtime URL.
+| Requirement | DocWeave evidence |
+| --- | --- |
+| Agentic application | PDF extraction plus Amazon Bedrock produces class, evidence, metadata, destination folder, and filename proposals. |
+| Human-governed actions | The model cannot mutate files. The dashboard records approval/rejection before any rename or move. |
+| CockroachDB persistent memory | Six judge-visible tables store documents, agent runs, proposals, human decisions, file history, and optional relationships. |
+| CockroachDB Tool #1 | `ccloud` Command-Line Interface (CLI) verifies the live CockroachDB Cloud serverless cluster `docweave-memory` on AWS `eu-central-1`. |
+| CockroachDB Tool #2 | CockroachDB Agent Skills repository guided schema and transaction design: primary keys, idempotent writes, proposal locking, and bounded `40001` retry handling. |
+| AWS deployment | CloudFormation deploys Amazon Bedrock permissions, AWS Lambda API/worker, Amazon S3 artifacts, Amazon SQS jobs, Amazon API Gateway, Amazon CloudWatch Logs, and AWS Secrets Manager dynamic references. |
+| Live cloud memory proof | AWS Lambda classified `scan_000184.pdf` with Amazon Bedrock and persisted the result to CockroachDB on 2026-08-10. |
+| Sample data | `pdf_sintetici` contains 100 synthetic PDFs with deliberately unhelpful filenames for realistic folder cleanup. |
 
-The visible product surface is the **glass-effect desktop cockpit**. A judge
-can choose a folder, scan documents, inspect an embedded PDF preview, run
-analysis, approve or reject the proposed rename, and then select the moved PDF
-to see exactly what it used to be called and where it came from. That is the
-core product loop: **LLM understanding + human control + durable path memory**.
+## Agent Memory Model
 
-## Hackathon Integration
+CockroachDB is the durable memory layer, not a side log. The memory agent writes
+and reads this chain:
 
-**CockroachDB**
+```text
+documents -> agent_runs -> proposals -> human_decisions -> file_history
+```
 
-- **Persistent agent memory:** `documents -> agent_runs -> proposals ->
-  human_decisions -> file_history` records what the agent saw, proposed, and
-  what the human approved.
-- **Required CockroachDB Tool #1: `ccloud` CLI:** used to inspect and prove the
-  live CockroachDB Cloud serverless cluster `docweave-memory` on AWS
-  `eu-central-1`.
-- **Required CockroachDB Tool #2: CockroachDB Agent Skills repository:** used to
-  review and shape schema design, idempotent writes, proposal locking, and
-  serializable transaction retry behavior.
+- `documents` keeps original and current path state.
+- `agent_runs` records the Bedrock model, task, input hash, output, and timing.
+- `proposals` stores the agent's class, evidence, destination, and filename.
+- `human_decisions` records whether the user accepted or rejected the proposal.
+- `file_history` is the restore memory: previous path, next path, operation,
+  status, and decision link.
+- `document_relationships` is available for lightweight related-document links.
 
-**AWS**
-
-- **Amazon Bedrock:** document reasoning and structured rename proposals.
-- **AWS Lambda:** cloud API and asynchronous analysis worker.
-- **Amazon S3:** PDF upload artifacts and JSON result artifacts.
-- **Amazon SQS:** queued analysis jobs between API and worker.
-- **Amazon API Gateway:** public demo endpoint.
-- **Amazon CloudWatch Logs:** operational execution evidence.
-- **AWS Secrets Manager dynamic references:** runtime CockroachDB URL wiring
-  without committing secrets.
+That is the core loop: **large language model understanding, human authority,
+and persistent path memory**. DocWeave remains useful after the files move
+because CockroachDB can still explain why a PDF has its current name and how to
+restore it.
 
 ## Submission Fit
 
@@ -79,7 +69,7 @@ core product loop: **LLM understanding + human control + durable path memory**.
 | Open-source license | MIT license in [`LICENSE`](LICENSE). |
 | Testing instructions | [`docs/submission/testing-instructions.md`](docs/submission/testing-instructions.md). |
 
-## AWS Services Used
+## AWS Services
 
 - **Amazon Bedrock** - model reasoning for document class, evidence, metadata,
   rationale, confidence signal, destination folder, and filename proposal.
@@ -92,7 +82,7 @@ core product loop: **LLM understanding + human control + durable path memory**.
 - **AWS Secrets Manager dynamic references** - CloudFormation wiring for the
   CockroachDB runtime URL when a secret ARN is supplied.
 
-## CockroachDB Tools Used
+## CockroachDB Tools
 
 - **`ccloud` CLI** - verifies the live CockroachDB Cloud cluster
   `docweave-memory`, its AWS region, serverless plan, version, and SQL users
@@ -105,19 +95,26 @@ core product loop: **LLM understanding + human control + durable path memory**.
 Evidence is recorded in
 [`docs/operations/hackathon-requirement-evidence.md`](docs/operations/hackathon-requirement-evidence.md).
 
-## CockroachDB Memory
+## Live Cloud Proof
 
-CockroachDB is intentionally simple. There is one schema, `docweave`, and six
-judge-visible tables. No hidden judge schema. No demo-only table family.
+Current AWS stack:
 
-| Table | What It Proves |
-| --- | --- |
-| `documents` | Original directory/name, current directory/name, digest, page count, status. |
-| `agent_runs` | Bedrock provider, model, task, input hash, sanitized output, timing. |
-| `proposals` | Proposed class, destination folder, destination filename, confidence, evidence. |
-| `human_decisions` | Human approval or rejection of a model proposal. |
-| `file_history` | Before/after path memory for an approved move or rename. |
-| `document_relationships` | Optional lightweight links between related documents. |
+```text
+docweave-cloud-dev
+region: eu-central-1
+status: UPDATE_COMPLETE
+lambda artifact: lambda/docweave-cloud-api-3eee97039dbc.zip
+```
+
+The public `/health` endpoint reports Amazon S3, Amazon SQS, AWS Lambda,
+Amazon Bedrock, and the CockroachDB secret as configured. A live worker proof
+on 2026-08-10 classified `scan_000184.pdf` with Bedrock and returned:
+
+```text
+analysisStatus: bedrock_classified_cockroachdb_persisted
+persistedClassificationCount: 1
+resultArtifactCount: 1
+```
 
 In a four-minute demo:
 
@@ -280,14 +277,14 @@ Current migration head:
 
 ## Current Limitations
 
-- The AWS stack needs a valid CockroachDB secret ARN with a `database_url`
-  value before Lambda can persist to CockroachDB.
 - Relationship inference exists as a lightweight table but is not the main demo
   path.
 - Confidence is an uncalibrated review-ordering signal, not a production
   probability.
 - Extraction quality still depends on PDF text quality and the selected
   Bedrock model.
+- The cloud worker classifies and persists proposals; local dashboard approval
+  remains the path that renames or restores files.
 
 ## Governance
 

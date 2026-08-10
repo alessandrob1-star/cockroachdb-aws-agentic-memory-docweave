@@ -179,7 +179,7 @@ def test_client_factory_uses_approved_region_retries_and_timeouts() -> None:
 def test_config_rejects_unapproved_or_unbounded_settings(
     kwargs: dict[str, Any],
 ) -> None:
-    with pytest.raises(ValueError, match="Unapproved|must be positive"):
+    with pytest.raises(ValueError, match=r"Unapproved|must be positive"):
         BedrockGatewayConfig(**kwargs)
 
 

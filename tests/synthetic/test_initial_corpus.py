@@ -17,10 +17,10 @@ def _manifest() -> dict[str, Any]:
     )
 
 
-def test_initial_corpus_contains_exactly_thirty_pdf_files() -> None:
-    files = sorted(CORPUS_ROOT.iterdir())
+def test_initial_corpus_contains_declared_pdf_files() -> None:
+    files = sorted(CORPUS_ROOT.glob("*.pdf"))
 
-    assert len(files) == 30
+    assert len(files) == _manifest()["document_count"]
     assert all(path.is_file() and path.suffix == ".pdf" for path in files)
     assert all(path.read_bytes().startswith(b"%PDF-") for path in files)
 
@@ -30,15 +30,12 @@ def test_manifest_matches_files_hashes_and_categories() -> None:
     entries = manifest["documents"]
     files_by_name = {path.name: path for path in CORPUS_ROOT.glob("*.pdf")}
 
-    assert manifest["document_count"] == 30
+    assert manifest["document_count"] == 100
     assert manifest["contains_real_personal_data"] is False
     assert {entry["filename"] for entry in entries} == set(files_by_name)
-    assert Counter(entry["category"] for entry in entries) == {
-        "purchase_order": 8,
-        "invoice": 8,
-        "payment_confirmation": 7,
-        "delivery_note": 7,
-    }
+    assert (
+        Counter(entry["category"] for entry in entries) == manifest["category_counts"]
+    )
     for entry in entries:
         content = files_by_name[entry["filename"]].read_bytes()
         assert hashlib.sha256(content).hexdigest() == entry["sha256"]
@@ -51,10 +48,11 @@ def test_manifest_matches_files_hashes_and_categories() -> None:
 def test_relationship_references_resolve_with_intentional_incomplete_cases() -> None:
     entries = _manifest()["documents"]
     known_ids = {entry["document_id"] for entry in entries}
+    complete_dossier_ids = {f"DOS-2026-{index:03d}" for index in range(1, 7)}
     full_dossiers = Counter(
         entry["dossier_id"]
         for entry in entries
-        if entry["dossier_id"] <= "DOS-2026-006"
+        if entry["dossier_id"] in complete_dossier_ids
     )
 
     assert all(

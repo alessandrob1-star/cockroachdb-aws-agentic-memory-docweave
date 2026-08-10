@@ -45,6 +45,7 @@ def test_cloud_runtime_requirements_avoid_desktop_only_dependencies() -> None:
     assert requirements == {
         "boto3==1.43.56",
         "botocore==1.43.56",
+        "certifi==2026.7.22",
         "greenlet==3.2.5",
         "jmespath==1.1.0",
         "psycopg[binary]==3.2.13",

@@ -118,7 +118,7 @@ def test_cloud_memory_writer_rejects_invalid_untrusted_values(
     classification[field] = value
     writer = CloudCockroachMemoryWriter(_FakeEngine())
 
-    with pytest.raises(ValueError, match="digest|non-negative|object"):
+    with pytest.raises(ValueError, match=r"digest|non-negative|object"):
         writer.persist_classifications(
             workspace_id=WORKSPACE_ID,
             job_id=JOB_ID,
@@ -161,3 +161,67 @@ def test_cloud_memory_writer_factory_uses_existing_environment_url(
 
     assert isinstance(writer, CloudCockroachMemoryWriter)
     assert created_urls == ["cockroachdb+psycopg://example"]
+
+
+def test_cloud_memory_writer_factory_adds_lambda_ca_bundle_for_verify_full(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    created_urls: list[str] = []
+
+    def fake_create_engine(database_url: str, **kwargs: object) -> _FakeEngine:
+        created_urls.append(database_url)
+        assert kwargs == {"future": True, "pool_pre_ping": True}
+        return _FakeEngine()
+
+    monkeypatch.setattr("docweave_cloud_api.memory.create_engine", fake_create_engine)
+    monkeypatch.setattr(
+        "docweave_cloud_api.memory.certifi.where",
+        lambda: "/var/task/certifi/cacert.pem",
+    )
+
+    writer = build_cloud_memory_writer_from_environment(
+        {
+            "DOCWEAVE_DATABASE_URL": (
+                "cockroachdb+psycopg://user:secret@example.test/docweave"
+                "?sslmode=verify-full"
+            )
+        }
+    )
+
+    assert isinstance(writer, CloudCockroachMemoryWriter)
+    assert created_urls == [
+        "cockroachdb+psycopg://user:secret@example.test/docweave"
+        "?sslmode=verify-full&sslrootcert=%2Fvar%2Ftask%2Fcertifi%2Fcacert.pem"
+    ]
+
+
+def test_cloud_memory_writer_factory_replaces_system_ca_bundle(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    created_urls: list[str] = []
+
+    def fake_create_engine(database_url: str, **kwargs: object) -> _FakeEngine:
+        created_urls.append(database_url)
+        assert kwargs == {"future": True, "pool_pre_ping": True}
+        return _FakeEngine()
+
+    monkeypatch.setattr("docweave_cloud_api.memory.create_engine", fake_create_engine)
+    monkeypatch.setattr(
+        "docweave_cloud_api.memory.certifi.where",
+        lambda: "/var/task/certifi/cacert.pem",
+    )
+
+    writer = build_cloud_memory_writer_from_environment(
+        {
+            "DOCWEAVE_DATABASE_URL": (
+                "cockroachdb+psycopg://user:secret@example.test/docweave"
+                "?sslmode=verify-full&sslrootcert=system"
+            )
+        }
+    )
+
+    assert isinstance(writer, CloudCockroachMemoryWriter)
+    assert created_urls == [
+        "cockroachdb+psycopg://user:secret@example.test/docweave"
+        "?sslmode=verify-full&sslrootcert=%2Fvar%2Ftask%2Fcertifi%2Fcacert.pem"
+    ]

@@ -1,0 +1,707 @@
+{
+  "corpus_id": "docweave-synthetic-pdf-corpus",
+  "last_updated": "2026-08-10",
+  "file_count": 100,
+  "files": [
+    {
+      "filename": "archive_export_009.pdf",
+      "document_id": "DN-2026-002",
+      "pages": 2,
+      "sha256": "3d6a2d0a9e0f61495dc660133d826ce2caf4be38c2d827b0259dbdc6f66f4606",
+      "synthetic": true
+    },
+    {
+      "filename": "archive_item_031.pdf",
+      "document_id": "PAY-2026-007",
+      "pages": 2,
+      "sha256": "41b605e5241cb951f7d61b8203969a0218faf84ca9bcac8405663beba1db5689",
+      "synthetic": true
+    },
+    {
+      "filename": "attachment_07.pdf",
+      "document_id": "DN-2026-001",
+      "pages": 2,
+      "sha256": "d57248fcb16d2069f3837c180c508d77f2aa424b380526f43d145bf7433f44d0",
+      "synthetic": true
+    },
+    {
+      "filename": "attachment_081.pdf",
+      "document_id": "INV-2026-0051",
+      "pages": 2,
+      "sha256": "7fdfcbe81a5a41cac17d9428f35d0c9a136706256db93cbf0b043d41acec9999",
+      "synthetic": true
+    },
+    {
+      "filename": "attachment_094.pdf",
+      "document_id": "PO-2026-0052",
+      "pages": 2,
+      "sha256": "8074bdd4b64b2483cc6ee5100a1f517bd80b4ec0ffbf4d7e3541f4ff403a0c93",
+      "synthetic": true
+    },
+    {
+      "filename": "attachment_118.pdf",
+      "document_id": "PAY-2026-0053",
+      "pages": 2,
+      "sha256": "b8574d2b13b059f758197294e940c71e170e55b69009a79ea857fa51a14b078c",
+      "synthetic": true
+    },
+    {
+      "filename": "attachment_137.pdf",
+      "document_id": "DN-2026-0054",
+      "pages": 2,
+      "sha256": "2e72e25885a379c7c6adfdcd695029a82ea4cd03a640e51229ad93d10a7c7050",
+      "synthetic": true
+    },
+    {
+      "filename": "attachment_162.pdf",
+      "document_id": "REC-2026-0055",
+      "pages": 2,
+      "sha256": "adb02409110375a7e36558ad6daa23a618a9b33bd639151444e59a5b3f1082ec",
+      "synthetic": true
+    },
+    {
+      "filename": "attachment_189.pdf",
+      "document_id": "INV-2026-0056",
+      "pages": 2,
+      "sha256": "c2c45d0ed2c417b435298e3b2cd922723d7b9f5ac859a0db9d3448886235d952",
+      "synthetic": true
+    },
+    {
+      "filename": "attachment_2026_17.pdf",
+      "document_id": "INV-2026-004",
+      "pages": 2,
+      "sha256": "f5009771557c74b4904d51889dd5b67d3ce241e00ab171a9ca54ceac4f5ccec1",
+      "synthetic": true
+    },
+    {
+      "filename": "attachment_203.pdf",
+      "document_id": "PO-2026-0057",
+      "pages": 2,
+      "sha256": "059903d571d0965f094b9b72face5becc0e3a1c9a3fb7d382d373d68b99435c9",
+      "synthetic": true
+    },
+    {
+      "filename": "attachment_227.pdf",
+      "document_id": "PAY-2026-0058",
+      "pages": 2,
+      "sha256": "a2abe83b15fdad5cbf08529a24b778f74d6dc0addeced9088d22a80db100f257",
+      "synthetic": true
+    },
+    {
+      "filename": "attachment_251.pdf",
+      "document_id": "DN-2026-0059",
+      "pages": 2,
+      "sha256": "b34c307abb920ee62f5ed2eab98d141d909a54ee6b2306463702585fc674bcc9",
+      "synthetic": true
+    },
+    {
+      "filename": "attachment_284.pdf",
+      "document_id": "REC-2026-0060",
+      "pages": 2,
+      "sha256": "526939e0c7b8110e4937ab7339b07e48afb059ef6da4a1db046fec5a621698ce",
+      "synthetic": true
+    },
+    {
+      "filename": "attachment_final_02.pdf",
+      "document_id": "PAY-2026-006",
+      "pages": 2,
+      "sha256": "9763a299658905041dcc0612ec2176928f210ad3f71b18565745016324f859cd",
+      "synthetic": true
+    },
+    {
+      "filename": "batch_a_071.pdf",
+      "document_id": "INV-2026-0091",
+      "pages": 2,
+      "sha256": "ad7c236c06ac08a4284b635053d8a1e0148a367d46fdcc6006b00195b275b944",
+      "synthetic": true
+    },
+    {
+      "filename": "batch_a_094.pdf",
+      "document_id": "PO-2026-0092",
+      "pages": 2,
+      "sha256": "bee75424a8df58233e14b8e8a4e455c44a3c8811b92d86d78f5f5434d2e80533",
+      "synthetic": true
+    },
+    {
+      "filename": "batch_b_118.pdf",
+      "document_id": "PAY-2026-0093",
+      "pages": 2,
+      "sha256": "9ad2bb6f7a47bb2d965069d417f3c6f8c837d6ba626e4264923913b67e645d7f",
+      "synthetic": true
+    },
+    {
+      "filename": "batch_b_143.pdf",
+      "document_id": "DN-2026-0094",
+      "pages": 2,
+      "sha256": "1956a2aef47b3367d3e358ce190769fca59c415cde3ff60f4dbfeb5486816390",
+      "synthetic": true
+    },
+    {
+      "filename": "batch_c_166.pdf",
+      "document_id": "REC-2026-0095",
+      "pages": 2,
+      "sha256": "824f06c481e3d2e754f1aec740b5f6ea02e99e6bd15ce5081ffae400b4a1166a",
+      "synthetic": true
+    },
+    {
+      "filename": "batch_c_192.pdf",
+      "document_id": "INV-2026-0096",
+      "pages": 2,
+      "sha256": "4a1df745dd75ec9073a783d5513b343bc5d758ad394cc965f738a108ec6ad732",
+      "synthetic": true
+    },
+    {
+      "filename": "batch_d_214.pdf",
+      "document_id": "PO-2026-0097",
+      "pages": 2,
+      "sha256": "c33469d782de271b1c051a578501dfd3c5e4ba9dea8b23e0ca600e011ee3e187",
+      "synthetic": true
+    },
+    {
+      "filename": "batch_d_239.pdf",
+      "document_id": "PAY-2026-0098",
+      "pages": 2,
+      "sha256": "bd027552b2e5de35625dee5cd690e46976f7877ce70b29ad45dc72303346da16",
+      "synthetic": true
+    },
+    {
+      "filename": "batch_e_260.pdf",
+      "document_id": "DN-2026-0099",
+      "pages": 2,
+      "sha256": "318f9d3b03855558c04d02bc9b1ce8b8f0907ab551259c8c76d73473e0900d23",
+      "synthetic": true
+    },
+    {
+      "filename": "batch_e_287.pdf",
+      "document_id": "REC-2026-0100",
+      "pages": 2,
+      "sha256": "2b0ce629a617662124313e6d0201230820d07738d1802bba8e4801bfd08f6c38",
+      "synthetic": true
+    },
+    {
+      "filename": "document_00067.pdf",
+      "document_id": "PAY-2026-005",
+      "pages": 2,
+      "sha256": "c3fd87176716c5c79c40e74cc3182c74bdbb7e0170cb06c77a7d060243b0b20f",
+      "synthetic": true
+    },
+    {
+      "filename": "document_20260713.pdf",
+      "document_id": "PAY-2026-001",
+      "pages": 2,
+      "sha256": "7c6e77c3c8410703e2be492cbe55595a771bb488ac41468f79001849b7f02bbc",
+      "synthetic": true
+    },
+    {
+      "filename": "document_318.pdf",
+      "document_id": "INV-2026-0071",
+      "pages": 2,
+      "sha256": "2c91f20c5660f3b4a75380d156365c3adf452aa739ab853981f38bc6a8019110",
+      "synthetic": true
+    },
+    {
+      "filename": "document_342.pdf",
+      "document_id": "PO-2026-0072",
+      "pages": 2,
+      "sha256": "6ce80f53363334d87d6fb406e8218d378d7d625617dfedaabbb2b6188495ceb0",
+      "synthetic": true
+    },
+    {
+      "filename": "document_379.pdf",
+      "document_id": "PAY-2026-0073",
+      "pages": 2,
+      "sha256": "53f5dae58f3027d4ccd68374ae539b2811d61f26c113f81e765f0b0fe7963937",
+      "synthetic": true
+    },
+    {
+      "filename": "document_415.pdf",
+      "document_id": "DN-2026-0074",
+      "pages": 2,
+      "sha256": "9341e47ec1e1773eb4fab8005013e1ab6c7ac749c9e49547d4fc9e42afe5710b",
+      "synthetic": true
+    },
+    {
+      "filename": "document_466.pdf",
+      "document_id": "REC-2026-0075",
+      "pages": 2,
+      "sha256": "2cc290f58169245ad2845f2fa85105403037f4b9d114746895383f19cb250235",
+      "synthetic": true
+    },
+    {
+      "filename": "document_502.pdf",
+      "document_id": "INV-2026-0076",
+      "pages": 2,
+      "sha256": "b22620951858a6891713c897f3f9134a60b75c052f64a7e81a4d8db8c900c025",
+      "synthetic": true
+    },
+    {
+      "filename": "document_548.pdf",
+      "document_id": "PO-2026-0077",
+      "pages": 2,
+      "sha256": "bfb73eef1addb6a347dedc25ace7c83f5aed9bb4c57d9c735b3babc0fb4ce775",
+      "synthetic": true
+    },
+    {
+      "filename": "document_590.pdf",
+      "document_id": "PAY-2026-0078",
+      "pages": 2,
+      "sha256": "c46d1de24d404892aa562954324ef7551434b423abaa2b733604edc693df1304",
+      "synthetic": true
+    },
+    {
+      "filename": "document_631.pdf",
+      "document_id": "DN-2026-0079",
+      "pages": 2,
+      "sha256": "bcebaf44f5584333a7594babb28428e1bbfc4142baa96cce4cebbdc9cb8c2bc0",
+      "synthetic": true
+    },
+    {
+      "filename": "document_677.pdf",
+      "document_id": "REC-2026-0080",
+      "pages": 2,
+      "sha256": "7b4f94f8f4b3b5bdda9ae9a2da8e848b3ac3a710c93f74b8dd8e9d291e1b26dd",
+      "synthetic": true
+    },
+    {
+      "filename": "document_copy_14.pdf",
+      "document_id": "INV-2026-003",
+      "pages": 2,
+      "sha256": "5883e3cfe000f45999fa842ced7c7aabe1af751d72d848d7d04076ce9cc07a2a",
+      "synthetic": true
+    },
+    {
+      "filename": "document_from_email_006.pdf",
+      "document_id": "DN-2026-007",
+      "pages": 2,
+      "sha256": "d3141113a9f6f9139dd44a45b65fa57a8fa0875b6bb18fd62c541ca0a18df584",
+      "synthetic": true
+    },
+    {
+      "filename": "exported_document_008.pdf",
+      "document_id": "PAY-2026-004",
+      "pages": 2,
+      "sha256": "a380e9fd6155b870a857e70ece19907a97cd7f2da298d024361ea351431e1ebe",
+      "synthetic": true
+    },
+    {
+      "filename": "external_file_025.pdf",
+      "document_id": "PAY-2026-003",
+      "pages": 2,
+      "sha256": "bfb620c4203a054a15c03fa6190d0f6b43e17eadf1cd61218bac1494da6dfcfc",
+      "synthetic": true
+    },
+    {
+      "filename": "file_000921.pdf",
+      "document_id": "DN-2026-004",
+      "pages": 2,
+      "sha256": "b12c68bd5fbe4a6dd1063dd1e349666ab39dd8bdce54e7e0e682accaa7e35689",
+      "synthetic": true
+    },
+    {
+      "filename": "file_10290.pdf",
+      "document_id": "INV-2026-0061",
+      "pages": 2,
+      "sha256": "a76360aeac94487b3348ca3307528e9d3de05af9efeedbb5aa2f62980c91e242",
+      "synthetic": true
+    },
+    {
+      "filename": "file_10441.pdf",
+      "document_id": "PO-2026-0062",
+      "pages": 2,
+      "sha256": "ecbbb4ec254e9cce7220ba7c39a1735c484d73fa05080c8b9c80f373565f7e59",
+      "synthetic": true
+    },
+    {
+      "filename": "file_10618.pdf",
+      "document_id": "PAY-2026-0063",
+      "pages": 2,
+      "sha256": "4c0cf6c1d2a646b56ede91fb13abff7c0d8a0e78df0b5f0957aa3545a9bdcadd",
+      "synthetic": true
+    },
+    {
+      "filename": "file_10873.pdf",
+      "document_id": "DN-2026-0064",
+      "pages": 2,
+      "sha256": "a4b7f507ba9157feb8dfdf35f219387ade3d5fadd1908045f5d1e376def5041c",
+      "synthetic": true
+    },
+    {
+      "filename": "file_11042.pdf",
+      "document_id": "REC-2026-0065",
+      "pages": 2,
+      "sha256": "f233cdfbf336da0657ab9253d82d7ea26c2a837bb1edd1628c79dcb819356587",
+      "synthetic": true
+    },
+    {
+      "filename": "file_11306.pdf",
+      "document_id": "INV-2026-0066",
+      "pages": 2,
+      "sha256": "67ba0567da684b79879ea802e3d5a2bd825ea8f2dd1f711808ccaadea77b9778",
+      "synthetic": true
+    },
+    {
+      "filename": "file_11579.pdf",
+      "document_id": "PO-2026-0067",
+      "pages": 2,
+      "sha256": "c83e205f105dfa7e3588cbc91740cef3c35ddcd4cadf53dc023c5391aafffa39",
+      "synthetic": true
+    },
+    {
+      "filename": "file_11821.pdf",
+      "document_id": "PAY-2026-0068",
+      "pages": 2,
+      "sha256": "976ff791f2cef53a0dc1e3fd3f059d1f75d51b8b9409343dd2302787c040e268",
+      "synthetic": true
+    },
+    {
+      "filename": "file_12008.pdf",
+      "document_id": "DN-2026-0069",
+      "pages": 2,
+      "sha256": "c593a20042043bbb966ce8b7860051922cd891df6a82cc4bc0db41a961e70af7",
+      "synthetic": true
+    },
+    {
+      "filename": "file_12350.pdf",
+      "document_id": "REC-2026-0070",
+      "pages": 2,
+      "sha256": "b38692bc57dcd62dbb9379421124958b1f269fc8e13f244074c04b4511974f8d",
+      "synthetic": true
+    },
+    {
+      "filename": "file_copy_0003.pdf",
+      "document_id": "INV-2026-006",
+      "pages": 2,
+      "sha256": "e4b221d715e229f0537de1895a8bc1d3130bedffdf9598ee243bdcc6af33f1ff",
+      "synthetic": true
+    },
+    {
+      "filename": "image_to_pdf_11.pdf",
+      "document_id": "PO-2026-006",
+      "pages": 2,
+      "sha256": "7e293a50788977e67f09776deaa9fc631554dfa5558d1ba696bb3e1c946b9153",
+      "synthetic": true
+    },
+    {
+      "filename": "inbox_item_112.pdf",
+      "document_id": "PAY-2026-002",
+      "pages": 2,
+      "sha256": "d405ee1423e2e671d5329055cea1f4c3c0470560733c61daed1691eaad5b6119",
+      "synthetic": true
+    },
+    {
+      "filename": "mobile_scan_41.pdf",
+      "document_id": "PO-2026-002",
+      "pages": 2,
+      "sha256": "29d2e740d04d1cd579f54dcafbb4c6b3df9aab4566408a61c34abbe98a4b65da",
+      "synthetic": true
+    },
+    {
+      "filename": "new_document_15.pdf",
+      "document_id": "PO-2026-007",
+      "pages": 2,
+      "sha256": "e5116db59f3ab3a6cafe04e3e07faf619ac8a50f41c2ba3df187f09ece37a303",
+      "synthetic": true
+    },
+    {
+      "filename": "paper_scan_73.pdf",
+      "document_id": "PO-2026-004",
+      "pages": 2,
+      "sha256": "7cd09505d718a504e3cc936e670f4c1d48c6ba00da41101d5e715b3b5d7d2bf3",
+      "synthetic": true
+    },
+    {
+      "filename": "received_00038.pdf",
+      "document_id": "DN-2026-003",
+      "pages": 2,
+      "sha256": "ff1057a3caa77b601255f95ff9ac3fc25b00b43bf5fce02e6108918bae35643b",
+      "synthetic": true
+    },
+    {
+      "filename": "received_0106.pdf",
+      "document_id": "INV-2026-0041",
+      "pages": 2,
+      "sha256": "f5dbbbb386907cf093fad6aa54d167a6a253771690f5c2c5b44652ea781082d7",
+      "synthetic": true
+    },
+    {
+      "filename": "received_0148.pdf",
+      "document_id": "PO-2026-0042",
+      "pages": 2,
+      "sha256": "f0419726f83a07e435ff565fa7d0533e4113f6ca085a1ad888cfb7ee9e3acfda",
+      "synthetic": true
+    },
+    {
+      "filename": "received_0182.pdf",
+      "document_id": "PAY-2026-0043",
+      "pages": 2,
+      "sha256": "e575054cf2c2aea595e3d479ec6a59e944fe5656733f57bebb95e634fecd671b",
+      "synthetic": true
+    },
+    {
+      "filename": "received_0207.pdf",
+      "document_id": "DN-2026-0044",
+      "pages": 2,
+      "sha256": "addcaa946f5d69d5f1bd8a0ed1bc73641794a13692713dd0328073574bbfb102",
+      "synthetic": true
+    },
+    {
+      "filename": "received_0241.pdf",
+      "document_id": "REC-2026-0045",
+      "pages": 2,
+      "sha256": "406f9b43c6d7b2569f2fd9aa6d00851d0d65c01d34a7b97ff484602cd25608ff",
+      "synthetic": true
+    },
+    {
+      "filename": "received_0299.pdf",
+      "document_id": "INV-2026-0046",
+      "pages": 2,
+      "sha256": "8b145b8f59b27fd6e36167e10da15aa997976f00bd5474fb1db146ee552f8d3b",
+      "synthetic": true
+    },
+    {
+      "filename": "received_0334.pdf",
+      "document_id": "PO-2026-0047",
+      "pages": 2,
+      "sha256": "d410c5b76d4297c4b72b2e3e5ee26ee257b65e568af19c8c8e3924b1465b3fb9",
+      "synthetic": true
+    },
+    {
+      "filename": "received_0372.pdf",
+      "document_id": "PAY-2026-0048",
+      "pages": 2,
+      "sha256": "a2df593e897b4dd4b70129d66031161100f15e772976cfd62a1827d7554118cf",
+      "synthetic": true
+    },
+    {
+      "filename": "received_0416.pdf",
+      "document_id": "DN-2026-0049",
+      "pages": 2,
+      "sha256": "7cb83ebf27c3365fac9b90dfaa8e3dbe8ac575845449bc2fd6cc90aac65092c4",
+      "synthetic": true
+    },
+    {
+      "filename": "received_0468.pdf",
+      "document_id": "REC-2026-0050",
+      "pages": 2,
+      "sha256": "278008cf326cf12e0547596df73b288d5ab299eda96106c9293988449836f180",
+      "synthetic": true
+    },
+    {
+      "filename": "received_document_004.pdf",
+      "document_id": "INV-2026-005",
+      "pages": 2,
+      "sha256": "75b0a14f9f12cd1aa9aaf27db6bae9baa6fa512ae551e3be6e55ec4e3b7eb323",
+      "synthetic": true
+    },
+    {
+      "filename": "received_file_003.pdf",
+      "document_id": "INV-2026-001",
+      "pages": 2,
+      "sha256": "0fa82b780a009800d90f743ee3bd0d8dbc805f401d4bbf66f1ba1056b7153772",
+      "synthetic": true
+    },
+    {
+      "filename": "received_file_044.pdf",
+      "document_id": "INV-2026-007",
+      "pages": 2,
+      "sha256": "33c1a315663875a9c5ace54e8b22463bbd6cd82b66b6d94e02c38fadf24597ab",
+      "synthetic": true
+    },
+    {
+      "filename": "scan_000184.pdf",
+      "document_id": "PO-2026-001",
+      "pages": 2,
+      "sha256": "865b1b9645f8803f0f5afcb5a497878ce5b7251c84efb99ef5d4a023dabb0edf",
+      "synthetic": true
+    },
+    {
+      "filename": "scan_000256.pdf",
+      "document_id": "PO-2026-008",
+      "pages": 2,
+      "sha256": "649c49ccc1c9bfd44b7c66e3468a0dfa96732985ff4f3e01eaf38f4841aaea86",
+      "synthetic": true
+    },
+    {
+      "filename": "scan_009314.pdf",
+      "document_id": "INV-2026-0031",
+      "pages": 2,
+      "sha256": "e9a6f7937ba8301f0b5a29e673a47f04695b0424a4dfc3f2576fd2adb46a1fbc",
+      "synthetic": true
+    },
+    {
+      "filename": "scan_009827.pdf",
+      "document_id": "PO-2026-0032",
+      "pages": 2,
+      "sha256": "3602d461b48eb13332c82c014954eee6f07c97a3f09d651498e2d1bc034f79e0",
+      "synthetic": true
+    },
+    {
+      "filename": "scan_010044.pdf",
+      "document_id": "PAY-2026-0033",
+      "pages": 2,
+      "sha256": "cfd59bfff83c8f354d77be7a1604f5d400f1d75cde7e02e4db27fff32c5282d1",
+      "synthetic": true
+    },
+    {
+      "filename": "scan_010391.pdf",
+      "document_id": "DN-2026-0034",
+      "pages": 2,
+      "sha256": "f58bada274fe5590cd786aca110c69885056dd4920fd14d6315a5cd051677c76",
+      "synthetic": true
+    },
+    {
+      "filename": "scan_010778.pdf",
+      "document_id": "REC-2026-0035",
+      "pages": 2,
+      "sha256": "0c232d0c174696364bac53fd13efc95df217e6b6a90c8db02164141519606396",
+      "synthetic": true
+    },
+    {
+      "filename": "scan_011209.pdf",
+      "document_id": "INV-2026-0036",
+      "pages": 2,
+      "sha256": "a5e3b3c0acc16eb5b850fa0f38a62247673d66b754f95d0d4d41bd98db26c941",
+      "synthetic": true
+    },
+    {
+      "filename": "scan_011643.pdf",
+      "document_id": "PO-2026-0037",
+      "pages": 2,
+      "sha256": "d09d3af49a085a86b82632055fd834e7c293f41d88c7e6c71f81968a7485d4c0",
+      "synthetic": true
+    },
+    {
+      "filename": "scan_012088.pdf",
+      "document_id": "PAY-2026-0038",
+      "pages": 2,
+      "sha256": "d5bdfd98144ab3a92ca721903edf6f79a99ebb7114713ee9edc819643e45968e",
+      "synthetic": true
+    },
+    {
+      "filename": "scan_012407.pdf",
+      "document_id": "DN-2026-0039",
+      "pages": 2,
+      "sha256": "f4c379c0f28c365ecb81ba13f3b15cb1f620d6a6a7a77049b3cd26696aa54f2a",
+      "synthetic": true
+    },
+    {
+      "filename": "scan_012930.pdf",
+      "document_id": "REC-2026-0040",
+      "pages": 2,
+      "sha256": "6d4f73c23be826eac54bde20a737140eaa2fb0961fa7c292bdb51bf70a46aa4b",
+      "synthetic": true
+    },
+    {
+      "filename": "scan_20260707_02.pdf",
+      "document_id": "PO-2026-003",
+      "pages": 2,
+      "sha256": "45425167cf029bbb79bd8018c6c393b5ec3c1f0ffb682bf06ae1d7b449ffc83c",
+      "synthetic": true
+    },
+    {
+      "filename": "scan_batch_a_005.pdf",
+      "document_id": "PO-2026-005",
+      "pages": 2,
+      "sha256": "e519ea62ab5355de5aaad7f3a3de55ab48a615ccb9455ce0b43150aaa588732d",
+      "synthetic": true
+    },
+    {
+      "filename": "scanner_output_204.pdf",
+      "document_id": "DN-2026-006",
+      "pages": 2,
+      "sha256": "664a05db081337f621d9ff396a9372b193b49486f5d59654985ccd0b6ad69d31",
+      "synthetic": true
+    },
+    {
+      "filename": "shared_file_29.pdf",
+      "document_id": "DN-2026-005",
+      "pages": 2,
+      "sha256": "c296d47d011265d6b413cd12090a6593ac913ac296592c3c8f9a5f2abd37395f",
+      "synthetic": true
+    },
+    {
+      "filename": "untitled_06.pdf",
+      "document_id": "INV-2026-002",
+      "pages": 2,
+      "sha256": "ae6adcd6f1612a06fa5d2b32ca7c71aa1adee3e728b51afb794f438b8799d0d1",
+      "synthetic": true
+    },
+    {
+      "filename": "untitled_document_09.pdf",
+      "document_id": "INV-2026-008",
+      "pages": 2,
+      "sha256": "0554ed577aaff99898b8d38fcd67609a4596d06da39f12816da20365d4e8e632",
+      "synthetic": true
+    },
+    {
+      "filename": "upload_2048.pdf",
+      "document_id": "INV-2026-0081",
+      "pages": 2,
+      "sha256": "e00d2650f706bfeebe59f3f45be50569a07f8ef8dc2bfae5d64d62d626845131",
+      "synthetic": true
+    },
+    {
+      "filename": "upload_2173.pdf",
+      "document_id": "PO-2026-0082",
+      "pages": 2,
+      "sha256": "c0b71e52b2ba2be22064cbf67492f1813de2c4fe897ac4f947a89e3c38761041",
+      "synthetic": true
+    },
+    {
+      "filename": "upload_2291.pdf",
+      "document_id": "PAY-2026-0083",
+      "pages": 2,
+      "sha256": "70db907a1ff32150769e3029bd3829fd49adade06a569c736685371df8d16de4",
+      "synthetic": true
+    },
+    {
+      "filename": "upload_2364.pdf",
+      "document_id": "DN-2026-0084",
+      "pages": 2,
+      "sha256": "be4c5cdb327df2b37834e8cc92d72339b1f1a64fe92f75680c9bf957ae852ec0",
+      "synthetic": true
+    },
+    {
+      "filename": "upload_2488.pdf",
+      "document_id": "REC-2026-0085",
+      "pages": 2,
+      "sha256": "8cf5993ae598e933a470785548050f5968f307213d812632884256bada60df92",
+      "synthetic": true
+    },
+    {
+      "filename": "upload_2590.pdf",
+      "document_id": "INV-2026-0086",
+      "pages": 2,
+      "sha256": "1b9fbef36109aa6821fcbd31ea1a87fd7497b7688818972956e5775e85221c93",
+      "synthetic": true
+    },
+    {
+      "filename": "upload_2675.pdf",
+      "document_id": "PO-2026-0087",
+      "pages": 2,
+      "sha256": "5dd0d01547bbae38bf27f3acaabfc21a29837e0cff34a5cf20d131f0ef35dd2f",
+      "synthetic": true
+    },
+    {
+      "filename": "upload_2784.pdf",
+      "document_id": "PAY-2026-0088",
+      "pages": 2,
+      "sha256": "2e03a1a8417806c719776c68511cb5201fa20d624b2591fb8780771ae870f9fd",
+      "synthetic": true
+    },
+    {
+      "filename": "upload_2896.pdf",
+      "document_id": "DN-2026-0089",
+      "pages": 2,
+      "sha256": "17a6a92083418481da80f998fc8e196dcc35887f66ebfd54369da07777d16084",
+      "synthetic": true
+    },
+    {
+      "filename": "upload_2972.pdf",
+      "document_id": "REC-2026-0090",
+      "pages": 2,
+      "sha256": "86d344ad7cf1df5226871918f0de5c81f02b0d1fcc237aae1174e20b0b0d0504",
+      "synthetic": true
+    }
+  ]
+}

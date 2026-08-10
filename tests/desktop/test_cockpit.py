@@ -124,7 +124,9 @@ def reachable_runtime_preflight_report() -> RuntimePreflightReport:
     )
 
 
-def assert_visible_classification_proposal(window: CockpitWindow) -> None:
+def assert_visible_classification_proposal(
+    window: CockpitWindow, expected_count: int = 30
+) -> None:
     assert not window.center.analysis_panel.isHidden()
     assert window.center.analysis_title.text() == "AI PROPOSAL"
     assert "invoice · confidence 0.80000" in window.center.analysis_summary.text()
@@ -147,7 +149,10 @@ def assert_visible_classification_proposal(window: CockpitWindow) -> None:
     assert "rename_and_move" in window.center.memory_detail.text()
 
     log_text = window.console.log_text.text()
-    assert "Classification batch complete: 30 of 30" in log_text
+    assert (
+        f"Classification batch complete: {expected_count} of {expected_count}"
+        in log_text
+    )
 
     proposed_class_item = window.left.table.item(0, 1)
     assert proposed_class_item is not None
@@ -174,13 +179,13 @@ def assert_visible_classification_proposal(window: CockpitWindow) -> None:
     ready_metric = cast(Any, window.right.metric_frames[1]).number
     review_metric = cast(Any, window.right.metric_frames[2]).number
     assert ready_metric.text() == "0"
-    assert review_metric.text() == "30"
+    assert review_metric.text() == str(expected_count)
     assert cast(Any, window.right.event_rows[0]).event_text.text() == (
-        "30/30 persisted"
+        f"{expected_count}/{expected_count} persisted"
     )
     assert cast(Any, window.right.event_rows[1]).event_text.text() == "0 item(s)"
     assert cast(Any, window.right.event_rows[2]).event_text.text() == (
-        "30 awaiting human review"
+        f"{expected_count} awaiting human review"
     )
     assert cast(Any, window.right.event_rows[3]).event_text.text() == (
         "0 ready remaining"
@@ -902,11 +907,11 @@ def test_cockpit_scans_synthetic_pdfs_and_raises_central_preview(
     window._workspace.start_scan()
     window._handle_scan_completed(result)
 
-    assert window.left.table.rowCount() == 30
+    assert window.left.table.rowCount() == 100
     discovered_metric = cast(Any, window.right.metric_frames[0]).number
     ready_metric = cast(Any, window.right.metric_frames[1]).number
-    assert discovered_metric.text() == "30"
-    assert ready_metric.text() == "30"
+    assert discovered_metric.text() == "100"
+    assert ready_metric.text() == "100"
 
     opened_paths: list[Path] = []
 
@@ -938,8 +943,8 @@ def test_cockpit_scans_synthetic_pdfs_and_raises_central_preview(
 
     expected_paths = sorted(corpus.glob("*.pdf"))
     assert classified_paths == [(path, corpus) for path in expected_paths]
-    assert window.left.count_status("REVIEW") == 30
-    assert_visible_classification_proposal(window)
+    assert window.left.count_status("REVIEW") == 100
+    assert_visible_classification_proposal(window, expected_count=100)
 
     window._open_document_row(0)
 

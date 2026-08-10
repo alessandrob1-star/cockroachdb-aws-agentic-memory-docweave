@@ -68,9 +68,11 @@ def _wait_until_terminal(dialog: PdfPreviewDialog) -> None:
         return
     loop = QEventLoop()
     dialog.document.statusChanged.connect(
-        lambda status: loop.quit()
-        if status in {QPdfDocument.Status.Ready, QPdfDocument.Status.Error}
-        else None
+        lambda status: (
+            loop.quit()
+            if status in {QPdfDocument.Status.Ready, QPdfDocument.Status.Error}
+            else None
+        )
     )
     QTimer.singleShot(3_000, loop.quit)
     loop.exec()

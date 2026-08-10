@@ -3,7 +3,7 @@
 **Competition:** CockroachDB x AWS Hackathon - Build with Agentic Memory
 **Official title in the rules:** CockroachDB x AWS Hackathon - Build the Future
 of Agentic Memory
-**Last verified:** 2026-07-24
+**Last verified:** 2026-08-10
 **Operational owner:** Project owner
 
 ## 1. Authority and source links
@@ -75,18 +75,17 @@ At least two of these tools must be used:
 3. `ccloud` Command-Line Interface with agent-ready access patterns;
 4. CockroachDB Agent Skills repository.
 
-### Proposed DocWeave evidence strategy
+### Current DocWeave evidence strategy
 
-This is a plan, not an implementation claim:
+DocWeave claims two implemented CockroachDB tools:
 
 | Tool | Intended meaningful role | Required evidence |
 | --- | --- | --- |
-| Managed Model Context Protocol Server | Audited agent-assisted schema inspection, database diagnostics, and memory operations | Configuration, audit record, reproducible workflow, and demo trace |
-| Distributed Vector Indexing | Store document embeddings alongside transactional memory and retrieve related documents | Schema and index migration, query plan, retrieval evaluation, and visible demo |
-| Agent Skills repository | Optional third tool for reviewed CockroachDB operational workflows | Pinned skill source, invoked workflow, and resulting evidence |
+| `ccloud` Command-Line Interface | Live CockroachDB Cloud cluster inspection for `docweave-memory`, including AWS region, plan, status, version, and SQL users | `scripts/cockroachdb-tool-evidence.ps1` output and `docs/operations/hackathon-requirement-evidence.md` |
+| CockroachDB Agent Skills repository | Agent-assisted schema and transaction review for primary keys, idempotent writes, proposal locking, and bounded `40001` retry handling | Pinned skills repository commit and applied findings in `docs/operations/hackathon-requirement-evidence.md` |
 
-No tool may be claimed until the runtime or operational workflow is implemented
-and demonstrated.
+DocWeave does not currently claim Managed Model Context Protocol (MCP) Server or
+Distributed Vector Indexing as submitted features.
 
 ## 6. AWS requirement
 
@@ -95,17 +94,17 @@ the rules include Amazon Bedrock, AWS Lambda, Amazon Elastic Container Service,
 Amazon Elastic Kubernetes Service, Amazon Simple Storage Service, Amazon
 SageMaker, and Amazon Bedrock Agents.
 
-### Proposed DocWeave evidence strategy
-
-This is a plan, not an implementation claim:
+### Current DocWeave evidence strategy
 
 | Service | Intended role | Required evidence |
 | --- | --- | --- |
-| Amazon Bedrock | Model inference for document analysis and agent reasoning | Invocation trace, model configuration, evaluation, latency, and cost evidence |
-| Amazon Simple Storage Service | Immutable original document storage | Versioning or immutability design, encryption, access policy, and demo evidence |
-| AWS compute service | Host the application and background processing | Infrastructure as Code, deployment output, health check, and public demo URL |
-
-The final compute choice requires architecture and budget approval.
+| Amazon Bedrock | Model inference for document classification and rename proposal evidence | Live worker proof with `model_id: eu.amazon.nova-2-lite-v1:0` |
+| AWS Lambda | HTTP API function and asynchronous analysis worker | CloudFormation stack `docweave-cloud-dev`, Lambda event source mapping, live worker proof |
+| Amazon Simple Storage Service | PDF upload artifacts and JSON analysis-result artifacts | Public API result lookup and S3-backed artifact path |
+| Amazon Simple Queue Service | Workspace-scoped queued analysis jobs | CloudFormation queue and Lambda event source mapping |
+| Amazon API Gateway | Public health, upload, job, and result endpoints | Functional demo URL |
+| Amazon CloudWatch Logs | Runtime logs and sanitized failure evidence | Lambda log groups |
+| AWS Secrets Manager | Runtime CockroachDB URL wiring through CloudFormation dynamic reference | `/health` reports `cockroachdb_secret: configured` |
 
 ## 7. Submission package
 

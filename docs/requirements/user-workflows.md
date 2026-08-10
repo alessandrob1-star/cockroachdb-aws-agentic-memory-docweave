@@ -1,7 +1,7 @@
 # DocWeave User Workflows
 
 **Status:** Focused demo workflows  
-**Last updated:** 2026-08-08
+**Last updated:** 2026-08-10
 
 ## Workflow 1 - Local Dashboard Demo
 
@@ -33,15 +33,16 @@ This is the database story judges must understand quickly.
 ## Workflow 3 - AWS Cloud Demo
 
 1. Call `GET /health`.
-2. Confirm S3, SQS, Lambda, API Gateway, CloudWatch, and Bedrock are configured.
+2. Confirm S3, SQS, Lambda, API Gateway, CloudWatch, Bedrock, and the
+   CockroachDB secret are configured.
 3. Upload a PDF through a pre-signed S3 URL.
 4. Queue an analysis job.
 5. Let the Lambda worker invoke Bedrock.
 6. Read the S3 analysis-result artifact.
-7. If CockroachDB secret configuration is present, verify rows in `docweave`.
-
-If the secret is missing, the demo must say that cloud CockroachDB persistence
-is not configured yet.
+7. Verify the worker returns
+   `analysisStatus: bedrock_classified_cockroachdb_persisted`.
+8. Read the CockroachDB memory rows written to `docweave.documents`,
+   `docweave.agent_runs`, and `docweave.proposals`.
 
 ## Empty And Failure States
 
@@ -54,7 +55,7 @@ The dashboard must keep these states clear:
 - CockroachDB unavailable;
 - proposal rejected;
 - move failed;
-- AWS CockroachDB secret missing.
+- AWS CockroachDB secret unavailable.
 
 No state may claim success unless the relevant file operation, model call, or
 database write actually happened.

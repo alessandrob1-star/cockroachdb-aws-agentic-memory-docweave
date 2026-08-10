@@ -2,6 +2,16 @@
 
 DocWeave is a desktop-first hackathon project with an AWS cloud API slice.
 
+## What To Test First
+
+Use the public synthetic corpus in `pdf_sintetici`. It contains 100 fake PDFs
+with deliberately poor filenames so the dashboard can demonstrate the core
+product loop:
+
+```text
+Choose folder -> Scan PDFs -> Analyze -> Review proposals -> Approve moves -> Restore from CockroachDB memory
+```
+
 ## Functional Demo URLs
 
 Cloud API health endpoint:
@@ -38,7 +48,9 @@ Demo flow:
 3. Analyze PDFs.
 4. Open one document in review.
 5. Approve a proposed rename/move.
-6. Select the moved PDF and inspect original/current path memory.
+6. Open the batch review table and approve or reject rows.
+7. Select a moved PDF and inspect original/current path memory.
+8. Click Restore to see the restore table driven by CockroachDB file history.
 
 ## CockroachDB Memory Evidence
 
@@ -90,12 +102,25 @@ Deployed AWS services:
 - Amazon CloudWatch Logs;
 - AWS Secrets Manager dynamic references.
 
-Known submission gate:
+Expected `/health` evidence:
 
 ```text
-The cloud API currently reports cockroachdb_secret: missing.
+aws_lambda: running
+amazon_bedrock: configured
+amazon_s3: configured
+amazon_sqs: configured
+cockroachdb_secret: configured
 ```
 
-Do not claim Lambda cloud-to-CockroachDB persistence as complete until the
-CockroachDB database URL secret ARN is connected and `/health` reports the
-secret as configured.
+Live cloud proof from 2026-08-10:
+
+```text
+job_id: 55555555-5555-4555-8555-555555555555
+analysisStatus: bedrock_classified_cockroachdb_persisted
+persistedClassificationCount: 1
+resultArtifactCount: 1
+```
+
+This proves the AWS Lambda worker can classify a PDF with Amazon Bedrock, write
+the analysis artifact to Amazon S3, and persist the proposal memory in
+CockroachDB.

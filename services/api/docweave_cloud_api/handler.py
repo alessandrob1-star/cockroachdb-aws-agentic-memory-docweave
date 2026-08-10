@@ -205,7 +205,21 @@ def worker_handler(event: Mapping[str, Any], context: object) -> dict[str, Any]:
                     persistence=persistence,
                 ),
             )
-        except Exception:
+        except Exception as error:
+            print(
+                json.dumps(
+                    {
+                        "level": "error",
+                        "event": "analysis_worker_item_failed",
+                        "message_id": message_id,
+                        "error_class": error.__class__.__name__,
+                        "error_category": _safe_error_category(error),
+                        "error_summary": _safe_error_summary(error),
+                    },
+                    sort_keys=True,
+                    separators=(",", ":"),
+                )
+            )
             failed_items.append({"itemIdentifier": message_id})
             continue
         accepted += 1
@@ -512,6 +526,36 @@ def _json_object_from_text(text: str) -> Mapping[str, Any]:
     if not isinstance(payload, dict):
         raise ValueError("bedrock_response_json_object_required")
     return cast(Mapping[str, Any], payload)
+
+
+def _safe_error_category(error: Exception) -> str:
+    text = str(error).strip().casefold()
+    if not text:
+        return "empty_error"
+    for category in (
+        "accessdenied",
+        "throttling",
+        "validation",
+        "timeout",
+        "connection",
+        "certificate",
+        "password",
+        "authentication",
+        "permission",
+        "notfound",
+    ):
+        if category in text:
+            return category
+    return "unclassified"
+
+
+def _safe_error_summary(error: Exception) -> str:
+    text = str(error).strip()
+    text = re.sub(r"//[^:@\s]+:[^@\s]+@", "//***:***@", text)
+    text = re.sub(r"password=[^&\s]+", "password=***", text, flags=re.IGNORECASE)
+    text = re.sub(r"://[^/\s]+", "://***", text)
+    text = re.sub(r"\s+", " ", text)
+    return text[:320] if text else "empty_error"
 
 
 def _validated_candidate_metadata(value: object) -> list[dict[str, str]]:

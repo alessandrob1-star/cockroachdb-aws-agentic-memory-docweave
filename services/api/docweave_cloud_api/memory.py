@@ -8,8 +8,10 @@ from collections.abc import Mapping, Sequence
 from datetime import UTC, datetime
 from pathlib import PurePosixPath
 from typing import Any, Protocol
+from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 from uuid import UUID, uuid5
 
+import certifi
 from sqlalchemy import create_engine, text
 from sqlalchemy.engine import Engine
 
@@ -95,8 +97,38 @@ def build_cloud_memory_writer_from_environment(
     database_url = values.get(DOCWEAVE_DATABASE_URL, "").strip()
     if not database_url:
         return None
-    engine: Engine = create_engine(database_url, pool_pre_ping=True, future=True)
+    engine: Engine = create_engine(
+        _cockroach_url_with_ca_bundle(database_url),
+        pool_pre_ping=True,
+        future=True,
+    )
     return CloudCockroachMemoryWriter(engine)
+
+
+def _cockroach_url_with_ca_bundle(database_url: str) -> str:
+    """Use the packaged trust store for Lambda CockroachDB TLS verification."""
+    parsed = urlsplit(database_url)
+    if not parsed.scheme.startswith("cockroachdb"):
+        return database_url
+    query_items = parse_qsl(parsed.query, keep_blank_values=True)
+    query = dict(query_items)
+    if query.get("sslmode") != "verify-full":
+        return database_url
+    if query.get("sslrootcert") and query["sslrootcert"] != "system":
+        return database_url
+    filtered_items = [
+        (name, value) for name, value in query_items if name != "sslrootcert"
+    ]
+    filtered_items.append(("sslrootcert", certifi.where()))
+    return urlunsplit(
+        (
+            parsed.scheme,
+            parsed.netloc,
+            parsed.path,
+            urlencode(filtered_items),
+            parsed.fragment,
+        )
+    )
 
 
 def _object_parameters(

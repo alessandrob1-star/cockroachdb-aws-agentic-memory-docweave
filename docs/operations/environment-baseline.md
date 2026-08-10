@@ -1,7 +1,7 @@
 # Environment Baseline
 
 **Project:** DocWeave  
-**Last updated:** 2026-08-08
+**Last updated:** 2026-08-10
 
 ## AWS
 
@@ -11,7 +11,8 @@
 | Live stacks | `docweave-artifacts`, `docweave-cloud-dev` |
 | Runtime services | S3, SQS, Lambda, API Gateway, CloudWatch Logs, Bedrock |
 | Bedrock smoke model | `eu.amazon.nova-2-lite-v1:0` |
-| Secret handling | Lambda can receive `DOCWEAVE_DATABASE_URL` through a Secrets Manager dynamic reference when `CockroachDbSecretArn` is supplied |
+| Secret handling | Lambda receives `DOCWEAVE_DATABASE_URL` through a Secrets Manager dynamic reference; `/health` reports `cockroachdb_secret: configured` |
+| Cloud memory proof | Worker job `55555555-5555-4555-8555-555555555555` persisted one Bedrock classification to CockroachDB |
 
 ## CockroachDB
 
