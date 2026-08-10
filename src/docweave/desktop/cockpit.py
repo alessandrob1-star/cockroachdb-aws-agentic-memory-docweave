@@ -1260,20 +1260,25 @@ class ReviewActionDelegate(QStyledItemDelegate):
             painter.setPen(QPen(QColor(105, 255, 184, 230), 1.6))
             painter.drawRoundedRect(button_rect, 8, 8)
 
-            painter.setPen(QPen(QColor(86, 255, 177, 245), 3.4))
-            pole_x = button_rect.left() + button_rect.width() * 0.34
-            painter.drawLine(
-                QPointF(pole_x, button_rect.top() + 7),
-                QPointF(pole_x, button_rect.bottom() - 7),
+            check_path = QPainterPath()
+            check_path.moveTo(
+                button_rect.left() + button_rect.width() * 0.25,
+                button_rect.top() + button_rect.height() * 0.54,
             )
-            flag = QPainterPath()
-            flag.moveTo(pole_x + 3, button_rect.top() + 8)
-            flag.lineTo(button_rect.right() - 10, button_rect.top() + 12)
-            flag.lineTo(pole_x + 3, button_rect.top() + button_rect.height() * 0.54)
-            flag.closeSubpath()
-            painter.fillPath(flag, QBrush(QColor(79, 255, 172, 245)))
-            painter.setPen(QPen(QColor(195, 255, 226, 245), 1.4))
-            painter.drawPath(flag)
+            check_path.lineTo(
+                button_rect.left() + button_rect.width() * 0.43,
+                button_rect.top() + button_rect.height() * 0.70,
+            )
+            check_path.lineTo(
+                button_rect.left() + button_rect.width() * 0.76,
+                button_rect.top() + button_rect.height() * 0.32,
+            )
+            painter.setPen(QPen(QColor(24, 255, 151, 90), 8.8))
+            painter.drawPath(check_path)
+            painter.setPen(QPen(QColor(79, 255, 172, 250), 5.2))
+            painter.drawPath(check_path)
+            painter.setPen(QPen(QColor(214, 255, 235, 235), 1.8))
+            painter.drawPath(check_path)
         elif self._action == "reject":
             painter.setBrush(QBrush(QColor(58, 9, 13, 238)))
             painter.setPen(QPen(QColor(255, 85, 98, 230), 1.6))
