@@ -1254,10 +1254,25 @@ class ReviewActionDelegate(QStyledItemDelegate):
         painter.save()
         painter.setRenderHint(QPainter.RenderHint.Antialiasing, True)
 
-        button_rect = QRectF(option.rect).adjusted(8, 7, -8, -7)
+        is_active = index.data(Qt.ItemDataRole.UserRole) == self._action
+        button_rect = QRectF(option.rect).adjusted(
+            5 if is_active else 8,
+            5 if is_active else 7,
+            -5 if is_active else -8,
+            -5 if is_active else -7,
+        )
         if self._action == "approve":
-            painter.setBrush(QBrush(QColor(4, 50, 30, 238)))
-            painter.setPen(QPen(QColor(105, 255, 184, 230), 1.6))
+            painter.setBrush(
+                QBrush(QColor(10, 94, 52, 248) if is_active else QColor(4, 50, 30, 238))
+            )
+            painter.setPen(
+                QPen(
+                    QColor(150, 255, 205, 255)
+                    if is_active
+                    else QColor(105, 255, 184, 230),
+                    2.8 if is_active else 1.6,
+                )
+            )
             painter.drawRoundedRect(button_rect, 8, 8)
 
             check_path = QPainterPath()
@@ -1273,19 +1288,30 @@ class ReviewActionDelegate(QStyledItemDelegate):
                 button_rect.left() + button_rect.width() * 0.76,
                 button_rect.top() + button_rect.height() * 0.32,
             )
-            painter.setPen(QPen(QColor(24, 255, 151, 90), 8.8))
+            painter.setPen(QPen(QColor(24, 255, 151, 120), 10.4 if is_active else 8.8))
             painter.drawPath(check_path)
-            painter.setPen(QPen(QColor(79, 255, 172, 250), 5.2))
+            painter.setPen(QPen(QColor(79, 255, 172, 255), 6.4 if is_active else 5.2))
             painter.drawPath(check_path)
             painter.setPen(QPen(QColor(214, 255, 235, 235), 1.8))
             painter.drawPath(check_path)
         elif self._action == "reject":
-            painter.setBrush(QBrush(QColor(58, 9, 13, 238)))
-            painter.setPen(QPen(QColor(255, 85, 98, 230), 1.6))
+            painter.setBrush(
+                QBrush(
+                    QColor(104, 14, 20, 248) if is_active else QColor(58, 9, 13, 238)
+                )
+            )
+            painter.setPen(
+                QPen(
+                    QColor(255, 130, 138, 255)
+                    if is_active
+                    else QColor(255, 85, 98, 230),
+                    2.8 if is_active else 1.6,
+                )
+            )
             painter.drawRoundedRect(button_rect, 8, 8)
 
             cross_rect = button_rect.adjusted(14, 10, -14, -10)
-            painter.setPen(QPen(QColor(255, 78, 91, 250), 4.2))
+            painter.setPen(QPen(QColor(255, 78, 91, 255), 5.2 if is_active else 4.2))
             painter.drawLine(cross_rect.topLeft(), cross_rect.bottomRight())
             painter.drawLine(cross_rect.bottomLeft(), cross_rect.topRight())
             painter.setPen(QPen(QColor(255, 185, 190, 230), 1.5))
@@ -1535,11 +1561,36 @@ class CenterPreview(ShapeWidget):
             return
         document_row = self._review_document_rows[table_row]
         if column == 3:
-            self.review_approve_requested.emit(document_row)
+            self._mark_review_row_feedback(table_row, "approve")
+            QTimer.singleShot(
+                140,
+                lambda row=document_row: self.review_approve_requested.emit(row),
+            )
         elif column == 4:
-            self.review_reject_requested.emit(document_row)
+            self._mark_review_row_feedback(table_row, "reject")
+            QTimer.singleShot(
+                140,
+                lambda row=document_row: self.review_reject_requested.emit(row),
+            )
         elif column == 5:
             self.review_preview_requested.emit(document_row)
+
+    def _mark_review_row_feedback(self, table_row: int, action: str) -> None:
+        if action == "approve":
+            background = QColor(5, 70, 42, 230)
+            foreground = QColor(226, 255, 241, 255)
+        else:
+            background = QColor(76, 12, 18, 230)
+            foreground = QColor(255, 230, 232, 255)
+        for column in range(self.review_table.columnCount()):
+            item = self.review_table.item(table_row, column)
+            if item is None:
+                continue
+            item.setBackground(QBrush(background))
+            item.setForeground(QBrush(foreground))
+            item.setData(Qt.ItemDataRole.UserRole, action if column in (3, 4) else "")
+        self.review_table.viewport().update()
+        QApplication.processEvents()
 
     def shape_path(self) -> QPainterPath:
         r = self.rect().adjusted(3, 3, -3, -3)

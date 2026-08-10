@@ -3,7 +3,7 @@ from typing import Any, cast
 from uuid import UUID
 
 import pytest
-from PySide6.QtCore import QCoreApplication, QEventLoop, QTimer
+from PySide6.QtCore import QCoreApplication, QEventLoop, Qt, QTimer
 from PySide6.QtWidgets import QApplication, QFileDialog
 
 import docweave.desktop.cockpit as cockpit_module
@@ -14,7 +14,12 @@ from docweave.classification_cli import (
     ClassificationEvidenceDetail,
     ClassificationMetadataDetail,
 )
-from docweave.desktop.cockpit import CockpitLineagePreview, CockpitWindow, Document
+from docweave.desktop.cockpit import (
+    CenterPreview,
+    CockpitLineagePreview,
+    CockpitWindow,
+    Document,
+)
 from docweave.desktop.scan import DesktopScanResult
 from docweave.discovery import DiscoveredFile, DiscoveryResult, DiscoveryStatus
 from docweave.intake import IntakeRecord, IntakeResult, IntakeStatus
@@ -1171,6 +1176,42 @@ def test_cockpit_opens_batch_review_table_from_approve_button(  # noqa: PLR0915
     assert window.center.geometry().width() > window.width() * 0.75
 
     close_cockpit_window(window)
+
+
+def test_center_review_action_cell_shows_click_feedback(
+    qt_application: object,
+) -> None:
+    center = CenterPreview()
+    center.resize(900, 420)
+    center.set_target_rect(center.rect())
+    center.show_review_table(
+        [
+            (
+                7,
+                "received_file_003.pdf",
+                "invoice_northstar-office-supplies-ltd.pdf",
+                "DocWeave Organized/Invoices",
+            )
+        ]
+    )
+    cast(QApplication, qt_application).processEvents()
+
+    approved_rows: list[int] = []
+    center.review_approve_requested.connect(approved_rows.append)
+
+    center.review_table.cellClicked.emit(0, 3)
+    approve_item = center.review_table.item(0, 3)
+    assert approve_item is not None
+    feedback_color = approve_item.background().color()
+    assert feedback_color.green() > feedback_color.red()
+    assert approve_item.data(Qt.ItemDataRole.UserRole) == "approve"
+
+    loop = QEventLoop()
+    QTimer.singleShot(190, loop.quit)
+    loop.exec()
+
+    assert approved_rows == [7]
+    center.close()
 
 
 def test_cockpit_records_durable_review_decision_when_proposal_id_is_available(
