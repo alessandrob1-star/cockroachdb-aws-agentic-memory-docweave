@@ -4,6 +4,15 @@ private-reference-data/
 *.xlsm
 *.xlsx
 
+# Local-only project governance and internal evidence
+AGENTS.md
+PROJECT_RULES.md
+DOCWEAVE_RESTART_PROMPT_IT.txt
+docs/architecture/
+docs/operations/
+docs/requirements/
+docs/classification-and-confidence-specification.md
+
 # Secrets and local configuration
 .env
 .env.*

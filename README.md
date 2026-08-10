@@ -22,6 +22,8 @@ the point of the project: CockroachDB `file_history` lets the agent answer the
 practical question a real user asks after cleanup: **"What was this file called
 before, and where did it come from?"**
 
+![DocWeave dashboard showing a Bedrock proposal, CockroachDB memory trace, PDF preview, and batch classification status](docs/assets/docweave-dashboard-memory-trace.png)
+
 ## Hackathon Proof In One Screen
 
 | Requirement | DocWeave evidence |
@@ -93,8 +95,11 @@ restore it.
   primary keys, idempotent writes, `FOR UPDATE` proposal locking, and bounded
   `40001` serialization retry handling.
 
-Evidence is recorded in
-[`docs/operations/hackathon-requirement-evidence.md`](docs/operations/hackathon-requirement-evidence.md).
+Tool verification is reproducible with:
+
+```powershell
+.\scripts\cockroachdb-tool-evidence.ps1
+```
 
 ## Live Cloud Proof
 
@@ -286,10 +291,3 @@ Current migration head:
   Bedrock model.
 - The cloud worker classifies and persists proposals; local dashboard approval
   remains the path that renames or restores files.
-
-## Governance
-
-Mandatory project rules are in [PROJECT_RULES.md](PROJECT_RULES.md). Claims in
-the README, demo, and submission must match live evidence. Intelligent behavior
-must remain genuine: no canned classifications, hidden bypasses, or fabricated
-success states.
