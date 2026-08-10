@@ -9,34 +9,29 @@ DocWeave
 
 ## Tagline
 
-An agentic document cockpit where CockroachDB remembers every AI proposal,
-human decision, file move, and restore path.
+An agentic glass dashboard for massive PDF renaming and reorganization for
+SMEs: Bedrock proposes, humans approve, and CockroachDB remembers every move.
 
 ## Project Description
 
-DocWeave is not an AI file renamer. It is a human-governed document cockpit
-where CockroachDB is the system of record for durable agent memory.
+DocWeave solves a concrete small and medium-sized enterprise (SME) problem:
+massive Portable Document Format (PDF) renaming and reorganization.
 
-The user opens a glass-effect desktop dashboard, chooses a folder full of
-opaque PDF names like `scan_000184.pdf` or `attachment_081.pdf`, and asks the
-document agents to make sense of it. The app extracts PDF text, sends the
-document evidence to Amazon Bedrock, classifies each document, proposes a
-clearer filename, and suggests a new destination folder. The model cannot
-rename anything by itself: the user approves or rejects each proposal, or
-reviews the whole batch in one table.
+A user opens the glass-effect desktop dashboard, chooses a chaotic folder full
+of opaque PDF names like `scan_000184.pdf`, `attachment_081.pdf`, and
+`document_final_02.pdf`, and asks the document agents to reorganize it. The app
+extracts text from each PDF, sends evidence to Amazon Bedrock, classifies the
+document, proposes a clearer filename, and suggests a destination folder.
 
-The core idea is persistent agent memory. CockroachDB stores the original path,
-current path, extracted evidence, Bedrock run, proposal, human decision, and
-file-history record. That means DocWeave can answer the question normal file
-tools usually lose forever: "What was this PDF called before, where did it come
-from, why was it moved, and how do I restore it?"
+The model cannot rename or move files by itself. The user can approve all
+proposals, approve only selected rows, reject individual rows, or reopen the
+PDF preview before deciding. CockroachDB is the system of record for the
+persistent memory agent: it stores original paths, current paths, extracted
+evidence, Bedrock runs, proposals, human decisions, and file-history records.
 
-The dashboard is intentionally visual instead of chat-first. The left screen
-shows the selected folder, the center screen previews the PDF or opens the
-batch approval/restore table, and the right screen shows live runtime and
-memory status. This makes the agent understandable in a few minutes: messy
-folder -> PDF understanding -> CockroachDB memory -> human approval -> safe
-rename/move -> restore from memory.
+That restore memory is the practical point of the project. After a massive
+cleanup, DocWeave can still answer: "What was this PDF called before, where did
+it come from, why was it moved, and how do I restore it?"
 
 ## What It Does
 
@@ -46,7 +41,8 @@ rename/move -> restore from memory.
   and destination folder.
 - Persists document state, model runs, proposals, human decisions, and restore
   history in CockroachDB.
-- Lets the user approve/reject single rows or approve the full batch.
+- Lets the user approve/reject single rows, approve selected files, or approve
+  the full batch.
 - Moves approved PDFs into readable folders such as
   `DocWeave Organized/Invoices`.
 - Restores renamed PDFs back to their original filename and directory using
@@ -151,11 +147,11 @@ shared memory, so every action can be audited, replayed, and reversed.
 ## Challenges
 
 The hardest part was avoiding a flashy demo that silently loses user trust. A
-file-management agent is dangerous if it moves documents without memory, so the
-schema had to preserve original names, original directories, current paths,
-proposal evidence, human decisions, and restore records. The AWS worker also
-had to prove that Bedrock classification and CockroachDB persistence work
-together from the deployed cloud environment.
+file-management agent is dangerous if it renames and moves hundreds of PDFs
+without memory, so the schema had to preserve original names, original
+directories, current paths, proposal evidence, human decisions, and restore
+records. The AWS worker also had to prove that Bedrock classification and
+CockroachDB persistence work together from the deployed cloud environment.
 
 ## Accomplishments
 

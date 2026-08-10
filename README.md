@@ -1,16 +1,21 @@
 # DocWeave
 
-**DocWeave is not an AI file renamer. It is an agentic document cockpit where
-CockroachDB is the system of record for durable agent memory.** A user opens
-the glass-effect dashboard, chooses a folder full of opaque Portable Document
-Format (PDF) names such as `scan_000184.pdf` or `attachment_081.pdf`, and lets
-document agents read, classify, explain, and propose a safer archive structure.
-Nothing is renamed by the model alone: the human approves each move, and
-CockroachDB remembers the original filename, original directory, model
-proposal, approval decision, executed path change, and restore path.
+**DocWeave is a program for massive Portable Document Format (PDF) renaming and
+reorganization for small and medium-sized enterprises (SMEs).** It solves the
+very ordinary mess of folders full of files called `scan_000184.pdf`,
+`attachment_081.pdf`, or `document_final_02.pdf`: the app reads the text inside
+each PDF, proposes clear filenames and destination folders, and lets the human
+approve all proposals or only selected files.
+
+The model never mutates files by itself. The glass-effect dashboard shows PDF
+previews, model evidence, batch review controls, and per-row approve/reject
+actions. CockroachDB is the system of record for the persistent memory agent:
+it remembers the original filename, original directory, model proposal, human
+decision, executed path change, and restore path, so renamed PDFs can be moved
+back to their original name and position.
 
 ```text
-messy folder -> PDF extraction -> Bedrock proposal -> CockroachDB memory -> human approval -> safe rename/move -> one-click restore
+messy SME folder -> PDF text extraction -> Bedrock rename/folder proposal -> human selects some or all -> CockroachDB memory -> safe move -> restore original name/path
 ```
 
 The visible product is the dashboard, not a chat box. The left screen shows the
