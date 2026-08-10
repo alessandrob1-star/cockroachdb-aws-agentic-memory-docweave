@@ -4,7 +4,7 @@ from uuid import UUID
 
 import pytest
 from PySide6.QtCore import QCoreApplication, QEventLoop, QTimer
-from PySide6.QtWidgets import QApplication, QFileDialog, QPushButton
+from PySide6.QtWidgets import QApplication, QFileDialog
 
 import docweave.desktop.cockpit as cockpit_module
 from docweave.analysis import BedrockGatewayError, BedrockGatewayErrorCode
@@ -1142,19 +1142,19 @@ def test_cockpit_opens_batch_review_table_from_approve_button(  # noqa: PLR0915
     assert original_item.text() == first_pdf.name
     assert proposed_item.text() == "first.pdf"
     assert directory_item.text() == "DocWeave Organized/Invoices"
-    action_buttons = [
-        window.center.review_table.cellWidget(0, column) for column in (3, 4, 5)
-    ]
-    assert all(isinstance(button, QPushButton) for button in action_buttons)
-    typed_action_buttons = cast(list[QPushButton], action_buttons)
-    assert [button.objectName() for button in typed_action_buttons] == [
-        "reviewApproveButton",
-        "reviewRejectButton",
-        "reviewPreviewButton",
-    ]
-    assert typed_action_buttons[0].text() == "✓"
-    assert typed_action_buttons[1].text() == chr(215)
-    assert typed_action_buttons[2].text() == "PDF"
+    assert all(
+        window.center.review_table.cellWidget(0, column) is None for column in (3, 4, 5)
+    )
+    approve_item = window.center.review_table.item(0, 3)
+    reject_item = window.center.review_table.item(0, 4)
+    preview_item = window.center.review_table.item(0, 5)
+    assert approve_item is not None
+    assert reject_item is not None
+    assert preview_item is not None
+    assert approve_item.toolTip() == "Approve this proposed rename."
+    assert reject_item.toolTip() == "Reject this proposed rename."
+    assert preview_item.text() == "PDF"
+    assert preview_item.toolTip() == "Open the PDF preview for this row."
     assert "Batch review ready: 2 proposed rename" in window.console.log_text.text()
 
     window.console.lateral_screens_button.click()

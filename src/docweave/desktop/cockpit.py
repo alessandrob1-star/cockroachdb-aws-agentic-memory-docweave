@@ -80,6 +80,7 @@ from PySide6.QtWidgets import (
     QLabel,
     QMainWindow,
     QPushButton,
+    QStyledItemDelegate,
     QTableWidget,
     QTableWidgetItem,
     QWidget,
@@ -1242,6 +1243,53 @@ class PdfPageMock(QWidget):
             y += 18 if index not in (2, 5) else 31
 
 
+class ReviewActionDelegate(QStyledItemDelegate):
+    """Paint visible review actions directly in the table cells."""
+
+    def __init__(self, action: str, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self._action = action
+
+    def paint(self, painter, option, index) -> None:
+        painter.save()
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing, True)
+
+        button_rect = QRectF(option.rect).adjusted(8, 7, -8, -7)
+        if self._action == "approve":
+            painter.setBrush(QBrush(QColor(4, 50, 30, 238)))
+            painter.setPen(QPen(QColor(105, 255, 184, 230), 1.6))
+            painter.drawRoundedRect(button_rect, 8, 8)
+
+            painter.setPen(QPen(QColor(86, 255, 177, 245), 3.4))
+            pole_x = button_rect.left() + button_rect.width() * 0.34
+            painter.drawLine(
+                QPointF(pole_x, button_rect.top() + 7),
+                QPointF(pole_x, button_rect.bottom() - 7),
+            )
+            flag = QPainterPath()
+            flag.moveTo(pole_x + 3, button_rect.top() + 8)
+            flag.lineTo(button_rect.right() - 10, button_rect.top() + 12)
+            flag.lineTo(pole_x + 3, button_rect.top() + button_rect.height() * 0.54)
+            flag.closeSubpath()
+            painter.fillPath(flag, QBrush(QColor(79, 255, 172, 245)))
+            painter.setPen(QPen(QColor(195, 255, 226, 245), 1.4))
+            painter.drawPath(flag)
+        elif self._action == "reject":
+            painter.setBrush(QBrush(QColor(58, 9, 13, 238)))
+            painter.setPen(QPen(QColor(255, 85, 98, 230), 1.6))
+            painter.drawRoundedRect(button_rect, 8, 8)
+
+            cross_rect = button_rect.adjusted(14, 10, -14, -10)
+            painter.setPen(QPen(QColor(255, 78, 91, 250), 4.2))
+            painter.drawLine(cross_rect.topLeft(), cross_rect.bottomRight())
+            painter.drawLine(cross_rect.bottomLeft(), cross_rect.topRight())
+            painter.setPen(QPen(QColor(255, 185, 190, 230), 1.5))
+            painter.drawLine(cross_rect.topLeft(), cross_rect.bottomRight())
+            painter.drawLine(cross_rect.bottomLeft(), cross_rect.topRight())
+
+        painter.restore()
+
+
 class CenterPreview(ShapeWidget):
     review_approve_requested = Signal(int)
     review_reject_requested = Signal(int)
@@ -1388,6 +1436,13 @@ class CenterPreview(ShapeWidget):
         self.review_table.setSelectionMode(QTableWidget.SelectionMode.NoSelection)
         self.review_table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
         self.review_table.setFont(QFont("Segoe UI", 12, QFont.Weight.Medium))
+        self.review_table.setItemDelegateForColumn(
+            3, ReviewActionDelegate("approve", self.review_table)
+        )
+        self.review_table.setItemDelegateForColumn(
+            4, ReviewActionDelegate("reject", self.review_table)
+        )
+        self.review_table.cellClicked.connect(self._handle_review_table_cell_clicked)
         review_header = self.review_table.horizontalHeader()
         review_header.setFont(QFont("Segoe UI", 12, QFont.Weight.Bold))
         review_header.setSectionResizeMode(0, QHeaderView.ResizeMode.Fixed)
@@ -1461,42 +1516,25 @@ class CenterPreview(ShapeWidget):
         self.zoom_in.clicked.connect(self.zoom_in_pdf)
         self.fit.clicked.connect(self.fit_pdf_width)
 
-    def _review_action_button(self, row: int, action: str) -> QPushButton:
-        if action == "approve":
-            button = QPushButton("✓", self.review_table)
-            button.setObjectName("reviewApproveButton")
-            button.setFont(QFont("Segoe UI Symbol", 24, QFont.Weight.Black))
-            button.setToolTip("Approve this proposed rename.")
-            glow = QGraphicsDropShadowEffect(button)
-            glow.setBlurRadius(18)
-            glow.setOffset(0, 0)
-            glow.setColor(QColor(90, 255, 185, 190))
-            button.setGraphicsEffect(glow)
-            button.clicked.connect(
-                lambda _checked=False, row=row: self.review_approve_requested.emit(row)
-            )
-            return button
-        if action == "reject":
-            button = QPushButton("×", self.review_table)
-            button.setObjectName("reviewRejectButton")
-            button.setFont(QFont("Segoe UI", 24, QFont.Weight.Black))
-            button.setToolTip("Reject this proposed rename.")
-            glow = QGraphicsDropShadowEffect(button)
-            glow.setBlurRadius(18)
-            glow.setOffset(0, 0)
-            glow.setColor(QColor(255, 70, 70, 190))
-            button.setGraphicsEffect(glow)
-            button.clicked.connect(
-                lambda _checked=False, row=row: self.review_reject_requested.emit(row)
-            )
-            return button
-        button = QPushButton("PDF", self.review_table)
-        button.setObjectName("reviewPreviewButton")
-        button.setToolTip("Open the PDF preview for this row.")
-        button.clicked.connect(
-            lambda _checked=False, row=row: self.review_preview_requested.emit(row)
-        )
-        return button
+        self._review_document_rows: list[int] = []
+
+    def _review_cell_item(self, tooltip: str, text: str = "") -> QTableWidgetItem:
+        item = QTableWidgetItem(text)
+        item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+        item.setToolTip(tooltip)
+        item.setFlags(Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable)
+        return item
+
+    def _handle_review_table_cell_clicked(self, table_row: int, column: int) -> None:
+        if table_row < 0 or table_row >= len(self._review_document_rows):
+            return
+        document_row = self._review_document_rows[table_row]
+        if column == 3:
+            self.review_approve_requested.emit(document_row)
+        elif column == 4:
+            self.review_reject_requested.emit(document_row)
+        elif column == 5:
+            self.review_preview_requested.emit(document_row)
 
     def shape_path(self) -> QPainterPath:
         r = self.rect().adjusted(3, 3, -3, -3)
@@ -1640,7 +1678,8 @@ class CenterPreview(ShapeWidget):
         self.review_approve_all.show()
         self.review_table.show()
         self.review_table.setRowCount(len(rows))
-        for table_row, (document_row, original, proposed_name, directory) in enumerate(
+        self._review_document_rows = [document_row for document_row, *_ in rows]
+        for table_row, (_document_row, original, proposed_name, directory) in enumerate(
             rows
         ):
             original_item = QTableWidgetItem(original)
@@ -1652,20 +1691,20 @@ class CenterPreview(ShapeWidget):
             self.review_table.setItem(table_row, 0, original_item)
             self.review_table.setItem(table_row, 1, proposed_item)
             self.review_table.setItem(table_row, 2, directory_item)
-            self.review_table.setCellWidget(
+            self.review_table.setItem(
                 table_row,
                 3,
-                self._review_action_button(document_row, "approve"),
+                self._review_cell_item("Approve this proposed rename."),
             )
-            self.review_table.setCellWidget(
+            self.review_table.setItem(
                 table_row,
                 4,
-                self._review_action_button(document_row, "reject"),
+                self._review_cell_item("Reject this proposed rename."),
             )
-            self.review_table.setCellWidget(
+            self.review_table.setItem(
                 table_row,
                 5,
-                self._review_action_button(document_row, "preview"),
+                self._review_cell_item("Open the PDF preview for this row.", "PDF"),
             )
             self.review_table.setRowHeight(table_row, 48)
         self.resizeEvent(None)
