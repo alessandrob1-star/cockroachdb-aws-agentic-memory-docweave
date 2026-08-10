@@ -19,6 +19,7 @@ from docweave.desktop.cockpit import (
     CockpitLineagePreview,
     CockpitWindow,
     Document,
+    RestoreMemoryEntry,
 )
 from docweave.desktop.scan import DesktopScanResult
 from docweave.discovery import DiscoveredFile, DiscoveryResult, DiscoveryStatus
@@ -1127,6 +1128,95 @@ def test_cockpit_restore_all_uses_visible_restore_table(
     assert not current_pdf.exists()
     assert "Restore batch completed: 1 file" in window.console.log_text.text()
     assert len(window._restore_audit_trail.events) == 2
+
+    close_cockpit_window(window)
+
+
+def test_cockpit_rehydrates_restore_rows_from_persistent_file_history(
+    qt_application: object,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    current_pdf = tmp_path / "DocWeave Organized" / "Invoices" / "invoice.pdf"
+    current_pdf.parent.mkdir(parents=True)
+    current_pdf.write_bytes(b"%PDF-1.4\n%persistent restore test\n")
+
+    monkeypatch.setattr(
+        cockpit_module,
+        "_read_restore_memory_entries",
+        lambda: (
+            RestoreMemoryEntry(
+                document_id="11111111-1111-4111-8111-111111111111",
+                proposal_id="22222222-2222-4222-8222-222222222222",
+                review_decision_id="33333333-3333-4333-8333-333333333333",
+                operation="rename_and_move",
+                previous_directory=".",
+                previous_filename="scan_001.pdf",
+                next_directory="DocWeave Organized/Invoices",
+                next_filename="invoice.pdf",
+            ),
+        ),
+    )
+
+    window = CockpitWindow(
+        runtime_preflight_function=ready_runtime_preflight_report,
+        integration_snapshot=RuntimeIntegrationSnapshot(
+            cockroachdb_configured=True,
+            bedrock_region="eu-central-1",
+            bedrock_model_id="anthropic.claude-3-5-sonnet-20240620-v1:0",
+        ),
+    )
+    window.set_authorized_root(tmp_path)
+    discovered = (
+        DiscoveredFile(
+            root=tmp_path,
+            absolute_path=current_pdf,
+            relative_path="DocWeave Organized/Invoices/invoice.pdf",
+            comparison_key="docweave organized/invoices/invoice.pdf",
+            status=DiscoveryStatus.CANDIDATE,
+            byte_size=current_pdf.stat().st_size,
+        ),
+    )
+    scan_result = DesktopScanResult(
+        root=tmp_path,
+        discovery=DiscoveryResult(
+            files=discovered,
+            scanned_roots=(tmp_path,),
+            limit_reached=False,
+        ),
+        intake=IntakeResult(
+            records=(
+                IntakeRecord(
+                    discovered_file=discovered[0],
+                    status=IntakeStatus.READY,
+                    reason=None,
+                    signature=None,
+                    fingerprint=None,
+                ),
+            )
+        ),
+    )
+
+    window._workspace.start_scan()
+    window._handle_scan_completed(scan_result)
+    window._set_busy(False)
+
+    document = window.left.document_at(0)
+    assert document is not None
+    assert document.status == "MOVED"
+    assert document.lineage_preview is not None
+    assert document.lineage_preview.original_relative_path == "scan_001.pdf"
+    assert document.lineage_preview.next_relative_path == (
+        "DocWeave Organized/Invoices/invoice.pdf"
+    )
+    assert window.console.buttons[5].isEnabled()
+
+    window.console.buttons[5].click()
+
+    assert not window.center.review_table.isHidden()
+    restore_target_item = window.center.review_table.item(0, 2)
+    assert restore_target_item is not None
+    assert restore_target_item.text() == "scan_001.pdf"
 
     close_cockpit_window(window)
 

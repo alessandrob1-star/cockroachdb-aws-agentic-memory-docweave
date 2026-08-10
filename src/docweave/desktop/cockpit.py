@@ -28,7 +28,7 @@ import shutil
 import subprocess
 import sys
 from collections.abc import Callable, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import UTC, datetime, timedelta
 from pathlib import Path, PurePosixPath
 from uuid import UUID, uuid4
@@ -85,10 +85,13 @@ from PySide6.QtWidgets import (
     QTableWidgetItem,
     QWidget,
 )
+from sqlalchemy import text as sql_text
+from sqlalchemy.exc import SQLAlchemyError
 
 from docweave.application_runtime import (
     RuntimeConfigurationError,
     RuntimeIntegrationSnapshot,
+    build_configured_review_decision_runtime,
     runtime_integration_snapshot,
 )
 from docweave.analysis import BedrockGatewayError
@@ -180,6 +183,41 @@ MUTED = QColor("#8FAAA1")
 ACCENT = QColor("#67D8B0")
 WARNING = QColor("#E1AB4D")
 DEFAULT_DEMO_DOCUMENT_FOLDER = Path(__file__).parents[3] / "pdf_sintetici"
+_RESTORE_MEMORY_QUERY = sql_text(
+    """
+    WITH latest_history AS (
+        SELECT
+            d.document_id,
+            h.proposal_id,
+            h.human_decision_id,
+            h.operation,
+            h.previous_directory,
+            h.previous_filename,
+            h.next_directory,
+            h.next_filename,
+            row_number() OVER (
+                PARTITION BY h.document_id
+                ORDER BY h.event_sequence DESC, h.occurred_at DESC
+            ) AS row_number
+        FROM docweave.file_history AS h
+        JOIN docweave.documents AS d
+            ON d.document_id = h.document_id
+        WHERE d.workspace_label = :workspace_label
+            AND h.status = 'succeeded'
+    )
+    SELECT
+        document_id,
+        proposal_id,
+        human_decision_id,
+        operation,
+        previous_directory,
+        previous_filename,
+        next_directory,
+        next_filename
+    FROM latest_history
+    WHERE row_number = 1
+    """
+)
 
 
 @dataclass(frozen=True)
@@ -211,6 +249,20 @@ class Document:
     proposal_fingerprint: str | None = None
     review_decision_id: str | None = None
     lineage_preview: CockpitLineagePreview | None = None
+
+
+@dataclass(frozen=True)
+class RestoreMemoryEntry:
+    """Latest durable file-history row used to rehydrate restore candidates."""
+
+    document_id: str
+    proposal_id: str
+    review_decision_id: str
+    operation: str
+    previous_directory: str
+    previous_filename: str
+    next_directory: str
+    next_filename: str
 
 
 @dataclass(frozen=True)
@@ -3167,6 +3219,7 @@ class CockpitWindow(QMainWindow):
             )
             for record in raw_result.intake.records
         ]
+        documents = self._rehydrate_restore_memory(documents)
         self.left.set_documents(documents)
         self.right.set_metrics(
             len(raw_result.discovery.files),
@@ -3177,6 +3230,70 @@ class CockpitWindow(QMainWindow):
             f"Scan complete: {len(raw_result.discovery.files)} files inspected. "
             "No files were changed."
         )
+
+    def _rehydrate_restore_memory(self, documents: list[Document]) -> list[Document]:
+        root = self.authorized_root
+        if root is None or not self._integration_snapshot.cockroachdb_configured:
+            return documents
+        try:
+            resolved_root = root.resolve(strict=True)
+            entries = _read_restore_memory_entries()
+        except (OSError, RuntimeConfigurationError, SQLAlchemyError, ValueError):
+            return documents
+        if not entries:
+            return documents
+        entries_by_current_path = {
+            _history_relative_path(entry.next_directory, entry.next_filename): entry
+            for entry in entries
+        }
+        rehydrated: list[Document] = []
+        for document in documents:
+            if document.path is None:
+                rehydrated.append(document)
+                continue
+            try:
+                current_relative_path = document.path.resolve(strict=True).relative_to(
+                    resolved_root
+                )
+            except (OSError, ValueError):
+                rehydrated.append(document)
+                continue
+            entry = entries_by_current_path.get(current_relative_path.as_posix())
+            if entry is None:
+                rehydrated.append(document)
+                continue
+            original_relative_path = _history_relative_path(
+                entry.previous_directory,
+                entry.previous_filename,
+            )
+            next_relative_path = _history_relative_path(
+                entry.next_directory,
+                entry.next_filename,
+            )
+            rehydrated.append(
+                replace(
+                    document,
+                    category=document.category
+                    if document.category != "PDF"
+                    else "restorable",
+                    status="MOVED",
+                    document_id=entry.document_id,
+                    proposal_id=entry.proposal_id,
+                    review_decision_id=entry.review_decision_id,
+                    lineage_preview=CockpitLineagePreview(
+                        action=entry.operation,
+                        original_relative_path=original_relative_path,
+                        previous_relative_path=original_relative_path,
+                        next_relative_path=next_relative_path,
+                        original_directory=entry.previous_directory,
+                        original_filename=entry.previous_filename,
+                        next_directory=entry.next_directory,
+                        next_filename=entry.next_filename,
+                        plan_fingerprint=entry.review_decision_id,
+                    ),
+                )
+            )
+        return rehydrated
 
     @Slot()
     def _handle_scan_cancelled(self) -> None:
@@ -4772,6 +4889,37 @@ def _review_memory_trace_detail(document: Document) -> str:
         f"Target {destination}; fingerprint {fingerprint}; "
         f"{_lineage_preview_label(document.lineage_preview)}."
     )
+
+
+def _read_restore_memory_entries() -> tuple[RestoreMemoryEntry, ...]:
+    runtime = build_configured_review_decision_runtime()
+    try:
+        with runtime.engine.connect() as connection:
+            rows = connection.execute(
+                _RESTORE_MEMORY_QUERY,
+                {"workspace_label": str(runtime.config.workspace_id)},
+            ).mappings()
+            return tuple(
+                RestoreMemoryEntry(
+                    document_id=str(row["document_id"]),
+                    proposal_id=str(row["proposal_id"]),
+                    review_decision_id=str(row["human_decision_id"]),
+                    operation=str(row["operation"]),
+                    previous_directory=str(row["previous_directory"]),
+                    previous_filename=str(row["previous_filename"]),
+                    next_directory=str(row["next_directory"]),
+                    next_filename=str(row["next_filename"]),
+                )
+                for row in rows
+            )
+    finally:
+        runtime.engine.dispose()
+
+
+def _history_relative_path(directory: str, filename: str) -> str:
+    if directory in {"", "."}:
+        return PurePosixPath(filename).as_posix()
+    return (PurePosixPath(directory) / filename).as_posix()
 
 
 def _cockpit_lineage_preview_from_item(
