@@ -15,7 +15,7 @@ human decision, file move, and restore path.
 ## Project Description
 
 DocWeave is not an AI file renamer. It is a human-governed document cockpit
-where CockroachDB is the agent's durable operational memory.
+where CockroachDB is the system of record for durable agent memory.
 
 The user opens a glass-effect desktop dashboard, chooses a folder full of
 opaque PDF names like `scan_000184.pdf` or `attachment_081.pdf`, and asks the

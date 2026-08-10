@@ -1,8 +1,8 @@
 # DocWeave
 
 **DocWeave is not an AI file renamer. It is an agentic document cockpit where
-CockroachDB is the agent's durable operational memory.** A user opens the
-glass-effect dashboard, chooses a folder full of opaque Portable Document
+CockroachDB is the system of record for durable agent memory.** A user opens
+the glass-effect dashboard, chooses a folder full of opaque Portable Document
 Format (PDF) names such as `scan_000184.pdf` or `attachment_081.pdf`, and lets
 document agents read, classify, explain, and propose a safer archive structure.
 Nothing is renamed by the model alone: the human approves each move, and
