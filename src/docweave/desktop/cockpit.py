@@ -1326,6 +1326,10 @@ class CenterPreview(ShapeWidget):
     review_reject_requested = Signal(int)
     review_preview_requested = Signal(int)
     review_approve_all_requested = Signal()
+    restore_approve_requested = Signal(int)
+    restore_reject_requested = Signal(int)
+    restore_preview_requested = Signal(int)
+    restore_approve_all_requested = Signal()
 
     def paintEvent(self, event) -> None:
         painter = QPainter(self)
@@ -1455,7 +1459,7 @@ class CenterPreview(ShapeWidget):
         self.review_approve_all = QPushButton("APPROVE ALL", self)
         self.review_approve_all.setObjectName("smallButton")
         self.review_approve_all.hide()
-        self.review_approve_all.clicked.connect(self.review_approve_all_requested)
+        self.review_approve_all.clicked.connect(self._handle_table_primary_action)
 
         self.review_table = QTableWidget(0, 6, self)
         self.review_table.setObjectName("reviewTable")
@@ -1548,6 +1552,13 @@ class CenterPreview(ShapeWidget):
         self.fit.clicked.connect(self.fit_pdf_width)
 
         self._review_document_rows: list[int] = []
+        self._review_table_mode = "review"
+
+    def _handle_table_primary_action(self) -> None:
+        if self._review_table_mode == "restore":
+            self.restore_approve_all_requested.emit()
+            return
+        self.review_approve_all_requested.emit()
 
     def _review_cell_item(self, tooltip: str, text: str = "") -> QTableWidgetItem:
         item = QTableWidgetItem(text)
@@ -1562,17 +1573,32 @@ class CenterPreview(ShapeWidget):
         document_row = self._review_document_rows[table_row]
         if column == 3:
             self._mark_review_row_feedback(table_row, "approve")
+            if self._review_table_mode == "restore":
+                QTimer.singleShot(
+                    140,
+                    lambda row=document_row: self.restore_approve_requested.emit(row),
+                )
+                return
             QTimer.singleShot(
                 140,
                 lambda row=document_row: self.review_approve_requested.emit(row),
             )
         elif column == 4:
             self._mark_review_row_feedback(table_row, "reject")
+            if self._review_table_mode == "restore":
+                QTimer.singleShot(
+                    140,
+                    lambda row=document_row: self.restore_reject_requested.emit(row),
+                )
+                return
             QTimer.singleShot(
                 140,
                 lambda row=document_row: self.review_reject_requested.emit(row),
             )
         elif column == 5:
+            if self._review_table_mode == "restore":
+                self.restore_preview_requested.emit(document_row)
+                return
             self.review_preview_requested.emit(document_row)
 
     def _mark_review_row_feedback(self, table_row: int, action: str) -> None:
@@ -1631,12 +1657,20 @@ class CenterPreview(ShapeWidget):
         reject_width = 58
         preview_width = 72
         action_width = approve_width + reject_width + preview_width
-        original_width = min(230, max(170, int(table_width * 0.16)))
-        directory_width = min(360, max(220, int(table_width * 0.24)))
-        proposed_width = max(
-            260,
-            table_width - original_width - directory_width - action_width - 28,
-        )
+        if self._review_table_mode == "restore":
+            original_width = min(430, max(300, int(table_width * 0.30)))
+            directory_width = min(430, max(300, int(table_width * 0.28)))
+            proposed_width = max(
+                300,
+                table_width - original_width - directory_width - action_width - 28,
+            )
+        else:
+            original_width = min(230, max(170, int(table_width * 0.16)))
+            directory_width = min(360, max(220, int(table_width * 0.24)))
+            proposed_width = max(
+                260,
+                table_width - original_width - directory_width - action_width - 28,
+            )
         self.review_table.setColumnWidth(0, original_width)
         self.review_table.setColumnWidth(1, proposed_width)
         self.review_table.setColumnWidth(2, directory_width)
@@ -1714,6 +1748,32 @@ class CenterPreview(ShapeWidget):
 
     def show_review_table(self, rows: list[tuple[int, str, str, str]]) -> None:
         """Replace the PDF preview with a batch decision table."""
+        self._review_table_mode = "review"
+        self.review_title.setText("BATCH REVIEW")
+        self.review_approve_all.setText("APPROVE ALL")
+        self.review_table.setHorizontalHeaderLabels(
+            ["PDF NAME", "PROPOSED NAME", "SUGGESTED DIRECTORY", "✓", "×", "PDF"]
+        )
+        self._show_decision_table(rows)
+
+    def show_restore_table(self, rows: list[tuple[int, str, str, str]]) -> None:
+        """Replace the PDF preview with a restore decision table."""
+        self._review_table_mode = "restore"
+        self.review_title.setText("RESTORE REVIEW")
+        self.review_approve_all.setText("RESTORE ALL")
+        self.review_table.setHorizontalHeaderLabels(
+            [
+                "CURRENT PDF NAME",
+                "CURRENT DIRECTORY",
+                "ORIGINAL DIRECTORY / NAME",
+                "✓",
+                "×",
+                "PDF",
+            ]
+        )
+        self._show_decision_table(rows)
+
+    def _show_decision_table(self, rows: list[tuple[int, str, str, str]]) -> None:
         self._geometry_animation.stop()
         self.opacity_animation.stop()
         self.opacity_effect.setOpacity(1.0)
@@ -2578,6 +2638,7 @@ class CockpitWindow(QMainWindow):
         self._selected_document_row: int | None = None
         self._review_ledger = InMemoryReviewDecisionLedger()
         self._restore_audit_trail = AppendOnlyAuditTrail()
+        self._restore_skipped_rows: set[int] = set()
         self._workspace = DesktopWorkspaceSession()
 
         self.setWindowTitle("DocWeave Cockpit")
@@ -2643,6 +2704,10 @@ class CockpitWindow(QMainWindow):
         self.center.review_reject_requested.connect(self._reject_review_row)
         self.center.review_preview_requested.connect(self._preview_review_row)
         self.center.review_approve_all_requested.connect(self._approve_all_review_rows)
+        self.center.restore_approve_requested.connect(self._restore_review_row)
+        self.center.restore_reject_requested.connect(self._skip_restore_review_row)
+        self.center.restore_preview_requested.connect(self._preview_restore_row)
+        self.center.restore_approve_all_requested.connect(self._restore_all_review_rows)
         self.console.buttons[3].setEnabled(False)
         self.console.buttons[3].setToolTip(
             "Run configured classification for ready PDFs."
@@ -3679,18 +3744,104 @@ class CockpitWindow(QMainWindow):
         )
 
     @Slot()
-    def _open_restore_for_selected(self) -> None:
-        document = self._selected_restorable_document()
-        if document is None or document.lineage_preview is None:
-            self._set_status(
-                "Select a moved document with retained file history before restore."
-            )
+    def _open_restore_for_selected(
+        self,
+        empty_status: str | None = (
+            "No moved documents with retained file history to restore."
+        ),
+    ) -> None:
+        rows = self._restore_review_rows()
+        if not rows:
+            if self._review_expanded:
+                self._set_review_expanded(False)
+                self.center.review_title.hide()
+                self.center.review_approve_all.hide()
+                self.center.review_table.hide()
+                self.center.resizeEvent(None)
+            if empty_status is not None:
+                self._set_status(empty_status)
             return
-        row = self._selected_document_row
+        self._set_review_expanded(True)
+        self.center.show_restore_table(rows)
+        self._set_status(
+            f"Restore review ready: {len(rows)} moved PDF(s) awaiting decision."
+        )
+        self.right.set_events(
+            [
+                ("RESTORE", f"{len(rows)} pending candidates"),
+                ("ACTION", "Restore, skip, or preview per row"),
+                ("MEMORY", "file_history lineage drives restore"),
+            ]
+        )
+
+    def _restore_review_rows(self) -> list[tuple[int, str, str, str]]:
+        rows: list[tuple[int, str, str, str]] = []
         root = self.authorized_root
-        if row is None or root is None:
-            self._set_status("Restore blocked: no authorized root is active.")
+        if root is None:
+            return rows
+        for row in range(self.left.document_count):
+            if row in self._restore_skipped_rows:
+                continue
+            document = self.left.document_at(row)
+            if (
+                document is None
+                or document.status not in {"APPROVED", "MOVED"}
+                or document.path is None
+                or document.lineage_preview is None
+            ):
+                continue
+            try:
+                document.path.resolve(strict=True).relative_to(
+                    root.resolve(strict=True)
+                )
+            except (OSError, ValueError):
+                continue
+            lineage = document.lineage_preview
+            current_directory = lineage.next_directory or "."
+            original_target = str(
+                PurePosixPath(lineage.original_directory or ".")
+                / lineage.original_filename
+            )
+            rows.append((row, document.path.name, current_directory, original_target))
+        return rows
+
+    @Slot(int)
+    def _restore_review_row(self, row: int) -> None:
+        self._execute_restore_for_row(row)
+        self._open_restore_for_selected(empty_status=None)
+
+    @Slot(int)
+    def _skip_restore_review_row(self, row: int) -> None:
+        self._restore_skipped_rows.add(row)
+        self._open_restore_for_selected()
+        self._set_status("Restore skipped for selected row; no files were changed.")
+
+    @Slot(int)
+    def _preview_restore_row(self, row: int) -> None:
+        self._close_batch_review(preview_row=row)
+
+    @Slot()
+    def _restore_all_review_rows(self) -> None:
+        rows = [row for row, *_ in self._restore_review_rows()]
+        if not rows:
+            self._set_status("No restore candidates remain.")
             return
+        restored = 0
+        for row in rows:
+            if self._execute_restore_for_row(row):
+                restored += 1
+        self._open_restore_for_selected(empty_status=None)
+        self._set_status(f"Restore batch completed: {restored} file(s) restored.")
+
+    def _execute_restore_for_row(self, row: int) -> bool:
+        document = self.left.document_at(row)
+        root = self.authorized_root
+        if document is None or document.lineage_preview is None:
+            self._set_status("Restore blocked: missing retained file history.")
+            return False
+        if root is None:
+            self._set_status("Restore blocked: no authorized root is active.")
+            return False
         try:
             original_plan, original_result = self._restore_original_operation_for(
                 document,
@@ -3701,7 +3852,7 @@ class CockpitWindow(QMainWindow):
             self._set_status(
                 f"Restore blocked before preview ({error.__class__.__name__})."
             )
-            return
+            return False
         if not restore_plan.is_ready:
             self._set_status(f"Restore blocked safely: {restore_plan.reason.value}.")
             self.center.show_memory_trace(
@@ -3712,7 +3863,7 @@ class CockpitWindow(QMainWindow):
                     f"reason: {restore_plan.reason.value}."
                 ),
             )
-            return
+            return False
         restore_id = str(uuid4())
         approved_at = datetime.now(UTC)
         approval = approve_restore_plan(
@@ -3759,7 +3910,7 @@ class CockpitWindow(QMainWindow):
                     f"original {document.lineage_preview.original_relative_path}."
                 ),
             )
-            return
+            return False
         restored_path = root / document.lineage_preview.original_relative_path
         self.left.record_review_decision(
             row,
@@ -3792,6 +3943,7 @@ class CockpitWindow(QMainWindow):
                 ("AUDIT", f"{len(self._restore_audit_trail.events)} restore events"),
             ]
         )
+        return True
 
     def _record_selected_review_decision(  # noqa: PLR0911
         self,
@@ -3981,9 +4133,7 @@ class CockpitWindow(QMainWindow):
             _classification_preflight_block(self._runtime_preflight_report) is None
         )
         batch_review_ready = self.left.count_status("REVIEW") > 0 and not blocked
-        selected_restore_ready = (
-            self._selected_restorable_document() is not None and not blocked
-        )
+        restore_ready = bool(self._restore_review_rows()) and not blocked
         self.console.buttons[0].setEnabled(not blocked)
         self.console.buttons[1].setEnabled(
             not blocked and self.authorized_root is not None
@@ -4001,7 +4151,7 @@ class CockpitWindow(QMainWindow):
                 "Retry runtime preflight and analyze when configuration is ready."
             )
         self.console.buttons[4].setEnabled(batch_review_ready)
-        self.console.buttons[5].setEnabled(selected_restore_ready)
+        self.console.buttons[5].setEnabled(restore_ready)
         self.console.lateral_screens_button.setEnabled(not blocked)
         if batch_review_ready:
             self.console.buttons[4].setToolTip(
@@ -4011,13 +4161,13 @@ class CockpitWindow(QMainWindow):
             self.console.buttons[4].setToolTip(
                 "Analyze documents before opening batch review."
             )
-        if selected_restore_ready:
+        if restore_ready:
             self.console.buttons[5].setToolTip(
-                "Open restore preview from retained file history."
+                "Open the restore review table from retained file history."
             )
         else:
             self.console.buttons[5].setToolTip(
-                "Select a moved document with retained file history before restore."
+                "Move/approve documents before opening restore review."
             )
 
     def _set_status(self, message: str) -> None:

@@ -1043,6 +1043,29 @@ def test_cockpit_restore_button_uses_moved_document_history(
 
     window.console.buttons[5].click()
 
+    assert not window.center.review_table.isHidden()
+    assert window.center.review_title.text() == "RESTORE REVIEW"
+    assert window.center.review_approve_all.text() == "RESTORE ALL"
+    assert window.center.review_table.rowCount() == 1
+    current_header = window.center.review_table.horizontalHeaderItem(0)
+    current_name_item = window.center.review_table.item(0, 0)
+    current_directory_item = window.center.review_table.item(0, 1)
+    original_target_item = window.center.review_table.item(0, 2)
+    assert current_header is not None
+    assert current_name_item is not None
+    assert current_directory_item is not None
+    assert original_target_item is not None
+    assert current_header.text() == "CURRENT PDF NAME"
+    assert current_name_item.text() == "invoice.pdf"
+    assert current_directory_item.text() == "DocWeave Organized/Invoices"
+    assert original_target_item.text() == "scan_001.pdf"
+    assert current_pdf.exists()
+
+    window.center.review_table.cellClicked.emit(0, 3)
+    loop = QEventLoop()
+    QTimer.singleShot(190, loop.quit)
+    loop.exec()
+
     restored_pdf = tmp_path / original_relative
     assert restored_pdf.exists()
     assert not current_pdf.exists()
@@ -1056,6 +1079,54 @@ def test_cockpit_restore_button_uses_moved_document_history(
     assert document.status == "RESTORED"
     assert document.path == restored_pdf
     assert document.name == "scan_001.pdf"
+
+    close_cockpit_window(window)
+
+
+def test_cockpit_restore_all_uses_visible_restore_table(
+    qt_application: object,
+    tmp_path: Path,
+) -> None:
+    current_pdf = tmp_path / "DocWeave Organized" / "Invoices" / "invoice.pdf"
+    current_pdf.parent.mkdir(parents=True)
+    current_pdf.write_bytes(b"%PDF-1.4\n%restore all test\n")
+
+    window = CockpitWindow(runtime_preflight_function=ready_runtime_preflight_report)
+    window.set_authorized_root(tmp_path)
+    window.left.set_documents(
+        [
+            Document(
+                name=current_pdf.name,
+                category="invoice",
+                pages="2",
+                status="MOVED",
+                path=current_pdf,
+                lineage_preview=CockpitLineagePreview(
+                    action="rename_and_move",
+                    original_relative_path="scan_001.pdf",
+                    previous_relative_path="scan_001.pdf",
+                    next_relative_path="DocWeave Organized/Invoices/invoice.pdf",
+                    original_directory=".",
+                    original_filename="scan_001.pdf",
+                    next_directory="DocWeave Organized/Invoices",
+                    next_filename="invoice.pdf",
+                    plan_fingerprint="b" * 64,
+                ),
+            )
+        ]
+    )
+    window._set_busy(False)
+
+    window.console.buttons[5].click()
+    assert not window.center.review_table.isHidden()
+
+    window.center.review_approve_all.click()
+
+    restored_pdf = tmp_path / "scan_001.pdf"
+    assert restored_pdf.exists()
+    assert not current_pdf.exists()
+    assert "Restore batch completed: 1 file" in window.console.log_text.text()
+    assert len(window._restore_audit_trail.events) == 2
 
     close_cockpit_window(window)
 
