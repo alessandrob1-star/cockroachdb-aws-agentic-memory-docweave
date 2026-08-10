@@ -1049,6 +1049,48 @@ def test_cockpit_enables_restore_after_analyze_when_memory_is_available(
     close_cockpit_window(window)
 
 
+def test_cockpit_restore_click_opens_empty_review_surface_after_analyze(
+    qt_application: object,
+    tmp_path: Path,
+) -> None:
+    reviewed_pdf = tmp_path / "incoming.pdf"
+    reviewed_pdf.write_bytes(b"%PDF-1.4\n%review candidate\n")
+    window = CockpitWindow(
+        runtime_preflight_function=ready_runtime_preflight_report,
+        integration_snapshot=RuntimeIntegrationSnapshot(
+            cockroachdb_configured=True,
+            bedrock_region="eu-central-1",
+            bedrock_model_id="anthropic.claude-3-5-sonnet-20240620-v1:0",
+        ),
+    )
+    window.set_authorized_root(tmp_path)
+    window.left.set_documents(
+        [
+            Document(
+                name=reviewed_pdf.name,
+                category="invoice",
+                pages="2",
+                status="REVIEW",
+                path=reviewed_pdf,
+                proposal_fingerprint="b" * 64,
+            )
+        ]
+    )
+    window._set_busy(False)
+
+    window.console.buttons[5].click()
+
+    assert not window.center.review_table.isHidden()
+    assert window.center.review_title.text() == "RESTORE REVIEW"
+    assert window.center.review_table.rowCount() == 1
+    empty_item = window.center.review_table.item(0, 0)
+    assert empty_item is not None
+    assert "No moved documents" in empty_item.text()
+    assert "No moved documents" in window.console.log_text.text()
+
+    close_cockpit_window(window)
+
+
 def test_cockpit_restore_button_uses_moved_document_history(
     qt_application: object,
     tmp_path: Path,

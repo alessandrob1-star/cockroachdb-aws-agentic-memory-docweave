@@ -1825,6 +1825,37 @@ class CenterPreview(ShapeWidget):
         )
         self._show_decision_table(rows)
 
+    def show_restore_empty(self, message: str) -> None:
+        """Open the restore review surface even when no rows are restorable."""
+        self._review_table_mode = "restore"
+        self.review_title.setText("RESTORE REVIEW")
+        self.review_approve_all.setText("RESTORE ALL")
+        self.review_table.setHorizontalHeaderLabels(
+            [
+                "CURRENT PDF NAME",
+                "CURRENT DIRECTORY",
+                "ORIGINAL DIRECTORY / NAME",
+                "✓",
+                "×",
+                "PDF",
+            ]
+        )
+        self._show_decision_table([])
+        self.review_approve_all.hide()
+        self.review_table.setRowCount(1)
+        self._review_document_rows = []
+        empty_item = QTableWidgetItem(message)
+        empty_item.setFlags(Qt.ItemFlag.ItemIsEnabled)
+        empty_item.setTextAlignment(
+            Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignVCenter
+        )
+        empty_item.setForeground(QBrush(QColor(255, 232, 232, 255)))
+        empty_item.setBackground(QBrush(QColor(16, 23, 27, 230)))
+        self.review_table.setItem(0, 0, empty_item)
+        self.review_table.setSpan(0, 0, 1, self.review_table.columnCount())
+        self.review_table.setRowHeight(0, 78)
+        self.resizeEvent(None)
+
     def _show_decision_table(self, rows: list[tuple[int, str, str, str]]) -> None:
         self._geometry_animation.stop()
         self.opacity_animation.stop()
@@ -2747,7 +2778,9 @@ class CockpitWindow(QMainWindow):
         self.console.buttons[2].clicked.connect(self.cancel_scan)
         self.console.buttons[3].clicked.connect(self._analyze_selected_document)
         self.console.buttons[4].clicked.connect(self._open_batch_review)
-        self.console.buttons[5].clicked.connect(self._open_restore_for_selected)
+        self.console.buttons[5].clicked.connect(
+            lambda _checked=False: self._open_restore_for_selected()
+        )
         self.console.bedrock_button.clicked.connect(self._handle_bedrock_button_clicked)
         self.console.lateral_screens_button.clicked.connect(
             self._toggle_lateral_screens
@@ -3870,14 +3903,17 @@ class CockpitWindow(QMainWindow):
         self._refresh_restore_memory_from_visible_documents()
         rows = self._restore_review_rows()
         if not rows:
-            if self._review_expanded:
-                self._set_review_expanded(False)
-                self.center.review_title.hide()
-                self.center.review_approve_all.hide()
-                self.center.review_table.hide()
-                self.center.resizeEvent(None)
             if empty_status is not None:
                 self._set_status(empty_status)
+                self._set_review_expanded(True)
+                self.center.show_restore_empty(empty_status)
+                self.right.set_events(
+                    [
+                        ("RESTORE", "No restorable PDFs found"),
+                        ("MEMORY", "No matching moved file_history rows"),
+                        ("ACTION", "Analyze, approve moves, then restore"),
+                    ]
+                )
             return
         self._set_review_expanded(True)
         self.center.show_restore_table(rows)
