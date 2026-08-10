@@ -1310,6 +1310,99 @@ def test_cockpit_rehydrates_restore_rows_from_persistent_file_history(
     close_cockpit_window(window)
 
 
+def test_cockpit_restores_when_user_selects_organized_folder(
+    qt_application: object,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    organized_root = tmp_path / "DocWeave Organized"
+    current_pdf = organized_root / "Invoices" / "invoice.pdf"
+    current_pdf.parent.mkdir(parents=True)
+    current_pdf.write_bytes(b"%PDF-1.4\n%organized root restore test\n")
+
+    monkeypatch.setattr(
+        cockpit_module,
+        "_read_restore_memory_entries",
+        lambda: (
+            RestoreMemoryEntry(
+                document_id="11111111-1111-4111-8111-111111111111",
+                proposal_id="22222222-2222-4222-8222-222222222222",
+                review_decision_id="33333333-3333-4333-8333-333333333333",
+                operation="rename_and_move",
+                previous_directory=".",
+                previous_filename="scan_001.pdf",
+                next_directory="DocWeave Organized/Invoices",
+                next_filename="invoice.pdf",
+            ),
+        ),
+    )
+
+    window = CockpitWindow(
+        runtime_preflight_function=ready_runtime_preflight_report,
+        integration_snapshot=RuntimeIntegrationSnapshot(
+            cockroachdb_configured=True,
+            bedrock_region="eu-central-1",
+            bedrock_model_id="anthropic.claude-3-5-sonnet-20240620-v1:0",
+        ),
+    )
+    window.set_authorized_root(organized_root)
+    discovered = (
+        DiscoveredFile(
+            root=organized_root,
+            absolute_path=current_pdf,
+            relative_path="Invoices/invoice.pdf",
+            comparison_key="invoices/invoice.pdf",
+            status=DiscoveryStatus.CANDIDATE,
+            byte_size=current_pdf.stat().st_size,
+        ),
+    )
+    scan_result = DesktopScanResult(
+        root=organized_root,
+        discovery=DiscoveryResult(
+            files=discovered,
+            scanned_roots=(organized_root,),
+            limit_reached=False,
+        ),
+        intake=IntakeResult(
+            records=(
+                IntakeRecord(
+                    discovered_file=discovered[0],
+                    status=IntakeStatus.READY,
+                    reason=None,
+                    signature=None,
+                    fingerprint=None,
+                ),
+            )
+        ),
+    )
+
+    window._workspace.start_scan()
+    window._handle_scan_completed(scan_result)
+    window._set_busy(False)
+
+    document = window.left.document_at(0)
+    assert document is not None
+    assert document.status == "MOVED"
+    assert document.lineage_preview is not None
+    assert window.console.buttons[5].isEnabled()
+
+    window.console.buttons[5].click()
+
+    assert not window.center.review_table.isHidden()
+    assert window.center.review_table.rowCount() == 1
+    restore_target_item = window.center.review_table.item(0, 2)
+    assert restore_target_item is not None
+    assert restore_target_item.text() == "scan_001.pdf"
+
+    window.center.review_approve_all.click()
+
+    restored_pdf = tmp_path / "scan_001.pdf"
+    assert restored_pdf.exists()
+    assert not current_pdf.exists()
+
+    close_cockpit_window(window)
+
+
 def test_cockpit_opens_batch_review_table_from_approve_button(  # noqa: PLR0915
     qt_application: object,
 ) -> None:

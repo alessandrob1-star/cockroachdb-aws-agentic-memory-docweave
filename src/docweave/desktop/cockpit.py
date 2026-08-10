@@ -3275,7 +3275,7 @@ class CockpitWindow(QMainWindow):
             return documents
         if not entries:
             return documents
-        entries_by_current_path = {
+        entries_by_selected_path = {
             _history_relative_path(entry.next_directory, entry.next_filename): entry
             for entry in entries
         }
@@ -3285,13 +3285,14 @@ class CockpitWindow(QMainWindow):
                 rehydrated.append(document)
                 continue
             try:
-                current_relative_path = document.path.resolve(strict=True).relative_to(
-                    resolved_root
-                )
+                current_path = document.path.resolve(strict=True)
+                current_relative_path = current_path.relative_to(resolved_root)
             except (OSError, ValueError):
                 rehydrated.append(document)
                 continue
-            entry = entries_by_current_path.get(current_relative_path.as_posix())
+            entry = entries_by_selected_path.get(current_relative_path.as_posix())
+            if entry is None:
+                entry = _restore_memory_entry_for_current_path(current_path, entries)
             if entry is None:
                 rehydrated.append(document)
                 continue
@@ -4524,7 +4525,7 @@ class CockpitWindow(QMainWindow):
         lineage = document.lineage_preview
         if lineage is None or document.path is None:
             raise ValueError("restore lineage is incomplete")
-        resolved_root = root.resolve(strict=True)
+        resolved_root = _restore_workspace_root_for_document(document, root)
         original_path = (resolved_root / lineage.original_relative_path).resolve(
             strict=False,
         )
@@ -4980,6 +4981,66 @@ def _history_relative_path(directory: str, filename: str) -> str:
     if directory in {"", "."}:
         return PurePosixPath(filename).as_posix()
     return (PurePosixPath(directory) / filename).as_posix()
+
+
+def _restore_memory_entry_for_current_path(
+    current_path: Path,
+    entries: tuple[RestoreMemoryEntry, ...],
+) -> RestoreMemoryEntry | None:
+    for entry in entries:
+        next_relative_path = _history_relative_path(
+            entry.next_directory,
+            entry.next_filename,
+        )
+        if _path_has_relative_suffix(current_path, next_relative_path):
+            return entry
+    return None
+
+
+def _restore_workspace_root_for_document(
+    document: Document, fallback_root: Path
+) -> Path:
+    lineage = document.lineage_preview
+    if lineage is None or document.path is None:
+        return fallback_root.resolve(strict=True)
+    current_path = document.path.resolve(strict=True)
+    inferred_root = _workspace_root_from_current_path(
+        current_path,
+        lineage.next_relative_path,
+    )
+    if inferred_root is not None:
+        return inferred_root
+    return fallback_root.resolve(strict=True)
+
+
+def _workspace_root_from_current_path(
+    current_path: Path,
+    current_relative_path: str,
+) -> Path | None:
+    relative_parts = _posix_relative_parts(current_relative_path)
+    if not _path_has_relative_suffix(current_path, current_relative_path):
+        return None
+    root = current_path
+    for _part in relative_parts:
+        root = root.parent
+    return root
+
+
+def _path_has_relative_suffix(path: Path, relative_path: str) -> bool:
+    relative_parts = _posix_relative_parts(relative_path)
+    if not relative_parts:
+        return False
+    path_parts = tuple(part.casefold() for part in path.parts)
+    suffix_parts = tuple(part.casefold() for part in relative_parts)
+    return len(path_parts) >= len(suffix_parts) and path_parts[
+        -len(suffix_parts) :
+    ] == (suffix_parts)
+
+
+def _posix_relative_parts(relative_path: str) -> tuple[str, ...]:
+    return tuple(
+        part for part in PurePosixPath(relative_path).parts if part not in {"", "."}
+    )
 
 
 def _cockpit_lineage_preview_from_item(
