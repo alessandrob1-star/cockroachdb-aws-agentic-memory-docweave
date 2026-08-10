@@ -1,12 +1,13 @@
 # DocWeave
 
-**DocWeave is an agentic memory cockpit for messy business documents.** A user
-opens the glass-effect dashboard, chooses a folder full of opaque Portable
-Document Format (PDF) names such as `scan_000184.pdf` or `attachment_081.pdf`,
-and lets document agents read, classify, explain, and propose a safer archive
-structure. Nothing is renamed by the model alone: the human approves each move,
-and CockroachDB remembers the original filename, original directory, proposed
-name, approval decision, and restore path.
+**DocWeave is not an AI file renamer. It is an agentic document cockpit where
+CockroachDB is the agent's durable operational memory.** A user opens the
+glass-effect dashboard, chooses a folder full of opaque Portable Document
+Format (PDF) names such as `scan_000184.pdf` or `attachment_081.pdf`, and lets
+document agents read, classify, explain, and propose a safer archive structure.
+Nothing is renamed by the model alone: the human approves each move, and
+CockroachDB remembers the original filename, original directory, model
+proposal, approval decision, executed path change, and restore path.
 
 ```text
 messy folder -> PDF extraction -> Bedrock proposal -> CockroachDB memory -> human approval -> safe rename/move -> one-click restore
@@ -16,10 +17,10 @@ The visible product is the dashboard, not a chat box. The left screen shows the
 selected folder, the center screen previews the PDF and model evidence, and the
 right screen shows live memory/runtime status. After analysis, the center
 screen becomes a review table: original PDF name, proposed filename, suggested
-directory, approve/reject controls, and preview buttons. The restore view uses
-CockroachDB `file_history` to answer the practical question a real user asks
-after cleanup: **"What was this file called before, and where did it come
-from?"**
+directory, approve/reject controls, and preview buttons. The restore view is
+the point of the project: CockroachDB `file_history` lets the agent answer the
+practical question a real user asks after cleanup: **"What was this file called
+before, and where did it come from?"**
 
 ## Hackathon Proof In One Screen
 
@@ -27,7 +28,7 @@ from?"**
 | --- | --- |
 | Agentic application | PDF extraction plus Amazon Bedrock produces class, evidence, metadata, destination folder, and filename proposals. |
 | Human-governed actions | The model cannot mutate files. The dashboard records approval/rejection before any rename or move. |
-| CockroachDB persistent memory | Six judge-visible tables store documents, agent runs, proposals, human decisions, file history, and optional relationships. |
+| CockroachDB persistent memory | Six judge-visible tables store the full document lifecycle: what the agent saw, what it proposed, what the human decided, what moved, and how to restore it. |
 | CockroachDB Tool #1 | `ccloud` Command-Line Interface (CLI) verifies the live CockroachDB Cloud serverless cluster `docweave-memory` on AWS `eu-central-1`. |
 | CockroachDB Tool #2 | CockroachDB Agent Skills repository guided schema and transaction design: primary keys, idempotent writes, proposal locking, and bounded `40001` retry handling. |
 | AWS deployment | CloudFormation deploys Amazon Bedrock permissions, AWS Lambda API/worker, Amazon S3 artifacts, Amazon SQS jobs, Amazon API Gateway, Amazon CloudWatch Logs, and AWS Secrets Manager dynamic references. |
