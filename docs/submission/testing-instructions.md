@@ -26,12 +26,6 @@ Public repository:
 https://github.com/alessandrob1-star/cockroachdb-aws-agentic-memory-docweave
 ```
 
-Repository pull request with the current submission branch:
-
-```text
-https://github.com/alessandrob1-star/cockroachdb-aws-agentic-memory-docweave/pull/118
-```
-
 ## Local Dashboard Test
 
 ```powershell
