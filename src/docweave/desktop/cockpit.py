@@ -3867,6 +3867,7 @@ class CockpitWindow(QMainWindow):
             "No moved documents with retained file history to restore."
         ),
     ) -> None:
+        self._refresh_restore_memory_from_visible_documents()
         rows = self._restore_review_rows()
         if not rows:
             if self._review_expanded:
@@ -3890,6 +3891,16 @@ class CockpitWindow(QMainWindow):
                 ("MEMORY", "file_history lineage drives restore"),
             ]
         )
+
+    def _refresh_restore_memory_from_visible_documents(self) -> None:
+        documents = [
+            document
+            for row in range(self.left.document_count)
+            if (document := self.left.document_at(row)) is not None
+        ]
+        rehydrated = self._rehydrate_restore_memory(documents)
+        if rehydrated != documents:
+            self.left.set_documents(rehydrated)
 
     def _restore_review_rows(self) -> list[tuple[int, str, str, str]]:
         rows: list[tuple[int, str, str, str]] = []
@@ -3949,6 +3960,19 @@ class CockpitWindow(QMainWindow):
                 restored += 1
         self._open_restore_for_selected(empty_status=None)
         self._set_status(f"Restore batch completed: {restored} file(s) restored.")
+
+    def _restore_button_ready(self, *, blocked: bool) -> bool:
+        if blocked or self.authorized_root is None:
+            return False
+        if self._restore_review_rows():
+            return True
+        cockroachdb_status = _cockroachdb_status(
+            self._runtime_preflight_report,
+            self._integration_snapshot,
+        )
+        return _runtime_config_status(
+            self._runtime_preflight_report
+        ) == "Ready" and cockroachdb_status in {"Reachable", "Configured"}
 
     def _execute_restore_for_row(self, row: int) -> bool:
         document = self.left.document_at(row)
@@ -4250,7 +4274,7 @@ class CockpitWindow(QMainWindow):
             _classification_preflight_block(self._runtime_preflight_report) is None
         )
         batch_review_ready = self.left.count_status("REVIEW") > 0 and not blocked
-        restore_ready = bool(self._restore_review_rows()) and not blocked
+        restore_ready = self._restore_button_ready(blocked=blocked)
         self.console.buttons[0].setEnabled(not blocked)
         self.console.buttons[1].setEnabled(
             not blocked and self.authorized_root is not None
@@ -4753,7 +4777,7 @@ def _restore_history_status(
     if cockroachdb_status in {"Reachable", "Configured"}:
         return (
             "Read-only CockroachDB restore history reader is available; "
-            "no restore action is wired."
+            "dashboard restore review can use retained file history."
         )
     return f"Restore history reader blocked: CockroachDB {cockroachdb_status.lower()}."
 

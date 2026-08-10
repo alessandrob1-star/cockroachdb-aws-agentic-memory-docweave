@@ -219,6 +219,9 @@ def test_cockpit_starts_with_definitive_local_surface(
     assert "Read-only CockroachDB restore history reader is available" in (
         window.right.restore_text.text()
     )
+    assert "dashboard restore review can use retained file history" in (
+        window.right.restore_text.text()
+    )
 
     close_cockpit_window(window)
 
@@ -958,7 +961,14 @@ def test_cockpit_records_local_rejection_without_file_mutation(
 ) -> None:
     corpus = Path("pdf_sintetici").resolve(strict=True)
     first_pdf = sorted(corpus.glob("*.pdf"))[0]
-    window = CockpitWindow(runtime_preflight_function=ready_runtime_preflight_report)
+    window = CockpitWindow(
+        runtime_preflight_function=ready_runtime_preflight_report,
+        integration_snapshot=RuntimeIntegrationSnapshot(
+            cockroachdb_configured=False,
+            bedrock_region="eu-central-1",
+            bedrock_model_id="anthropic.claude-3-5-sonnet-20240620-v1:0",
+        ),
+    )
     window.set_authorized_root(corpus)
     window.left.set_documents(
         [
@@ -998,6 +1008,43 @@ def test_cockpit_records_local_rejection_without_file_mutation(
         window.center.memory_summary.text()
     )
     assert "Local review ledger" in window.center.memory_detail.text()
+
+    close_cockpit_window(window)
+
+
+def test_cockpit_enables_restore_after_analyze_when_memory_is_available(
+    qt_application: object,
+    tmp_path: Path,
+) -> None:
+    reviewed_pdf = tmp_path / "incoming.pdf"
+    reviewed_pdf.write_bytes(b"%PDF-1.4\n%review candidate\n")
+    window = CockpitWindow(
+        runtime_preflight_function=ready_runtime_preflight_report,
+        integration_snapshot=RuntimeIntegrationSnapshot(
+            cockroachdb_configured=True,
+            bedrock_region="eu-central-1",
+            bedrock_model_id="anthropic.claude-3-5-sonnet-20240620-v1:0",
+        ),
+    )
+    window.set_authorized_root(tmp_path)
+    window.left.set_documents(
+        [
+            Document(
+                name=reviewed_pdf.name,
+                category="invoice",
+                pages="2",
+                status="REVIEW",
+                path=reviewed_pdf,
+                proposal_fingerprint="a" * 64,
+            )
+        ]
+    )
+
+    window._set_busy(False)
+
+    assert window.console.buttons[4].isEnabled()
+    assert window.console.buttons[5].isEnabled()
+    assert "restore review table" in window.console.buttons[5].toolTip()
 
     close_cockpit_window(window)
 
