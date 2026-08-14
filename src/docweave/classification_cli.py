@@ -4,8 +4,9 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import sys
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from enum import StrEnum
@@ -13,7 +14,7 @@ from pathlib import Path
 from typing import Literal, Protocol
 from uuid import UUID, uuid5
 
-from docweave.analysis import BedrockClassificationRun
+from docweave.analysis import BedrockClassificationRun, CandidateMetadata
 from docweave.analysis.confidence import compute_uncalibrated_confidence
 from docweave.application_runtime import (
     ConfiguredClassificationRuntime,
@@ -43,6 +44,18 @@ from docweave.persistence.simple_memory_repository import (
 
 _IDENTITY_NAMESPACE = UUID("7f5461df-2c2f-4f8d-b504-83ddf8e0d00a")
 _MAX_BATCH_SIZE = 1_000
+_BACKFILL_FIELD_LABELS = {
+    "document_id": ("Document ID",),
+    "dossier_id": ("Dossier ID",),
+    "issue_date": ("Issue date",),
+    "due_date": ("Due date",),
+    "payment_reference": ("Settlement reference", "Payment reference"),
+    "matched_document": ("Matched document",),
+}
+_DOCUMENT_ID_PATTERN = re.compile(
+    r"\b(?:INV|PO|PAY|DN|REC|DOS|REF)-20\d{2}-\d{4}\b",
+    re.IGNORECASE,
+)
 
 BatchItemStatus = Literal["succeeded", "failed"]
 
@@ -418,6 +431,7 @@ def _classify_pdf_once_with_runtime(
             extraction_status=extraction.status,
         )
     model_run = configured.gateway.classify(extraction.pages)
+    model_run = _enrich_model_run_metadata(model_run, extraction.pages)
     confidence = compute_uncalibrated_confidence(model_run.proposal, extraction)
     disposition = _persist_simple_analysis(
         configured,
@@ -575,6 +589,73 @@ def batch_main(argv: list[str] | None = None) -> int:
             return 2
         print(f"JSON report: {args.json_report}")
     return 1 if result.failed_count else 0
+
+
+def _enrich_model_run_metadata(
+    model_run: BedrockClassificationRun,
+    pages: tuple[ExtractedPage, ...],
+) -> BedrockClassificationRun:
+    """Backfill stable document metadata from already extracted PDF text."""
+    existing_keys = {
+        _metadata_key(item.name)
+        for item in model_run.proposal.candidate_metadata
+        if item.value.strip()
+    }
+    backfilled: list[CandidateMetadata] = []
+    for key, labels in _BACKFILL_FIELD_LABELS.items():
+        if key in existing_keys:
+            continue
+        value = _first_label_value(pages, labels)
+        if value is None and key == "document_id":
+            value = _first_document_identifier(pages)
+        if value is None:
+            continue
+        backfilled.append(
+            CandidateMetadata(name=key, value=value, evidence_ids=())
+        )
+        existing_keys.add(key)
+    if not backfilled:
+        return model_run
+    proposal = replace(
+        model_run.proposal,
+        candidate_metadata=(
+            *model_run.proposal.candidate_metadata,
+            *tuple(backfilled),
+        ),
+    )
+    return replace(model_run, proposal=proposal)
+
+
+def _first_label_value(
+    pages: tuple[ExtractedPage, ...],
+    labels: tuple[str, ...],
+) -> str | None:
+    for page in pages:
+        lines = tuple(line.strip() for line in page.text.splitlines())
+        for index, line in enumerate(lines[:-1]):
+            if line.casefold() not in {label.casefold() for label in labels}:
+                continue
+            for candidate in lines[index + 1 : index + 4]:
+                if candidate and candidate.casefold() not in {
+                    "field",
+                    "value",
+                    "issuer",
+                    "customer",
+                }:
+                    return candidate[:120]
+    return None
+
+
+def _first_document_identifier(pages: tuple[ExtractedPage, ...]) -> str | None:
+    for page in pages:
+        match = _DOCUMENT_ID_PATTERN.search(page.text)
+        if match is not None:
+            return match.group(0).upper()
+    return None
+
+
+def _metadata_key(value: str) -> str:
+    return "_".join(value.strip().casefold().replace("-", "_").split())
 
 
 def _command_result_from_run(  # noqa: PLR0913

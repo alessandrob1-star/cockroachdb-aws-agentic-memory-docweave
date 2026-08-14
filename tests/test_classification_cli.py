@@ -28,6 +28,7 @@ from docweave.classification_cli import (
     build_content_addressed_identity,
     discover_batch_pdfs,
 )
+from docweave.extraction import ExtractedPage
 from docweave.persistence.contracts import PersistenceDisposition
 
 
@@ -192,6 +193,64 @@ def test_command_result_includes_validated_evidence_details() -> None:
     assert result.metadata_details[0].value == "ACME SRL"
     assert result.metadata_details[0].evidence_ids == ("ev_2",)
     assert result.retry_attempts == 1
+
+
+def test_model_run_metadata_backfill_uses_extracted_document_id() -> None:
+    model_run = BedrockClassificationRun(
+        proposal=ClassificationProposal(
+            contract_version="classification.v1",
+            taxonomy_version="docweave_mvp_v0_1",
+            proposed_class=TaxonomyClass.PAYMENT_NOTICE,
+            document_language="en",
+            rationale="Payment confirmation is explicit.",
+            rationale_evidence_ids=("ev_1",),
+            evidence=(
+                EvidenceReference(
+                    evidence_id="ev_1",
+                    page_index=0,
+                    quote="Payment confirmation is explicit.",
+                    supports=("classification",),
+                ),
+            ),
+            candidate_metadata=(),
+            alternative_classes=(),
+            contradictions=(),
+            missing_expected_evidence=(),
+            raw_signals=RawClassificationSignals(
+                classification_strength=SignalStrength.STRONG,
+                evidence_coverage=SignalStrength.STRONG,
+                ambiguity=SignalStrength.WEAK,
+            ),
+            abstention_reason=None,
+        ),
+        provenance=BedrockRunProvenance(
+            region_name="eu-central-1",
+            model_id="eu.amazon.nova-2-lite-v1:0",
+            contract_version="classification.v1",
+            taxonomy_version="docweave_mvp_v0_1",
+            stop_reason="tool_use",
+            usage=BedrockUsage(10, 5, 15),
+            service_latency_ms=100,
+            observed_duration_ms=110,
+            request_id="request-123",
+            retry_attempts=0,
+            estimated_cost_usd=None,
+        ),
+    )
+    pages = (
+        ExtractedPage(
+            page_index=0,
+            page_label="1",
+            text="PAYMENT CONFIRMATION\nDocument ID\nPAY-2026-0053\n",
+        ),
+    )
+
+    enriched = classification_cli._enrich_model_run_metadata(model_run, pages)
+
+    metadata = {
+        item.name: item.value for item in enriched.proposal.candidate_metadata
+    }
+    assert metadata["document_id"] == "PAY-2026-0053"
 
 
 def test_main_reports_configuration_errors_without_secret_values(

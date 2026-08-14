@@ -78,6 +78,30 @@ def test_uses_validated_metadata_for_more_meaningful_filename(
     assert proposal.plan.is_ready
 
 
+def test_uses_generic_document_id_when_specific_metadata_is_missing(
+    tmp_path: Path,
+) -> None:
+    source = tmp_path / "attachment_118.pdf"
+    write_file(source)
+
+    proposal = propose_safe_organization_copy(
+        source_path=source,
+        authorized_root=tmp_path,
+        proposed_class="payment_notice",
+        metadata={
+            "document_id": "PAY-2026-0053",
+            "dossier_id": "DOS-2026-006",
+            "settlement_amount": "EUR 1,213.42",
+        },
+    )
+
+    assert proposal.destination_relative_path == (
+        f"{ORGANIZED_ROOT_FOLDER}/Payment Notices/"
+        "payment-notice_pay-2026-0053.pdf"
+    )
+    assert proposal.plan.is_ready
+
+
 def test_sanitizes_dangerous_pdf_filename(tmp_path: Path) -> None:
     source = tmp_path / "invoice:ACME*Q1?.pdf"
     write_file(source)

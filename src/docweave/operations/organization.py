@@ -65,7 +65,11 @@ _FILENAME_METADATA_PRIORITY = (
     "purchase_order_number",
     "contract_number",
     "payment_reference",
+    "document_id",
+    "document_number",
+    "document_reference",
     "reference",
+    "issue_date",
     "date",
     "due_date",
 )
