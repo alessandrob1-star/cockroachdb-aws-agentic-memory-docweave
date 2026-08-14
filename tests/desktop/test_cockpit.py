@@ -631,6 +631,53 @@ def test_cockpit_blocks_analyze_when_runtime_preflight_failed(
     close_cockpit_window(window)
 
 
+def test_cockpit_analyze_click_explains_when_no_ready_pdfs(
+    qt_application: object,
+) -> None:
+    corpus = Path("pdf_sintetici").resolve(strict=True)
+    first_pdf = sorted(corpus.glob("*.pdf"))[0]
+    calls = 0
+
+    def unexpected_classification(
+        source_path: Path,
+        authorized_root: Path,
+    ) -> ClassificationCommandResult:
+        nonlocal calls
+        calls += 1
+        raise AssertionError("classification should not start")
+
+    window = CockpitWindow(
+        classification_function=unexpected_classification,
+        runtime_preflight_function=ready_runtime_preflight_report,
+    )
+    window.set_authorized_root(corpus)
+    window.left.set_documents(
+        [
+            Document(
+                name=first_pdf.name,
+                category="restorable",
+                pages="-",
+                status="MOVED",
+                path=first_pdf,
+            )
+        ]
+    )
+    window._selected_document_row = 0
+    window._set_busy(False)
+
+    assert window.console.buttons[3].isEnabled()
+    assert "No READY PDFs" in window.console.buttons[3].toolTip()
+
+    window._analyze_selected_document()
+
+    assert calls == 0
+    assert "No ready PDFs are available for classification" in (
+        window.console.log_text.text()
+    )
+
+    close_cockpit_window(window)
+
+
 def test_cockpit_retries_runtime_preflight_before_analyze(
     qt_application: object,
 ) -> None:

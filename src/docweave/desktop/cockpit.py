@@ -4318,12 +4318,17 @@ class CockpitWindow(QMainWindow):
         )
         self.console.buttons[2].setEnabled(self.scan_in_progress)
         self.console.buttons[3].setEnabled(
-            not blocked and self._ready_document_count() > 0
+            not blocked and self.left.document_count > 0
         )
         if analysis_ready:
-            self.console.buttons[3].setToolTip(
-                "Run configured classification for all visible ready PDFs."
-            )
+            if self._ready_document_count() > 0:
+                self.console.buttons[3].setToolTip(
+                    "Run configured classification for all visible ready PDFs."
+                )
+            else:
+                self.console.buttons[3].setToolTip(
+                    "No READY PDFs are available; scan another folder or restore files."
+                )
         else:
             self.console.buttons[3].setToolTip(
                 "Retry runtime preflight and analyze when configuration is ready."
