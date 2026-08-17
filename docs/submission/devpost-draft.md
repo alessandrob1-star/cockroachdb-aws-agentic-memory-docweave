@@ -1,7 +1,6 @@
 # Devpost Submission Draft
 
-Use this as copy-ready submission text. Replace `TODO_VIDEO_URL` only after the
-public YouTube or Vimeo video is uploaded.
+Use this as copy-ready submission text.
 
 ## Project Name
 
@@ -108,7 +107,7 @@ testing instructions below.
 
 ## Demo Video URL
 
-TODO_VIDEO_URL
+https://youtu.be/p1QFV6ahOJo
 
 ## Testing Instructions
 
@@ -160,8 +159,9 @@ CockroachDB persistence work together from the deployed cloud environment.
 - A live AWS deployment using Bedrock, Lambda, S3, SQS, API Gateway, CloudWatch,
   and Secrets Manager dynamic references.
 - 100 synthetic PDFs with deliberately poor filenames for repeatable judging.
-- Local test suite: 552 tests passing with 87% coverage on the latest verified
-  run.
+- The full local quality gate covers formatting, linting, strict type checking,
+  tests, and branch coverage; current results are recorded after each release
+  verification rather than hard-coded into the submission.
 
 ## What's Next
 

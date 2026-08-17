@@ -247,9 +247,7 @@ def test_model_run_metadata_backfill_uses_extracted_document_id() -> None:
 
     enriched = classification_cli._enrich_model_run_metadata(model_run, pages)
 
-    metadata = {
-        item.name: item.value for item in enriched.proposal.candidate_metadata
-    }
+    metadata = {item.name: item.value for item in enriched.proposal.candidate_metadata}
     assert metadata["document_id"] == "PAY-2026-0053"
 
 

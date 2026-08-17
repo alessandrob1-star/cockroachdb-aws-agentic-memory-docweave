@@ -1609,6 +1609,40 @@ def test_center_review_action_cell_shows_click_feedback(
     center.close()
 
 
+def test_center_review_table_clears_empty_restore_span(
+    qt_application: object,
+) -> None:
+    center = CenterPreview()
+    center.resize(900, 420)
+    center.set_target_rect(center.rect())
+
+    center.show_restore_empty("No moved documents with retained file history.")
+    assert center.review_table.columnSpan(0, 0) == center.review_table.columnCount()
+
+    center.show_review_table(
+        [
+            (
+                7,
+                "attachment_118.pdf",
+                "payment-notice_pay-2026-0053.pdf",
+                "DocWeave Organized/Payment Notices",
+            )
+        ]
+    )
+    cast(QApplication, qt_application).processEvents()
+
+    first_original = center.review_table.item(0, 0)
+    first_proposed = center.review_table.item(0, 1)
+    assert center.review_table.rowSpan(0, 0) == 1
+    assert center.review_table.columnSpan(0, 0) == 1
+    assert first_original is not None
+    assert first_proposed is not None
+    assert first_original.text() == "attachment_118.pdf"
+    assert first_proposed.text() == "payment-notice_pay-2026-0053.pdf"
+    assert center.review_table.item(0, 3) is not None
+    center.close()
+
+
 def test_cockpit_records_durable_review_decision_when_proposal_id_is_available(
     qt_application: object,
     tmp_path: Path,

@@ -18,6 +18,8 @@ back to their original name and position.
 messy SME folder -> PDF text extraction -> Bedrock rename/folder proposal -> human selects some or all -> CockroachDB memory -> safe move -> restore original name/path
 ```
 
+**[Watch the complete DocWeave demo on YouTube (under three minutes)](https://youtu.be/p1QFV6ahOJo)**
+
 The visible product is the dashboard, not a chat box. The left screen shows the
 selected folder, the center screen previews the PDF and model evidence, and the
 right screen shows live memory/runtime status. After analysis, the center
@@ -42,6 +44,8 @@ before, and where did it come from?"**
 | Live cloud memory proof | AWS Lambda classified `scan_000184.pdf` with Amazon Bedrock and persisted the result to CockroachDB on 2026-08-10. |
 | Sample data | `pdf_sintetici` contains 100 synthetic PDFs with deliberately unhelpful filenames for realistic folder cleanup. |
 
+![DocWeave architecture connecting the document agents, CockroachDB persistent memory, and AWS services](docs/assets/docweave-architecture-diagram.png)
+
 ## Agent Memory Model
 
 CockroachDB is the durable memory layer, not a side log. The memory agent writes
@@ -63,19 +67,6 @@ That is the core loop: **large language model understanding, human authority,
 and persistent path memory**. DocWeave remains useful after the files move
 because CockroachDB can still explain why a PDF has its current name and how to
 restore it.
-
-## Submission Fit
-
-| Requirement | DocWeave evidence |
-| --- | --- |
-| Agentic application | Bedrock reads extracted PDF text and proposes class, metadata, evidence, destination folder, and filename. |
-| CockroachDB as persistent memory | CockroachDB stores documents, Bedrock runs, proposals, human decisions, and before/after file history. |
-| Deployed on AWS | CloudFormation deploys Lambda API/worker, S3 artifacts, SQS queue, API Gateway, CloudWatch Logs, Bedrock permissions, and Secrets Manager dynamic references. |
-| AWS services identified | Amazon Bedrock; AWS Lambda; Amazon S3; Amazon SQS; Amazon API Gateway; Amazon CloudWatch Logs; AWS Secrets Manager dynamic references. |
-| CockroachDB tools identified | `ccloud` CLI inspects the live `docweave-memory` CockroachDB Cloud cluster; CockroachDB Agent Skills review schema and transaction design. |
-| Demo must show memory layer | The dashboard and SQL queries show original filename, current filename, proposal, human decision, and file history in CockroachDB. |
-| Open-source license | MIT license in [`LICENSE`](LICENSE). |
-| Testing instructions | [`docs/submission/testing-instructions.md`](docs/submission/testing-instructions.md). |
 
 ## AWS Services
 
@@ -127,7 +118,7 @@ persistedClassificationCount: 1
 resultArtifactCount: 1
 ```
 
-In a four-minute demo:
+In the demo video:
 
 1. Start the cockpit and choose a messy PDF folder.
 2. Click Analyze. Bedrock produces a structured proposal and CockroachDB records
@@ -163,14 +154,31 @@ python -m venv .venv
 .\.venv\Scripts\docweave-desktop.exe
 ```
 
-On this workstation, `launch-docweave-dashboard.cmd` delegates to the approved
-runtime launcher when present so runtime values stay outside the repository.
+Before analysis, configure your own CockroachDB Cloud connection and AWS
+credentials. Copy the variable names from [`.env.example`](.env.example), set
+them in the current shell, and create the six-table schema:
+
+```powershell
+$env:DOCWEAVE_DATABASE_URL = "cockroachdb://USER:PASSWORD@HOST:26257/docweave?sslmode=verify-full"
+$env:DOCWEAVE_WORKSPACE_ID = "11111111-1111-4111-8111-111111111111"
+$env:DOCWEAVE_TAXONOMY_VERSION_ID = "22222222-2222-4222-8222-222222222222"
+$env:DOCWEAVE_APPROVED_BY_ACTOR_ID = "33333333-3333-4333-8333-333333333333"
+$env:AWS_PROFILE = "YOUR_AWS_PROFILE"
+.\.venv\Scripts\python -m alembic upgrade head
+.\.venv\Scripts\docweave-runtime-preflight.exe --database
+```
+
+The AWS identity must be able to invoke the configured Amazon Nova model in
+Amazon Bedrock in `eu-central-1`. `launch-docweave-dashboard.cmd` is only a
+Windows convenience launcher; it does not contain credentials.
 
 ## Functional Demo Endpoint
 
 ```text
 https://76824l7ub1.execute-api.eu-central-1.amazonaws.com/dev/health
 ```
+
+Demo video: [https://youtu.be/p1QFV6ahOJo](https://youtu.be/p1QFV6ahOJo)
 
 Testing instructions for judges are in
 [`docs/submission/testing-instructions.md`](docs/submission/testing-instructions.md).

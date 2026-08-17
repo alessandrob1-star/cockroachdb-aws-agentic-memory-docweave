@@ -610,9 +610,7 @@ def _enrich_model_run_metadata(
             value = _first_document_identifier(pages)
         if value is None:
             continue
-        backfilled.append(
-            CandidateMetadata(name=key, value=value, evidence_ids=())
-        )
+        backfilled.append(CandidateMetadata(name=key, value=value, evidence_ids=()))
         existing_keys.add(key)
     if not backfilled:
         return model_run

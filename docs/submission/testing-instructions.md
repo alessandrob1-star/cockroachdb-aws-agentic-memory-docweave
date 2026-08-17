@@ -35,6 +35,22 @@ python -m venv .venv
 .\.venv\Scripts\docweave-desktop.exe
 ```
 
+To run live analysis, set the variables documented in [`.env.example`](../../.env.example)
+in the current shell, authenticate to AWS, and initialize the schema:
+
+```powershell
+$env:DOCWEAVE_DATABASE_URL = "cockroachdb://USER:PASSWORD@HOST:26257/docweave?sslmode=verify-full"
+$env:DOCWEAVE_WORKSPACE_ID = "11111111-1111-4111-8111-111111111111"
+$env:DOCWEAVE_TAXONOMY_VERSION_ID = "22222222-2222-4222-8222-222222222222"
+$env:DOCWEAVE_APPROVED_BY_ACTOR_ID = "33333333-3333-4333-8333-333333333333"
+$env:AWS_PROFILE = "YOUR_AWS_PROFILE"
+.\.venv\Scripts\python -m alembic upgrade head
+.\.venv\Scripts\docweave-runtime-preflight.exe --database
+```
+
+The AWS identity needs Amazon Bedrock model invocation access in
+`eu-central-1`. Do not commit real database credentials or AWS keys.
+
 Demo flow:
 
 1. Choose `pdf_sintetici`.

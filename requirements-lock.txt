@@ -19,7 +19,7 @@ pluggy==1.6.0
 psycopg==3.3.4
 psycopg-binary==3.3.4
 Pygments==2.20.0
-pytest==8.4.1
+pytest==9.0.3
 pytest-cov==6.2.1
 python-dateutil==2.9.0.post0
 PySide6==6.11.1

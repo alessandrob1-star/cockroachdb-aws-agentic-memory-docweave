@@ -96,8 +96,7 @@ def test_uses_generic_document_id_when_specific_metadata_is_missing(
     )
 
     assert proposal.destination_relative_path == (
-        f"{ORGANIZED_ROOT_FOLDER}/Payment Notices/"
-        "payment-notice_pay-2026-0053.pdf"
+        f"{ORGANIZED_ROOT_FOLDER}/Payment Notices/payment-notice_pay-2026-0053.pdf"
     )
     assert proposal.plan.is_ready
 

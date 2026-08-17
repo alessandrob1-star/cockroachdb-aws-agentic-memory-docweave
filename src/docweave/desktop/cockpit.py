@@ -1876,6 +1876,8 @@ class CenterPreview(ShapeWidget):
         self.review_title.show()
         self.review_approve_all.show()
         self.review_table.show()
+        self.review_table.clearSpans()
+        self.review_table.clearContents()
         self.review_table.setRowCount(len(rows))
         self._review_document_rows = [document_row for document_row, *_ in rows]
         for table_row, (_document_row, original, proposed_name, directory) in enumerate(
@@ -4317,9 +4319,7 @@ class CockpitWindow(QMainWindow):
             not blocked and self.authorized_root is not None
         )
         self.console.buttons[2].setEnabled(self.scan_in_progress)
-        self.console.buttons[3].setEnabled(
-            not blocked and self.left.document_count > 0
-        )
+        self.console.buttons[3].setEnabled(not blocked and self.left.document_count > 0)
         if analysis_ready:
             if self._ready_document_count() > 0:
                 self.console.buttons[3].setToolTip(

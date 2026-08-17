@@ -8,7 +8,7 @@ version = "0.1.0"
 description = "Human-governed agentic document management with CockroachDB memory and AWS deployment."
 readme = "README.md"
 requires-python = ">=3.12"
-license = { text = "License not selected yet" }
+license = "MIT"
 authors = [
   { name = "DocWeave contributors" },
 ]
@@ -36,7 +36,7 @@ docweave-runtime-preflight = "docweave.runtime_preflight:main"
 dev = [
   "alembic==1.18.5",
   "mypy==1.17.1",
-  "pytest==8.4.1",
+  "pytest==9.0.3",
   "pytest-cov==6.2.1",
   "ruff==0.12.5",
 ]
