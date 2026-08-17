@@ -7,9 +7,10 @@ very ordinary mess of folders full of files called `scan_000184.pdf`,
 each PDF, proposes clear filenames and destination folders, and lets the human
 approve all proposals or only selected files.
 
-The model never mutates files by itself. The glass-effect dashboard shows PDF
-previews, model evidence, batch review controls, and per-row approve/reject
-actions. CockroachDB is the system of record for the persistent memory agent:
+The model never mutates files by itself. The advanced PySide6 glass-effect
+dashboard shows PDF previews, model evidence, batch review controls, and
+per-row approve/reject actions. CockroachDB is the system of record for the
+persistent memory agent:
 it remembers the original filename, original directory, model proposal, human
 decision, executed path change, and restore path, so renamed PDFs can be moved
 back to their original name and position.
