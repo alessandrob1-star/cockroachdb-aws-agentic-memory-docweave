@@ -2,6 +2,10 @@
 
 DocWeave is a desktop-first hackathon project with an AWS cloud API slice.
 
+For a clean-machine setup, CockroachDB Cloud database creation, Amazon Bedrock
+access, and optional deployment of every AWS service, follow the
+[`complete installation guide`](../complete-installation-guide.md).
+
 ## What To Test First
 
 Use the public synthetic corpus in `pdf_sintetici`. It contains 100 fake PDFs
@@ -39,7 +43,7 @@ To run live analysis, set the variables documented in [`.env.example`](../../.en
 in the current shell, authenticate to AWS, and initialize the schema:
 
 ```powershell
-$env:DOCWEAVE_DATABASE_URL = "cockroachdb://USER:PASSWORD@HOST:26257/docweave?sslmode=verify-full"
+$env:DOCWEAVE_DATABASE_URL = "cockroachdb+psycopg://USER:PASSWORD@HOST:26257/docweave?sslmode=verify-full"
 $env:DOCWEAVE_WORKSPACE_ID = "11111111-1111-4111-8111-111111111111"
 $env:DOCWEAVE_TAXONOMY_VERSION_ID = "22222222-2222-4222-8222-222222222222"
 $env:DOCWEAVE_APPROVED_BY_ACTOR_ID = "33333333-3333-4333-8333-333333333333"
