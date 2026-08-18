@@ -32,6 +32,43 @@ before, and where did it come from?"**
 
 ![DocWeave dashboard showing a Bedrock proposal, CockroachDB memory trace, PDF preview, and batch classification status](docs/assets/docweave-dashboard-memory-trace.png)
 
+## Screenshot Sequence
+
+![After choosing a folder and running Scan, DocWeave mirrors the PDFs from the local directory inside the cockpit with live preview.](docs/assets/docweave-screenshot-01-folder-scan.png)
+
+After choosing a folder and running Scan, DocWeave mirrors the PDFs from the
+local directory inside the cockpit with live preview.
+
+![DocWeave analyzes 9 PDFs with Bedrock, proposes classes and safer filenames, and persists memory traces in CockroachDB for human review.](docs/assets/docweave-screenshot-02-batch-analysis-memory.png)
+
+DocWeave analyzes 9 PDFs with Bedrock, proposes classes and safer filenames,
+and persists memory traces in CockroachDB for human review.
+
+![DocWeave presents 9 proposed renames and folders for human review, requiring explicit approval before changing files.](docs/assets/docweave-screenshot-03-human-review.png)
+
+DocWeave presents 9 proposed renames and folders for human review, requiring
+explicit approval before changing files.
+
+![After human approval, DocWeave creates category folders, moves the renamed PDFs into them, and keeps a restore review ready for rollback.](docs/assets/docweave-screenshot-04-approved-organization.png)
+
+After human approval, DocWeave creates category folders, moves the renamed PDFs
+into them, and keeps a restore review ready for rollback.
+
+![DocWeave's restore review maps moved PDFs back to original names and locations, letting the user approve or reject rollback before restore.](docs/assets/docweave-screenshot-05-restore-review.png)
+
+DocWeave's restore review maps moved PDFs back to original names and locations,
+letting the user approve or reject rollback before restore.
+
+![After restore approval, DocWeave restores all 9 PDFs to their original folder and filenames using persistent file history.](docs/assets/docweave-screenshot-06-restore-complete.png)
+
+After restore approval, DocWeave restores all 9 PDFs to their original folder
+and filenames using persistent file history.
+
+![DocWeave combines CockroachDB memory with AWS runtime to analyze folders, require approval, move files safely, and restore from history.](docs/assets/docweave-screenshot-07-architecture-summary.png)
+
+DocWeave combines CockroachDB memory with AWS runtime to analyze folders,
+require approval, move files safely, and restore from history.
+
 ## Hackathon Proof In One Screen
 
 | Requirement | DocWeave evidence |
