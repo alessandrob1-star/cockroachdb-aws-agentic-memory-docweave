@@ -34,4 +34,4 @@ sqlalchemy-cockroachdb==2.0.4
 trove-classifiers==2026.6.1.19
 typing_extensions==4.16.0
 tzdata==2026.3
-urllib3==2.7.0
+urllib3==2.8.0
